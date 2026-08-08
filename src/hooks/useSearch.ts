@@ -104,7 +104,7 @@ export const useSearch = () => {
         } finally {
           setLoading(false);
         }
-      }, 300);
+      }, 150);
 
       return () => clearTimeout(timer);
     },
