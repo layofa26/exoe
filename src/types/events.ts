@@ -26,7 +26,6 @@ export interface Event {
     lat?: number
     lng?: number
   }
-  virtualLink?: string // Zoom/Google Meet link
   
   // Streaming Live (Jitsi Meet)
   streaming?: {

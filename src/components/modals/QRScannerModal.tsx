@@ -119,15 +119,15 @@ export default function QRScannerModal({ isOpen, onClose, eventId, eventTitle }:
             <button
               onClick={() => setMode('manual')}
               className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'manual' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                mode === 'manual' ? 'bg-white text-gray-900' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
               }`}
             >
-              Manuel
+              Mode manuel
             </button>
             <button
               onClick={() => setMode('camera')}
               className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'camera' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                mode === 'camera' ? 'bg-white text-gray-900' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
               }`}
             >
               Caméra

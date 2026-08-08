@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
-import { useLocation, NavLink, Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Home, Calendar, Inbox, Heart
+  Home, Calendar, Inbox, Heart, Plus, Video, Camera, X
 } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
+import { UploadVideo } from '../video/UploadVideo'
+import CameraRecord from '../video/CameraRecord'
+import { getCurrentUserId } from '../../services/apiClient'
 
 interface NavItem {
   to: string
@@ -21,6 +24,10 @@ export const ProSidebar = (): JSX.Element | null => {
   const [isCreatingEvent, setIsCreatingEvent] = useState(false)
   const [isUploadingVideo, setIsUploadingVideo] = useState(false)
   const [newRequestsCount, setNewRequestsCount] = useState(0)
+  const [showCreateMenu, setShowCreateMenu] = useState(false)
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false)
+  const [cameraVideoData, setCameraVideoData] = useState<{ videoFile: File, videoUrl: string, thumbnail: string } | null>(null)
 
   useEffect(() => {
     const checkGlobalUIState = () => {
@@ -43,33 +50,57 @@ export const ProSidebar = (): JSX.Element | null => {
   }, [])
 
   useEffect(() => {
-    const loadUnreadRequests = () => {
-      const savedRequests = localStorage.getItem('exile_requests')
-      if (savedRequests) {
-        const requests = JSON.parse(savedRequests)
-        const currentUserId = 'current-user-123'
-        const pendingCount = requests.filter((r: any) =>
-          r.receiverId === currentUserId && r.status === 'pending'
-        ).length
-        setNewRequestsCount(pendingCount)
+    const loadUnreadRequests = async () => {
+      const currentUserId = getCurrentUserId()
+      if (!currentUserId) {
+        setNewRequestsCount(0)
+        return
+      }
+
+      try {
+        const token = localStorage.getItem('accessToken')
+        if (!token) return
+
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+        const response = await fetch(`${API_BASE_URL}/demande/demandes/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const pendingCount = data.filter((r: any) =>
+            r.receiver === currentUserId && r.status === 'pending'
+          ).length
+          setNewRequestsCount(pendingCount)
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des demandes:', error)
+        setNewRequestsCount(0)
       }
     }
 
     loadUnreadRequests()
-    window.addEventListener('storage', loadUnreadRequests)
-    return () => window.removeEventListener('storage', loadUnreadRequests)
   }, [location.pathname])
 
   const handleLogout = () => {
     logout()
   }
 
+  // Fonction de navigation avec stockage de la page d'origine
+  const handleNavigate = (path: string) => {
+    localStorage.setItem('exile_previous_page', '/pro')
+    navigate(path)
+  }
+
   const isManagementPage = [
     '/pro/profile',
-    '/pro/dashboard',
     '/pro/statistics',
     '/pro/calendar',
-    '/pro/my-videos'
+    '/pro/my-videos',
+    '/pro/drafts'
   ].some(path => location.pathname.startsWith(path))
 
   const isLiveRoom = location.pathname.includes('/live')
@@ -78,104 +109,234 @@ export const ProSidebar = (): JSX.Element | null => {
   // FIX: Kache ak CSS olye return null pou evite re-render ki redirijte
   const shouldHide = isManagementPage || isLiveRoom || isCreatingEvent || isUploadingVideo || isPreviewPage
 
+  const handleCameraRecordComplete = (videoData: { videoFile: File, videoUrl: string, thumbnail: string }) => {
+    setCameraVideoData(videoData)
+    setIsCameraModalOpen(false)
+    setIsUploadModalOpen(true)
+  }
+
+  // Vérifier l'authentification avant d'ouvrir les modals
+  const checkAuthAndOpen = (action: () => void) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+    action()
+  }
+
   const navItems: NavItem[] = [
     { to: '/pro', label: 'Accueil', icon: Home },
-    { to: '/pro/events', label: 'Événements', icon: Calendar },
+    { to: '/pro/requests', label: 'Demandes', icon: Inbox },
   ]
 
   const navItemsRight: NavItem[] = [
-    { to: '/pro/requests', label: 'Demandes', icon: Inbox },
+    { to: '/pro/events', label: 'Événements', icon: Calendar },
     { to: '/pro/subscriptions', label: 'Abonnement', icon: Heart },
   ]
 
   return (
     <div style={{ display: shouldHide ? 'none' : 'contents' }}>
-      {/* Mobile: Bottom navigation */}
-      <div className={`md:hidden fixed bottom-4 left-4 right-4 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl z-[10000] safe-area-pb backdrop-blur-md shadow-lg`}>
-        <nav className="flex justify-around items-center h-16 px-4">
+      {/* Mobile & Tablet: Bottom navigation - 4 carrés style YouTube mobile */}
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border-t z-[10000]`}>
+        <nav className="flex justify-around items-center h-16">
           {navItems.map((item) => (
-            <NavLink
+            <button
               key={item.to}
-              to={item.to}
-              end={item.to === '/pro'}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center py-2 px-3 min-w-[70px] rounded-xl transition-all ${
-                  isActive
-                    ? 'bg-primary text-white'
-                    : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'
-                }`
-              }
+              onClick={() => handleNavigate(item.to)}
+              className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
+                location.pathname === item.to || (item.to === '/pro' && location.pathname === '/pro')
+                  ? 'text-orange-500'
+                  : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'
+              }`}
             >
-              <item.icon className="w-5 h-5" />
-              <span className="text-xs mt-1 font-medium">{item.label}</span>
-            </NavLink>
+              <div className="relative">
+                <item.icon className="w-6 h-6" />
+                {item.to === '/pro/requests' && newRequestsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {newRequestsCount > 9 ? '9+' : newRequestsCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] mt-1 font-medium">{item.label}</span>
+            </button>
           ))}
 
-          {navItemsRight.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center py-2 px-3 min-w-[70px] rounded-xl transition-all ${
-                  isActive
-                    ? 'bg-primary text-white'
-                    : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'
-                }`
-              }
+          {/* Bouton Créer - Au centre */}
+          <div className="relative flex flex-col items-center justify-center flex-1 h-full">
+            <button
+              onClick={() => setShowCreateMenu(!showCreateMenu)}
+              className={`flex flex-col items-center justify-center transition-all`}
             >
-              <item.icon className="w-5 h-5" />
-              <span className="text-xs mt-1 font-medium">{item.label}</span>
-            </NavLink>
+              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
+                <Plus className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-[10px] mt-1 font-medium text-orange-500">Créer</span>
+            </button>
+
+            {/* Create Menu Dropdown - Mobile simple */}
+            {showCreateMenu && (
+              <div className={`fixed bottom-16 left-0 right-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border-t z-[10001] p-4`}>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => checkAuthAndOpen(() => { setIsUploadModalOpen(true); setShowCreateMenu(false); })}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <Video className="w-6 h-6 text-blue-500" />
+                    <span className={`font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Importer vidéo</span>
+                  </button>
+                  <button
+                    onClick={() => checkAuthAndOpen(() => { setIsCameraModalOpen(true); setShowCreateMenu(false); })}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <Camera className="w-6 h-6 text-green-500" />
+                    <span className={`font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Caméra</span>
+                  </button>
+                  <button
+                    onClick={() => checkAuthAndOpen(() => { handleNavigate('/pro/events?create=true'); setShowCreateMenu(false); })}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <Calendar className="w-6 h-6 text-purple-500" />
+                    <span className={`font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Créer événement</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {navItemsRight.map((item) => (
+            <button
+              key={item.to}
+              onClick={() => handleNavigate(item.to)}
+              className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
+                location.pathname === item.to
+                  ? 'text-orange-500'
+                  : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'
+              }`}
+            >
+              <item.icon className="w-6 h-6" />
+              <span className="text-[10px] mt-1 font-medium">{item.label}</span>
+            </button>
           ))}
         </nav>
       </div>
 
       {/* Desktop: Bottom horizontal navigation */}
       <div className={`hidden md:flex fixed bottom-0 left-0 right-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border-t z-[10000] shadow-lg`}>
-        <div className="flex-1 max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <nav className="flex items-center justify-center gap-2 flex-1">
+        <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <nav className="flex items-center justify-center gap-1 sm:gap-2 flex-1">
             {navItems.map((item) => (
-              <NavLink
+              <button
                 key={item.to}
-                to={item.to}
-                end={item.to === '/pro'}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-6 py-3 rounded-xl transition-all ${
-                    isActive
-                      ? 'bg-primary text-white'
-                      : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`
-                }
+                onClick={() => handleNavigate(item.to)}
+                className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-xl transition-all ${
+                  location.pathname === item.to || (item.to === '/pro' && location.pathname === '/pro')
+                    ? 'bg-orange-500 text-white'
+                    : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
               >
-                <item.icon className="w-5 h-5" />
-                <span className="text-sm font-medium">{item.label}</span>
-              </NavLink>
+                <div className="relative">
+                  <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  {item.to === '/pro/requests' && newRequestsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {newRequestsCount > 9 ? '9+' : newRequestsCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs sm:text-sm font-medium">{item.label}</span>
+              </button>
             ))}
 
-            {navItemsRight.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-6 py-3 rounded-xl transition-all ${
-                    isActive
-                      ? 'bg-primary text-white'
-                      : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`
-                }
+            {/* Bouton Créer - Tablette uniquement (md) - Après Événements */}
+            <div className="relative hidden md:block lg:hidden">
+              <button
+                onClick={() => setShowCreateMenu(!showCreateMenu)}
+                className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-xl transition-all`}
               >
-                <item.icon className="w-5 h-5" />
-                <span className="text-sm font-medium">{item.label}</span>
-              </NavLink>
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                </div>
+                <span className="text-xs sm:text-sm font-medium text-orange-500">Créer</span>
+              </button>
+
+              {/* Create Menu Dropdown - Tablette uniquement */}
+              {showCreateMenu && (
+                <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 rounded-lg shadow-lg py-2 z-[10001] max-h-[80vh] overflow-y-auto ${
+                  resolvedTheme === 'dark' ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-gray-200'
+                }`}>
+                  {/* Section Vidéos */}
+                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">
+                    Vidéos
+                  </div>
+                  <button
+                    onClick={() => checkAuthAndOpen(() => { setIsUploadModalOpen(true); setShowCreateMenu(false); })}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-3"
+                  >
+                    <Video className="w-4 h-4 text-blue-500" />
+                    Importer une vidéo
+                  </button>
+                  <button
+                    onClick={() => checkAuthAndOpen(() => { setIsCameraModalOpen(true); setShowCreateMenu(false); })}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-3"
+                  >
+                    <Camera className="w-4 h-4 text-green-500" />
+                    Enregistrer avec caméra
+                  </button>
+
+                  {/* Section Événements */}
+                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase border-t border-gray-200 dark:border-zinc-700 mt-2">
+                    Événements
+                  </div>
+                  <button
+                    onClick={() => checkAuthAndOpen(() => { handleNavigate('/pro/events?create=true'); setShowCreateMenu(false); })}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-3"
+                  >
+                    <Calendar className="w-4 h-4 text-purple-500" />
+                    Créer un événement
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {navItemsRight.map((item) => (
+              <button
+                key={item.to}
+                onClick={() => handleNavigate(item.to)}
+                className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-xl transition-all ${
+                  location.pathname === item.to
+                    ? 'bg-orange-500 text-white'
+                    : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-xs sm:text-sm font-medium">{item.label}</span>
+              </button>
             ))}
           </nav>
 
           {/* Right Side: Theme Toggle only for desktop */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2">
             <ThemeToggle />
           </div>
         </div>
       </div>
+
+      {/* Video Upload Modal */}
+      {isUploadModalOpen && (
+        <UploadVideo
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          initialVideoData={cameraVideoData}
+        />
+      )}
+
+      {/* Camera Record Modal */}
+      {isCameraModalOpen && (
+        <CameraRecord
+          isOpen={isCameraModalOpen}
+          onClose={() => setIsCameraModalOpen(false)}
+          onComplete={handleCameraRecordComplete}
+        />
+      )}
     </div>
   )
 }

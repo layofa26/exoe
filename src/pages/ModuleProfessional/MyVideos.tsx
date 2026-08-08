@@ -6,86 +6,152 @@ import {
   Eye,
   ThumbsUp,
   MessageSquare,
-  MoreVertical,
   Edit3,
   Trash2,
-  Share2,
-  Filter,
   Search,
   Grid3X3,
   List,
-  TrendingUp,
   Clock,
   ArrowLeft
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+
 interface MyVideo {
   id: string
   title: string
-  thumbnail: string
-  duration: string
-  views: number
-  likes: number
-  comments: number
-  status: 'published' | 'draft' | 'processing'
+  thumbnailUrl?: string
+  duration?: number
+  viewsCount: number
+  likesCount: number
+  commentsCount: number
+  status: string
   createdAt: string
-  isPublic: boolean
+  visibility: string
+  author?: {
+    id: string
+    username: string
+    fullName: string
+    avatarUrl?: string
+  }
 }
 
 export const MyVideos = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [videos, setVideos] = useState<MyVideo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    // Charger les vidéos depuis localStorage
-    const savedVideos = localStorage.getItem('exile_videos')
-    if (savedVideos) {
-      const parsed = JSON.parse(savedVideos)
-      // Ajouter des métadonnées si nécessaire
-      const enriched = parsed.map((v: any) => ({
-        ...v,
-        status: v.status || 'published',
-        isPublic: v.isPublic !== false,
-        createdAt: v.date || new Date().toISOString()
-      }))
-      setVideos(enriched)
+    const loadVideos = async () => {
+      try {
+        setLoading(true)
+        const token = localStorage.getItem('accessToken')
+        
+        const response = await fetch(`${API_BASE_URL}/v1/videos/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        const videosData = data.results || data
+        
+        setVideos(videosData.map((video: any) => ({
+          id: video.id,
+          title: video.title,
+          thumbnailUrl: video.thumbnail_url,
+          duration: video.duration,
+          viewsCount: video.views_count,
+          likesCount: video.likes_count,
+          commentsCount: video.comments_count,
+          status: video.status,
+          createdAt: video.created_at,
+          visibility: video.visibility,
+          author: video.author
+        })))
+      } catch (error) {
+        console.error('Error loading videos:', error)
+        setError('Erreur lors du chargement des vidéos')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadVideos()
+
+    // Écouter l'événement de publication de vidéo pour rafraîchir la liste
+    const handleVideoPublished = () => {
+      console.log('📢 Video published event received in MyVideos, refreshing...')
+      loadVideos()
+    }
+
+    window.addEventListener('video-published', handleVideoPublished)
+
+    return () => {
+      window.removeEventListener('video-published', handleVideoPublished)
     }
   }, [])
 
   const filteredVideos = videos.filter(video => {
-    const matchesFilter = filter === 'all' || video.status === filter
+    const matchesFilter = filter === 'all' || 
+      (filter === 'published' && video.status === 'PUBLISHED') ||
+      (filter === 'draft' && video.status === 'DRAFT')
     const matchesSearch = video.title?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesFilter && matchesSearch
   })
 
   const stats = {
     total: videos.length,
-    published: videos.filter(v => v.status === 'published').length,
-    draft: videos.filter(v => v.status === 'draft').length,
-    totalViews: videos.reduce((acc, v) => acc + (v.views || 0), 0),
-    totalLikes: videos.reduce((acc, v) => acc + (v.likes || 0), 0)
+    published: videos.filter(v => v.status === 'PUBLISHED').length,
+    draft: videos.filter(v => v.status === 'DRAFT').length,
+    totalViews: videos.reduce((acc, v) => acc + (v.viewsCount || 0), 0),
+    totalLikes: videos.reduce((acc, v) => acc + (v.likesCount || 0), 0)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette vidéo ?')) {
-      const updated = videos.filter(v => v.id !== id)
-      setVideos(updated)
-      localStorage.setItem('exile_videos', JSON.stringify(updated))
+      try {
+        // Backend removed - video deletion disabled
+        alert('Backend service not available');
+      } catch (error) {
+        console.error('Error deleting video:', error)
+        alert('Erreur lors de la suppression de la vidéo')
+      }
     }
   }
 
-  // Fonksyon pou efase tout videyo (netwaye ansyen kontènè)
-  const clearAllVideos = () => {
-    if (confirm('ATTENTION: Voulez-vous vider TOUTES les vidéos du stockage local ?')) {
-      localStorage.removeItem('exile_videos')
-      setVideos([])
-      alert('Toutes les vidéos ont été supprimées du localStorage.')
-    }
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex items-center justify-center`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex items-center justify-center`}>
+        <div className="text-center p-8">
+          <p className={`text-lg ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -95,7 +161,7 @@ export const MyVideos = (): JSX.Element => {
         <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-10 mb-6 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 py-4`}>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/pro/settings')}
+              onClick={() => navigate('/pro/profile')}
               className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
             >
               <ArrowLeft className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
@@ -164,7 +230,7 @@ export const MyVideos = (): JSX.Element => {
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     filter === f.id
                       ? 'bg-primary text-white'
-                      : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {f.label}
@@ -188,17 +254,6 @@ export const MyVideos = (): JSX.Element => {
               </button>
             </div>
 
-            {/* Bouton netwaye tout videyo */}
-            {videos.length > 0 && (
-              <button
-                onClick={clearAllVideos}
-                className="px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors flex items-center gap-2"
-                title="Vider toutes les vidéos du stockage local"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Vider tout</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -222,46 +277,60 @@ export const MyVideos = (): JSX.Element => {
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          // Grid View
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          // Grid View - Responsive: Mobile 1 col, Tablet 2 cols, Laptop 2 cols, Desktop 3 cols
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredVideos.map((video) => (
               <div key={video.id} className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm overflow-hidden group border`}>
                 {/* Thumbnail */}
                 <div className={`relative aspect-video ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'}`}>
-                  {video.thumbnail ? (
-                    <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
+                  {video.status === 'PROCESSING' ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center">
+                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
+                      <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>Traitement en cours...</span>
+                    </div>
+                  ) : video.thumbnailUrl ? (
+                    <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Video className={`w-12 h-12 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
                     </div>
                   )}
-                  <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                    {video.duration || '00:00'}
-                  </span>
-                  {video.status === 'draft' && (
+                  {video.status !== 'PROCESSING' && (
+                    <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                      {video.duration ? formatDuration(video.duration) : '00:00'}
+                    </span>
+                  )}
+                  {video.status === 'DRAFT' && (
                     <span className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-medium">
                       Brouillon
                     </span>
                   )}
+                  {video.status === 'PROCESSING' && (
+                    <span className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-pulse">
+                      Traitement
+                    </span>
+                  )}
 
-                  {/* Hover Actions */}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Link
-                      to={`/pro/video/${video.id}`}
-                      className="p-2 bg-white rounded-full hover:bg-gray-100 transition-colors"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </Link>
-                    <button className="p-2 bg-white rounded-full hover:bg-gray-100 transition-colors">
-                      <Edit3 className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(video.id)}
-                      className="p-2 bg-white rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
+                  {/* Hover Actions - Only show if not processing */}
+                  {video.status !== 'PROCESSING' && (
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <Link
+                        to={`/pro/video/${video.id}`}
+                        className="p-2 bg-white rounded-full hover:bg-gray-100 transition-colors"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </Link>
+                      <button className="p-2 bg-white rounded-full hover:bg-gray-100 transition-colors">
+                        <Edit3 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(video.id)}
+                        className="p-2 bg-white rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Info */}
@@ -270,15 +339,15 @@ export const MyVideos = (): JSX.Element => {
                   <div className={`flex items-center gap-4 text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                     <span className="flex items-center gap-1">
                       <Eye className="w-4 h-4" />
-                      {video.views?.toLocaleString() || 0}
+                      {video.viewsCount?.toLocaleString() || 0}
                     </span>
                     <span className="flex items-center gap-1">
                       <ThumbsUp className="w-4 h-4" />
-                      {video.likes?.toLocaleString() || 0}
+                      {video.likesCount?.toLocaleString() || 0}
                     </span>
                     <span className="flex items-center gap-1">
                       <MessageSquare className="w-4 h-4" />
-                      {video.comments?.toLocaleString() || 0}
+                      {video.commentsCount?.toLocaleString() || 0}
                     </span>
                   </div>
                   <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} mt-2`}>
@@ -298,15 +367,15 @@ export const MyVideos = (): JSX.Element => {
               >
                 {/* Thumbnail */}
                 <div className={`relative w-40 aspect-video ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'} rounded-lg overflow-hidden flex-shrink-0`}>
-                  {video.thumbnail ? (
-                    <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
+                  {video.thumbnailUrl ? (
+                    <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Video className={`w-8 h-8 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
                     </div>
                   )}
                   <span className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                    {video.duration || '00:00'}
+                    {video.duration ? formatDuration(video.duration) : '00:00'}
                   </span>
                 </div>
 
@@ -316,15 +385,15 @@ export const MyVideos = (): JSX.Element => {
                   <div className={`flex items-center gap-4 text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                     <span className="flex items-center gap-1">
                       <Eye className="w-4 h-4" />
-                      {video.views?.toLocaleString() || 0} vues
+                      {video.viewsCount?.toLocaleString() || 0} vues
                     </span>
                     <span className="flex items-center gap-1">
                       <ThumbsUp className="w-4 h-4" />
-                      {video.likes?.toLocaleString() || 0} likes
+                      {video.likesCount?.toLocaleString() || 0} likes
                     </span>
                     <span className="flex items-center gap-1">
                       <MessageSquare className="w-4 h-4" />
-                      {video.comments?.toLocaleString() || 0} commentaires
+                      {video.commentsCount?.toLocaleString() || 0} commentaires
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
@@ -334,7 +403,7 @@ export const MyVideos = (): JSX.Element => {
                 </div>
 
                 {/* Status */}
-                {video.status === 'draft' && (
+                {video.status === 'DRAFT' && (
                   <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full font-medium">
                     Brouillon
                   </span>
@@ -365,6 +434,13 @@ export const MyVideos = (): JSX.Element => {
       </div>
     </div>
   )
+}
+
+// Helper function to format duration in seconds to MM:SS
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
 export default MyVideos

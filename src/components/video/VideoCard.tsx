@@ -6,10 +6,12 @@ import {
   Flag,
   CheckCircle,
   X,
-  Lock
+  Lock,
+  MessageCircle
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { Video, Professional } from '../../types'
 
 interface VideoCardProps {
@@ -20,6 +22,7 @@ interface VideoCardProps {
   onReport?: (videoId: string, reason: string) => void
   onAddToFavorites?: (videoId: string) => void
   onSubscribe?: (authorId: string) => void
+  onContact?: () => void
   onClick?: () => void
   hasLiked?: boolean
   hasFavorited?: boolean
@@ -35,6 +38,7 @@ export const VideoCard = ({
   onClick,
   onAddToFavorites,
   onSubscribe,
+  onContact,
   hasLiked = false,
   hasFavorited = false,
   isSubscribed = false,
@@ -45,6 +49,7 @@ export const VideoCard = ({
   const [reportReason, setReportReason] = useState('')
 
   const { isAuthenticated } = useAuth()
+  const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const actionMenuRef = useRef<HTMLDivElement>(null)
 
@@ -105,7 +110,7 @@ export const VideoCard = ({
       }}
     >
       {/* Thumbnail - Style pure */}
-      <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+      <div className="relative aspect-video bg-gray-100 overflow-hidden">
         {video.isLive ? (
           <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center">
             <div className="flex items-center gap-1.5">
@@ -123,22 +128,22 @@ export const VideoCard = ({
 
             {/* Play Overlay on hover */}
             <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="w-12 h-12 bg-black/70 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-black/70 flex items-center justify-center">
                 <Play className="w-5 h-5 text-white ml-0.5" />
               </div>
             </div>
 
             {/* Duration Badge */}
             {video.duration && (
-              <div className="absolute bottom-2 right-2 bg-black/90 text-white text-xs px-1.5 py-0.5 rounded font-medium">
+              <div className="absolute bottom-2 right-2 bg-black/90 text-white text-xs px-1.5 py-0.5 font-medium">
                 {video.duration}
               </div>
             )}
 
             {/* Live Badge */}
             {video.isLive && (
-              <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-0.5 font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-white animate-pulse" />
                 LIVE
               </div>
             )}
@@ -148,27 +153,42 @@ export const VideoCard = ({
 
       {/* Info Section - Compact style */}
       <div className="flex gap-2 sm:gap-3 mt-2 sm:mt-3 px-1">
-        {/* Avatar */}
+        {/* Avatar de l'utilisateur connecté */}
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-pro to-emerald-400 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-xs sm:text-sm">
-              {author.name.charAt(0)}
-            </span>
+          <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden">
+            {(() => {
+              const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+              if (userProfile?.photo) {
+                return <img src={userProfile.photo} alt={userProfile.name} className="w-full h-full object-cover" />
+              }
+              return userProfile?.name?.charAt(0).toUpperCase() || 'U'
+            })()}
           </div>
         </div>
 
         {/* Text Info */}
         <div className="flex-1 min-w-0">
+          {/* Nom de l'utilisateur connecté */}
+          <div className="flex items-center gap-1 text-xs text-gray-600 mb-0.5">
+            <span className="font-medium">
+              {(() => {
+                const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+                return userProfile?.name || 'Utilisateur'
+              })()}
+            </span>
+            <span className="text-gray-400">•</span>
+            <span>
+              {(() => {
+                const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+                return userProfile?.profession || 'Professionnel'
+              })()}
+            </span>
+          </div>
+
           {/* Title - 2 lines max */}
           <h3 className="font-semibold text-gray-900 text-xs sm:text-sm leading-tight line-clamp-2 mb-0.5 sm:mb-1">
             {video.title}
           </h3>
-
-          {/* Author + Verified */}
-          <div className="flex items-center gap-1 text-xs text-gray-600">
-            <span className="font-medium">{author.name}</span>
-            {author.verified && <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-pro" />}
-          </div>
 
           {/* Stats row */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-1.5 text-xs text-gray-500 mt-0.5">
@@ -178,6 +198,19 @@ export const VideoCard = ({
             <span className="hidden sm:inline">•</span>
             <span>{formatTimeAgo(video.date)}</span>
           </div>
+        </div>
+
+        {/* Bouton contacter */}
+        <div className="flex-shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onContact?.()
+            }}
+            className="p-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+          >
+            <MessageCircle className="w-4 h-4" />
+          </button>
         </div>
 
         {/* More Actions */}

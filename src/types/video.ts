@@ -36,17 +36,30 @@ export interface Comment {
 export interface Video {
   id: string;
   title: string;
-  description: string;
-  category: string;
-  categoryColor: string;
-  duration: string;
-  gradient: string;
-  tags: string[];
+  description?: string;
+  category?: string;
+  categoryColor?: string;
+  duration?: string | number;
+  gradient?: string;
+  tags?: string[];
   author: Author;
-  views: number;
-  likes: number;
-  comments: Comment[];
-  postedAt: string;
+  views?: number;
+  viewsCount?: number;
+  likes?: number;
+  likesCount?: number;
+  comments?: Comment[];
+  commentsCount?: number;
+  sharesCount?: number;
+  favoritesCount?: number;
+  postedAt?: string;
+  createdAt?: string;
   videoUrl?: string; // URL videyo a (optional)
   thumbnail?: string; // URL thumbnail la (optional)
+  thumbnailUrl?: string; // URL thumbnail la (backend field)
+  visibility?: 'PUBLIC' | 'PRIVATE' | 'SUBSCRIBERS_ONLY';
+  status?: 'PUBLISHED' | 'DRAFT' | 'UPLOADING' | 'FAILED' | 'READY';
+  allowComments?: boolean;
+  allowLikes?: boolean;
+  allowShares?: boolean;
+  isLive?: boolean;
 }

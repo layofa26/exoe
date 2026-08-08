@@ -59,6 +59,7 @@ export interface Conversation {
   unreadCount: number
   isPinned?: boolean
   isArchived?: boolean
+  isBlocked?: boolean
   lastTypingAt?: string
   typingUserId?: string | null
 }

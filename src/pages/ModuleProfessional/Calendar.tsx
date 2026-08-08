@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar as CalendarIcon,
@@ -13,6 +13,9 @@ import {
   ArrowLeft as ArrowLeftIcon
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { api } from '../../services/apiClient'
+import { EventListSchema } from '../../schemas/apiSchemas'
+import { getCurrentUserId } from '../../services/apiClient'
 
 interface CalendarEvent {
   id: string
@@ -31,15 +34,53 @@ export const Calendar = (): JSX.Element => {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month')
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Données de démo
-  const events: CalendarEvent[] = [
-    { id: '1', title: 'Consultation M. Dupont', date: '2024-01-25', time: '14:00', duration: '1h', type: 'meeting', with: 'M. Dupont', description: 'Discussion projet salon' },
-    { id: '2', title: 'Webinaire Design', date: '2024-01-26', time: '10:00', duration: '2h', type: 'event', description: 'Tendances 2024' },
-    { id: '3', title: 'Tournage vidéo', date: '2024-01-28', time: '09:00', duration: '3h', type: 'video', description: 'Tutoriel cuisine' },
-    { id: '4', title: 'Rendez-vous Marie L.', date: '2024-01-30', time: '16:00', duration: '1h', type: 'meeting', with: 'Marie L.' },
-    { id: '5', title: 'Payer facture', date: '2024-01-28', time: '09:00', duration: '', type: 'reminder' }
-  ]
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        setLoading(true)
+        const token = localStorage.getItem('accessToken')
+        if (!token) {
+          navigate('/login')
+          return
+        }
+
+        const userId = getCurrentUserId()
+        
+        // Load events from backend
+        const result = await api.get('/v1/evenement/evenements/', EventListSchema)
+        
+        if (result.success && result.data) {
+          const calendarEvents = (result.data.results || result.data).map((event: any) => ({
+            id: String(event.id),
+            title: event.title,
+            date: event.start_date?.split('T')[0] || event.created_at?.split('T')[0] || '',
+            time: event.start_date?.split('T')[1]?.substring(0, 5) || '00:00',
+            duration: '1h',
+            type: 'event',
+            description: event.description
+          }))
+          setEvents(calendarEvents)
+        }
+      } catch (err) {
+        console.error('Error loading events:', err)
+        // Fallback to demo data if API fails
+        setEvents([
+          { id: '1', title: 'Consultation M. Dupont', date: '2024-01-25', time: '14:00', duration: '1h', type: 'meeting', with: 'M. Dupont', description: 'Discussion projet salon' },
+          { id: '2', title: 'Webinaire Design', date: '2024-01-26', time: '10:00', duration: '2h', type: 'event', description: 'Tendances 2024' },
+          { id: '3', title: 'Tournage vidéo', date: '2024-01-28', time: '09:00', duration: '3h', type: 'video', description: 'Tutoriel cuisine' },
+          { id: '4', title: 'Rendez-vous Marie L.', date: '2024-01-30', time: '16:00', duration: '1h', type: 'meeting', with: 'Marie L.' },
+          { id: '5', title: 'Payer facture', date: '2024-01-28', time: '09:00', duration: '', type: 'reminder' }
+        ])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadEvents()
+  }, [navigate])
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -99,50 +140,51 @@ export const Calendar = (): JSX.Element => {
   }
 
   return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-20`}>
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-16 sm:pb-20`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <button
-            onClick={() => navigate('/pro/settings')}
+            onClick={() => navigate('/pro/profile')}
             className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-800' : 'hover:bg-gray-200'} transition-colors`}
           >
-            <ArrowLeftIcon className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+            <ArrowLeftIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
           </button>
-          <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
             <div>
-              <h1 className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Mon calendrier</h1>
-              <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Gérez votre emploi du temps</p>
+              <h1 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Mon calendrier</h1>
+              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Gérez votre emploi du temps</p>
             </div>
-            <button className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors">
-              <Plus className="w-5 h-5" />
-              Nouveau
+            <button className="inline-flex items-center gap-2 bg-primary text-white px-3 sm:px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors text-xs sm:text-sm">
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Nouveau</span>
+              <span className="sm:hidden">+</span>
             </button>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Calendar */}
           <div className="lg:col-span-2">
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-6 border`}>
+            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
               {/* Calendar Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <h2 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <h2 className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
                   </h2>
                   <div className="flex gap-1">
                     <button
                       onClick={prevMonth}
-                      className={`p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
+                      className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
                     >
-                      <ChevronLeft className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`} />
+                      <ChevronLeft className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`} />
                     </button>
                     <button
                       onClick={nextMonth}
-                      className={`p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
+                      className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
                     >
-                      <ChevronRight className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`} />
+                      <ChevronRight className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`} />
                     </button>
                   </div>
                 </div>
@@ -151,7 +193,7 @@ export const Calendar = (): JSX.Element => {
                     <button
                       key={mode}
                       onClick={() => setViewMode(mode as any)}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-sm font-medium capitalize transition-colors ${
                         viewMode === mode
                           ? 'bg-white dark:bg-zinc-600 text-gray-900 dark:text-white shadow-sm'
                           : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
@@ -166,7 +208,7 @@ export const Calendar = (): JSX.Element => {
               {/* Day Names */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {dayNames.map((day) => (
-                  <div key={day} className={`text-center text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} py-2`}>
+                  <div key={day} className={`text-center text-[10px] sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} py-1 sm:py-2`}>
                     {day}
                   </div>
                 ))}
@@ -190,21 +232,21 @@ export const Calendar = (): JSX.Element => {
                     <button
                       key={day}
                       onClick={() => setSelectedDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
-                      className={`aspect-square p-2 rounded-lg border transition-colors text-left ${
+                      className={`aspect-square p-1 sm:p-2 rounded-lg border transition-colors text-left ${
                         isToday
                           ? 'border-primary bg-primary/5'
                           : resolvedTheme === 'dark' ? 'border-zinc-700 hover:border-zinc-600 hover:bg-zinc-700' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       } ${selectedDate?.getDate() === day ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-zinc-800' : ''}`}
                     >
-                      <span className={`text-sm font-medium ${isToday ? 'text-primary' : resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
+                      <span className={`text-xs sm:text-sm font-medium ${isToday ? 'text-primary' : resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
                         {day}
                       </span>
                       {dayEvents.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="flex flex-wrap gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
                           {dayEvents.slice(0, 3).map((event, i) => (
                             <div
                               key={i}
-                              className={`w-2 h-2 rounded-full ${
+                              className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
                                 event.type === 'meeting' ? 'bg-blue-500' :
                                 event.type === 'video' ? 'bg-purple-500' :
                                 event.type === 'reminder' ? 'bg-amber-500' : 'bg-green-500'
@@ -212,7 +254,7 @@ export const Calendar = (): JSX.Element => {
                             />
                           ))}
                           {dayEvents.length > 3 && (
-                            <span className="text-xs text-gray-500 dark:text-zinc-400">+{dayEvents.length - 3}</span>
+                            <span className="text-[9px] sm:text-xs text-gray-500 dark:text-zinc-400">+{dayEvents.length - 3}</span>
                           )}
                         </div>
                       )}
@@ -224,10 +266,10 @@ export const Calendar = (): JSX.Element => {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Selected Date Events */}
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-6 border`}>
-              <h2 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>
+            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
+              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>
                 {selectedDate
                   ? selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
                   : 'Sélectionnez une date'
@@ -235,53 +277,53 @@ export const Calendar = (): JSX.Element => {
               </h2>
 
               {selectedDate ? (
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {getEventsForDate(selectedDate.getDate()).length > 0 ? (
                     getEventsForDate(selectedDate.getDate()).map((event) => (
                       <div
                         key={event.id}
-                        className={`p-3 rounded-lg border ${getEventColor(event.type)}`}
+                        className={`p-2 sm:p-3 rounded-lg border ${getEventColor(event.type)}`}
                       >
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-1.5 sm:gap-2">
                           <div className="mt-0.5">{getEventIcon(event.type)}</div>
                           <div className="flex-1">
-                            <p className="font-medium text-sm">{event.title}</p>
-                            <p className="text-xs opacity-80">{event.time} {event.duration && `(${event.duration})`}</p>
-                            {event.with && <p className="text-xs opacity-80">avec {event.with}</p>}
-                            {event.description && <p className="text-xs opacity-70 mt-1">{event.description}</p>}
+                            <p className="font-medium text-xs sm:text-sm">{event.title}</p>
+                            <p className="text-[10px] sm:text-xs opacity-80">{event.time} {event.duration && `(${event.duration})`}</p>
+                            {event.with && <p className="text-[10px] sm:text-xs opacity-80">avec {event.with}</p>}
+                            {event.description && <p className="text-[10px] sm:text-xs opacity-70 mt-0.5 sm:mt-1">{event.description}</p>}
                           </div>
                           <button className={`${resolvedTheme === 'dark' ? 'text-zinc-500 hover:text-zinc-400' : 'text-gray-400 hover:text-gray-600'}`}>
-                            <MoreHorizontal className="w-4 h-4" />
+                            <MoreHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-4`}>Aucun événement ce jour</p>
+                    <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-3 sm:py-4 text-xs sm:text-sm`}>Aucun événement ce jour</p>
                   )}
                 </div>
               ) : (
-                <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-4`}>Cliquez sur une date pour voir les événements</p>
+                <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-3 sm:py-4 text-xs sm:text-sm`}>Cliquez sur une date pour voir les événements</p>
               )}
 
-              <button className={`w-full mt-4 py-2 border ${resolvedTheme === 'dark' ? 'border-zinc-600 text-zinc-300 hover:bg-zinc-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2`}>
-                <Plus className="w-4 h-4" />
+              <button className={`w-full mt-3 sm:mt-4 py-2 border ${resolvedTheme === 'dark' ? 'border-zinc-600 text-zinc-300 hover:bg-zinc-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2`}>
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Ajouter un événement
               </button>
             </div>
 
             {/* Upcoming Events */}
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-6 border`}>
-              <h2 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Prochains événements</h2>
-              <div className="space-y-3">
+            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
+              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>Prochains événements</h2>
+              <div className="space-y-2 sm:space-y-3">
                 {events.slice(0, 4).map((event) => (
-                  <div key={event.id} className={`flex items-start gap-3 p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-50'} rounded-lg transition-colors`}>
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getEventColor(event.type)}`}>
+                  <div key={event.id} className={`flex items-start gap-2 sm:gap-3 p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-50'} rounded-lg transition-colors`}>
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getEventColor(event.type)}`}>
                       {getEventIcon(event.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-medium text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>{event.title}</p>
-                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{new Date(event.date).toLocaleDateString('fr-FR')} à {event.time}</p>
+                      <p className={`font-medium text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>{event.title}</p>
+                      <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{new Date(event.date).toLocaleDateString('fr-FR')} à {event.time}</p>
                     </div>
                   </div>
                 ))}
@@ -289,9 +331,9 @@ export const Calendar = (): JSX.Element => {
             </div>
 
             {/* Legend */}
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-6 border`}>
-              <h2 className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3`}>Légende</h2>
-              <div className="space-y-2">
+            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
+              <h2 className={`text-xs sm:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2 sm:mb-3`}>Légende</h2>
+              <div className="space-y-1.5 sm:space-y-2">
                 {[
                   { type: 'meeting', label: 'Rendez-vous', color: 'bg-blue-500' },
                   { type: 'video', label: 'Tournage', color: 'bg-purple-500' },
@@ -299,8 +341,8 @@ export const Calendar = (): JSX.Element => {
                   { type: 'event', label: 'Événement', color: 'bg-green-500' }
                 ].map((item) => (
                   <div key={item.type} className="flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${item.color}`} />
-                    <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>{item.label}</span>
+                    <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${item.color}`} />
+                    <span className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>{item.label}</span>
                   </div>
                 ))}
               </div>

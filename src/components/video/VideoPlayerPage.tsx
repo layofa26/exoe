@@ -3,11 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import type { Video, Comment } from '../../types/video';
 import { useIsTabletOrBelow } from '../../hooks/useMediaQuery';
 import { useToast } from '../../hooks/useToast';
-import { fmtNum } from '../../utils/format';
+import { fmtNum, formatYouTubeDate } from '../../utils/format';
 import { DotsMenu } from './DotsMenu';
 import { ContactModal } from '../modals/ContactModal';
 import { VoiceComment } from '../common/VoiceComment';
 import { PlayIcon, HeartIcon, CommentIcon, ShareIcon, ArrowLeftIcon, SendIcon, ChevronRightIcon, ThumbUpIcon, MessageCircleIcon, XIcon, PauseIcon } from '../icons/VideoIcons';
+import { useAccueilAlgo } from '../../algoPro/signals/useAccueilAlgo';
+import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import { VideoPlayer } from './VideoPlayer';
+import { videoApi } from '../../services/videoApi';
 
 interface VideoPlayerPageProps {
   video: Video;
@@ -19,19 +25,31 @@ interface VideoPlayerPageProps {
 const COMMENT_COLORS = ['#1d4ed8', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
 
 export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlayerPageProps) {
+  console.log('VideoPlayerPage rendering with video:', video.id, video.title);
+  const { resolvedTheme } = useTheme();
   const isTabletOrBelow = useIsTabletOrBelow();
   const { msg, show } = useToast();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  // Récupérer ou créer un userId pour les signaux algorithmiques
+  const userId = localStorage.getItem('exile_user_id') || 'user_default'
+  
+  // Initialiser les Logic Hooks
+  const accueilAlgo = useAccueilAlgo(userId)
+  const subsAlgo = useSubsAlgo(userId)
 
   // États pour les interactions
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(video.likes || 0);
   const [disliked, setDisliked] = useState(false);
+  const [likeId, setLikeId] = useState<number | null>(null);
+  const [dislikeId, setDislikeId] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [subscribers, setSubscribers] = useState(video.author?.followers || 0);
   const [descOpen, setDescOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(!isTabletOrBelow);
+  const [commentsOpen, setCommentsOpen] = useState(true);
   const [commentInput, setCommentInput] = useState('');
   const [comments, setComments] = useState<Comment[]>(video.comments || []);
   const [colorIdx, setColorIdx] = useState(0);
@@ -39,19 +57,19 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyInput, setReplyInput] = useState('');
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
-  const [voiceCommentAccess, setVoiceCommentAccess] = useState(true);
   const [playingCommentId, setPlayingCommentId] = useState<string | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
   
   // États pour les modals
   const [showContactModal, setShowContactModal] = useState(false);
-  const [descModalOpen, setDescModalOpen] = useState(false);
   const [selectedAuthorForContact, setSelectedAuthorForContact] = useState<typeof video.author | null>(null);
   
   const commentRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoPlayerRef = useRef<any>(null);
   const lastTapRef = useRef(0);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -100,48 +118,35 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
     }
   };
 
-  // Save/restore videyo progress
-  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    const current = e.currentTarget.currentTime;
-    const duration = e.currentTarget.duration;
-    if (duration && current > 0 && current < duration - 2) {
-      localStorage.setItem(`exile_video_progress_${video.id}`, String(current));
-    }
-  };
-
-  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    const saved = localStorage.getItem(`exile_video_progress_${video.id}`);
-    if (saved) {
-      const time = parseFloat(saved);
-      if (time > 0) {
-        e.currentTarget.currentTime = time;
-      }
-    }
-  };
 
   // Komposan videyo a (itilize nan 2 kote pou mobil/desktop)
   const VideoPlayer = () => (
-    <div 
+    <div
       ref={playerRef}
-      onClick={handleVideoTap}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className={`relative w-full aspect-video bg-gradient-to-br ${video.gradient || 'from-zinc-700 to-zinc-900'} overflow-hidden shadow-xl select-none`}
+      className={`relative w-full ${isTabletOrBelow ? 'aspect-video' : 'h-[450px]'} bg-gradient-to-br ${video.gradient || 'from-zinc-700 to-zinc-900'} overflow-hidden shadow-xl select-none`}
     >
       {video.videoUrl ? (
-        <video 
-          ref={videoRef}
+        <video
+          ref={videoPlayerRef}
           src={video.videoUrl}
-          controls
-          className="absolute inset-0 w-full h-full object-cover"
           poster={video.thumbnail}
-          playsInline
-          preload="metadata"
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
-        >
-          Navigatè ou a pa sipòte baliz vidéo a.
-        </video>
+          controls
+          onClick={(e) => {
+            e.stopPropagation()
+            const videoEl = videoPlayerRef.current
+            if (videoEl) {
+              if (videoEl.paused) {
+                videoEl.play()
+              } else {
+                videoEl.pause()
+              }
+            }
+          }}
+          className="w-full h-full object-contain"
+          onError={(e) => console.error('Video error:', e)}
+        />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center text-white/60 select-none">
@@ -180,22 +185,61 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
     return comments.reduce((sum, c) => sum + 1 + (c.replies?.length || 0), 0);
   }, [comments]);
 
-  // Charger les états depuis localStorage
+  // Charger les commentaires et le statut like/dislike depuis le backend
+  useEffect(() => {
+    const loadVideoData = async () => {
+      const token = localStorage.getItem('accessToken')
+      if (token) {
+        // Charger les commentaires
+        const commentsResult = await videoApi.getComments(parseInt(video.id), token)
+        if (commentsResult.success && commentsResult.data) {
+          const transformedComments = commentsResult.data.map((c: any) => ({
+            id: c.id.toString(),
+            authorName: c.is_anonymous ? 'Anonyme' : (c.user_username || 'Utilisateur'),
+            initials: c.is_anonymous ? '?' : (c.user_username?.charAt(0).toUpperCase() || 'U'),
+            color: COMMENT_COLORS[Math.floor(Math.random() * COMMENT_COLORS.length)],
+            text: c.text,
+            ago: formatYouTubeDate(c.created_at),
+            likes: c.likes_count || 0,
+            liked: c.is_liked || false,
+            disliked: c.is_disliked || false,
+            replies: c.replies?.map((r: any) => ({
+              id: r.id.toString(),
+              authorName: r.is_anonymous ? 'Anonyme' : (r.user_username || 'Utilisateur'),
+              initials: r.is_anonymous ? '?' : (r.user_username?.charAt(0).toUpperCase() || 'U'),
+              color: COMMENT_COLORS[Math.floor(Math.random() * COMMENT_COLORS.length)],
+              text: r.text,
+              ago: formatYouTubeDate(r.created_at),
+              likes: r.likes_count || 0,
+              liked: r.is_liked || false,
+              disliked: r.is_disliked || false,
+              replies: [],
+              parentId: r.parent_id?.toString(),
+            })) || [],
+            parentId: c.parent_id?.toString(),
+          }))
+          setComments(transformedComments)
+        }
+        
+        // Charger le statut like/dislike (à implémenter avec un endpoint dédié ou via les commentaires)
+        // Pour l'instant, on utilise localStorage comme fallback
+        const likedVideos = JSON.parse(localStorage.getItem('exile_liked_videos') || '[]');
+        const dislikedVideos = JSON.parse(localStorage.getItem('exile_disliked_videos') || '[]');
+        setLiked(likedVideos.includes(video.id));
+        setDisliked(dislikedVideos.includes(video.id));
+      }
+    }
+    
+    loadVideoData()
+  }, [video.id])
+
   useEffect(() => {
     pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     setDescOpen(false);
-    setComments(video.comments || []);
     setCommentsOpen(!isTabletOrBelow);
-    
-    // Charger l'état "like" de cette vidéo
-    const likedVideos = JSON.parse(localStorage.getItem('exile_liked_videos') || '[]');
-    setLiked(likedVideos.includes(video.id));
-    setLikes((video.likes || 0) + (likedVideos.includes(video.id) ? 1 : 0));
-    
-    // Charger l'état "dislike"
-    const dislikedVideos = JSON.parse(localStorage.getItem('exile_disliked_videos') || '[]');
-    setDisliked(dislikedVideos.includes(video.id));
-    
+  }, [isTabletOrBelow]);
+
+  useEffect(() => {
     // Charger l'état "saved"
     const savedVideos = JSON.parse(localStorage.getItem('exile_saved_videos') || '[]');
     setSaved(savedVideos.includes(video.id));
@@ -207,7 +251,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
     );
     setSubscribed(isSubscribed);
     setSubscribers((video.author?.followers || 0) + (isSubscribed ? 1 : 0));
-  }, [video.id, video.author?.id, isTabletOrBelow]);
+  }, [video.id, video.author?.id]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onBack(); };
@@ -224,63 +268,99 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
     }
   }, [video.id]);
 
+  // Tracker le temps de visionnage avec useAccueilAlgo
+  useEffect(() => {
+    const startTime = Date.now()
+    
+    return () => {
+      const watchDuration = Math.floor((Date.now() - startTime) / 1000)
+      if (watchDuration > 0) {
+        accueilAlgo.trackVideoClick(video, watchDuration, false, liked)
+      }
+    }
+  }, [video, liked, accueilAlgo])
+
   // Fonctions d'interaction
-  const handleLike = () => {
-    const likedVideos = JSON.parse(localStorage.getItem('exile_liked_videos') || '[]');
-    const dislikedVideos = JSON.parse(localStorage.getItem('exile_disliked_videos') || '[]');
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+    
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
     
     if (liked) {
       // Retirer le like
-      const updated = likedVideos.filter((id: string) => id !== video.id);
-      localStorage.setItem('exile_liked_videos', JSON.stringify(updated));
-      setLiked(false);
-      setLikes(l => l - 1);
-      show('Like retiré');
+      if (likeId) {
+        const result = await videoApi.unlikeVideo(likeId, token)
+        if (result.success) {
+          setLiked(false)
+          setLikes(l => l - 1)
+          setLikeId(null)
+          show('Like retiré')
+        }
+      }
     } else {
       // Ajouter le like et retirer dislike si présent
-      const updatedLiked = [...likedVideos, video.id];
-      localStorage.setItem('exile_liked_videos', JSON.stringify(updatedLiked));
-      
-      if (disliked) {
-        const updatedDisliked = dislikedVideos.filter((id: string) => id !== video.id);
-        localStorage.setItem('exile_disliked_videos', JSON.stringify(updatedDisliked));
-        setDisliked(false);
+      const result = await videoApi.likeVideo(parseInt(video.id), token)
+      if (result.success) {
+        setLiked(true)
+        setLikes(l => l + 1)
+        setLikeId(result.data?.id || null)
+        
+        if (disliked && dislikeId) {
+          await videoApi.undislikeVideo(dislikeId, token)
+          setDisliked(false)
+          setDislikeId(null)
+        }
+        show('Vous aimez 👍')
       }
-      
-      setLiked(true);
-      setLikes(l => l + 1);
-      show('Vous aimez 👍');
     }
   };
 
-  const handleDislike = () => {
-    const likedVideos = JSON.parse(localStorage.getItem('exile_liked_videos') || '[]');
-    const dislikedVideos = JSON.parse(localStorage.getItem('exile_disliked_videos') || '[]');
+  const handleDislike = async () => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+    
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
     
     if (disliked) {
       // Retirer le dislike
-      const updated = dislikedVideos.filter((id: string) => id !== video.id);
-      localStorage.setItem('exile_disliked_videos', JSON.stringify(updated));
-      setDisliked(false);
-      show('Dislike retiré');
+      if (dislikeId) {
+        const result = await videoApi.undislikeVideo(dislikeId, token)
+        if (result.success) {
+          setDisliked(false)
+          setDislikeId(null)
+          show('Dislike retiré')
+        }
+      }
     } else {
       // Ajouter le dislike et retirer like si présent
-      const updatedDisliked = [...dislikedVideos, video.id];
-      localStorage.setItem('exile_disliked_videos', JSON.stringify(updatedDisliked));
-      
-      if (liked) {
-        const updatedLiked = likedVideos.filter((id: string) => id !== video.id);
-        localStorage.setItem('exile_liked_videos', JSON.stringify(updatedLiked));
-        setLiked(false);
-        setLikes(l => l - 1);
+      const result = await videoApi.dislikeVideo(parseInt(video.id), token)
+      if (result.success) {
+        setDisliked(true)
+        setDislikeId(result.data?.id || null)
+        
+        if (liked && likeId) {
+          await videoApi.unlikeVideo(likeId, token)
+          setLiked(false)
+          setLikes(l => l - 1)
+          setLikeId(null)
+        }
+        show('Dislike ajouté 👎')
       }
-      
-      setDisliked(true);
-      show('Dislike ajouté 👎');
     }
   };
 
   const handleSubscribe = () => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
     const subscriptions = JSON.parse(localStorage.getItem('exile_subscriptions') || '[]');
     
     if (subscribed) {
@@ -292,6 +372,11 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       setSubscribed(false);
       setSubscribers(s => Math.max(0, s - 1));
       show(`Vous ne suivez plus ${video.author?.name}`);
+      
+      // Tracker la désabonnement avec useSubsAlgo
+      if (video.author) {
+        subsAlgo.removeSubscription(video.author.id)
+      }
     } else {
       // S'abonner
       const newSub = {
@@ -306,6 +391,11 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       setSubscribed(true);
       setSubscribers(s => s + 1);
       show(`Vous suivez maintenant ${video.author?.name} 🔔`);
+      
+      // Tracker l'abonnement avec useSubsAlgo
+      if (video.author) {
+        subsAlgo.addSubscription(video.author.id)
+      }
     }
   };
 
@@ -326,25 +416,28 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
   };
 
   const handleShare = () => {
+    // Construire l'URL avec l'ID de la vidéo pour le partage
+    const shareUrl = `${window.location.origin}/pro/video/${video.id}`;
+    
     if (navigator.share) {
       navigator.share({
         title: video.title,
         text: `Regardez cette vidéo de ${video.author?.name}`,
-        url: window.location.href
+        url: shareUrl
       }).catch(() => {
         // Fallback
-        navigator.clipboard.writeText(window.location.href);
+        navigator.clipboard.writeText(shareUrl);
         show('Lien copié dans le presse-papiers 🔗');
       });
     } else {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(shareUrl);
       show('Lien copié dans le presse-papiers 🔗');
     }
   };
 
   const handleProfileClick = () => {
     // Vérifier si c'est le profil de l'utilisateur connecté
-    const userProfile = JSON.parse(localStorage.getItem('exile_profile') || '{}');
+    const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
     const authorId = video.author?.id;
     
     // Si pa gen otè (author), montre modal default
@@ -362,19 +455,40 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
 
   const MAX_COMMENT_LENGTH = 1000;
 
-  const sendComment = () => {
+  const sendComment = async () => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
     const text = commentInput.trim();
     if (!text) return;
     if (text.length > MAX_COMMENT_LENGTH) { show(`Max ${MAX_COMMENT_LENGTH} caractères`); return; }
-    const authorLabel = isAnonymous ? 'Anonyme' : 'Vous';
-    const initialsLabel = isAnonymous ? '?' : 'Moi';
-    setComments(prev => [...prev, {
-      id: `c-${Date.now()}`, authorName: authorLabel, initials: initialsLabel,
-      color: COMMENT_COLORS[colorIdx % COMMENT_COLORS.length], text, ago: "À l'instant",
-      likes: 0, liked: false, disliked: false, replies: [], parentId: null,
-    }]);
-    setCommentInput(''); setColorIdx(i => i + 1);
-    show(isAnonymous ? 'Commentaire anonyme publié ✓' : 'Commentaire publié ✓');
+    
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+    
+    const result = await videoApi.createComment(parseInt(video.id), text, undefined, isAnonymous, token)
+    if (result.success) {
+      const newComment = {
+        id: result.data.id.toString(),
+        authorName: result.data.user_username || 'Vous',
+        initials: result.data.user_username?.charAt(0).toUpperCase() || 'M',
+        color: COMMENT_COLORS[colorIdx % COMMENT_COLORS.length],
+        text,
+        ago: "À l'instant",
+        likes: result.data.likes_count || 0,
+        liked: result.data.is_liked || false,
+        disliked: result.data.is_disliked || false,
+        replies: [],
+        parentId: null,
+      }
+      setComments(prev => [newComment, ...prev])
+      setCommentInput('')
+      setColorIdx(i => i + 1)
+      show(isAnonymous ? 'Commentaire anonyme publié ✓' : 'Commentaire publié ✓')
+    } else {
+      show(result.error || 'Erreur lors de la publication du commentaire')
+    }
   };
 
   const handleVoiceCommentSend = (audioBlob: Blob, duration: number) => {
@@ -448,11 +562,9 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
     let seconds = 0;
     if (parts.length === 2) seconds = parts[0] * 60 + parts[1];
     else if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-    if (videoRef.current) {
-      videoRef.current.currentTime = seconds;
-      videoRef.current.play();
-      show(`Saut à ${timestamp} ⏱`);
-    }
+    // Note: This would need access to the Video.js player instance
+    // For now, we'll skip this functionality as it requires VideoJSPlayer to expose its player
+    show(`Timestamp ${timestamp} - fonctionnalité désactivée`);
   };
 
   // Fonksyon pou report yon kòmantè
@@ -480,6 +592,42 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       }))
     );
     show('Commentaire supprimé');
+  };
+
+  const editComment = (commentId: string, newText: string) => {
+    setComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        return { ...c, text: newText };
+      }
+      if (c.replies) {
+        return {
+          ...c,
+          replies: c.replies.map(r => 
+            r.id === commentId ? { ...r, text: newText } : r
+          )
+        };
+      }
+      return c;
+    }));
+    show('Commentaire modifié');
+    setEditingCommentId(null);
+    setEditCommentText('');
+  };
+
+  const startEditComment = (commentId: string, currentText: string) => {
+    setEditingCommentId(commentId);
+    setEditCommentText(currentText);
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditCommentText('');
+  };
+
+  const saveEditComment = (commentId: string) => {
+    if (editCommentText.trim()) {
+      editComment(commentId, editCommentText);
+    }
   };
 
   // Parse tèks kòmantè pou detekte timestamp yo
@@ -570,9 +718,9 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
           )}
           
           {isVoiceComment ? (
-            <div className={`flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg ${!isMobile ? 'mt-2' : ''}`}>
+            <div className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 border rounded-lg ${!isMobile ? 'mt-2' : ''} ${resolvedTheme === 'dark' ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
               <audio
-                src={audioUrl}
+                src={audioUrl || undefined}
                 onEnded={handleAudioEnded}
                 onPlay={() => setPlayingCommentId(c.id)}
                 autoPlay={isPlaying}
@@ -580,21 +728,49 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
               />
               <button
                 onClick={togglePlayback}
-                className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex-shrink-0"
+                className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex-shrink-0"
               >
-                {isPlaying ? <PauseIcon className="w-4 h-4" /> : <PlayIcon className="w-4 h-4" />}
+                {isPlaying ? <PauseIcon /> : <PlayIcon />}
               </button>
               <div className="flex-1">
-                <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                <div className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
                   {isPlaying ? 'Lecture en cours...' : 'Message vocal'}
                 </div>
-                <div className="text-xs text-blue-500 dark:text-blue-500">
+                <div className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-blue-500' : 'text-blue-500'}`}>
                   {c.audioDuration}s
                 </div>
               </div>
             </div>
+          ) : editingCommentId === c.id ? (
+            <div className="flex gap-2 mt-2">
+              <input
+                autoFocus
+                value={editCommentText}
+                onChange={e => setEditCommentText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveEditComment(c.id)}
+                maxLength={MAX_COMMENT_LENGTH}
+                className={`flex-1 rounded-full px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                  resolvedTheme === 'dark' 
+                    ? 'bg-zinc-800 border border-zinc-700 text-zinc-100 placeholder-zinc-400' 
+                    : 'bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-500'
+                }`}
+              />
+              <button
+                onClick={() => saveEditComment(c.id)}
+                disabled={!editCommentText.trim()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full text-xs font-medium transition-colors"
+              >
+                Sauvegarder
+              </button>
+              <button
+                onClick={cancelEditComment}
+                className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-full text-xs font-medium transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
           ) : (
-            <p className={`text-sm text-zinc-200 leading-relaxed ${!isMobile ? 'bg-zinc-800 rounded-2xl rounded-tl-none px-3.5 py-2.5' : ''}`}>
+            <p className={`text-xs sm:text-sm leading-relaxed ${!isMobile ? `rounded-2xl rounded-tl-none px-2.5 sm:px-3.5 py-2 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-200' : 'bg-gray-100 text-gray-800'}` : resolvedTheme === 'dark' ? 'text-zinc-200' : 'text-gray-800'}`}>
               {renderCommentText(c.text)}
             </p>
           )}
@@ -641,12 +817,20 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
             )}
             {/* Siprime - sèlman pwòp kòmantè reyèl (pa Anonyme ki pa ka verifye) */}
             {c.authorName === 'Vous' && (
-              <button
-                onClick={() => deleteComment(c.id)}
-                className="text-xs text-zinc-500 hover:text-red-400 font-medium transition-colors"
-              >
-                Supprimer
-              </button>
+              <>
+                <button
+                  onClick={() => startEditComment(c.id, c.text)}
+                  className="text-xs text-zinc-500 hover:text-blue-400 font-medium transition-colors"
+                >
+                  Modifier
+                </button>
+                <button
+                  onClick={() => deleteComment(c.id)}
+                  className="text-xs text-zinc-500 hover:text-red-400 font-medium transition-colors"
+                >
+                  Supprimer
+                </button>
+              </>
             )}
           </div>
 
@@ -691,12 +875,12 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
   // Safety check pou asire video la valide
   if (!video || !video.id || !video.author) {
     return (
-      <div className="min-h-screen w-full bg-[#0f0f0f] flex items-center justify-center">
+      <div className={`min-h-screen w-full ${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]' : 'bg-white'} flex items-center justify-center`}>
         <div className="text-center">
-          <p className="text-zinc-400 mb-4">Vidéo non disponible</p>
+          <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-4`}>Vidéo non disponible</p>
           <button
             onClick={onBack}
-            className="px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700"
+            className={`px-4 py-2 ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'} rounded-lg`}
           >
             Retour
           </button>
@@ -708,23 +892,57 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
   return (
     <div
       ref={pageRef}
-      className={`w-full bg-[#0f0f0f] pointer-events-auto ${isTabletOrBelow ? 'h-screen flex flex-col overflow-hidden' : 'min-h-screen overflow-y-auto'}`}
+      className={`w-full ${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]' : 'bg-white'} pointer-events-auto ${isTabletOrBelow ? 'h-screen flex flex-col overflow-hidden' : 'h-screen overflow-y-auto'}`}
       style={!isTabletOrBelow ? { scrollbarWidth: 'thin' } : {}}
     >
       {/* Bouton retour - MOBILE: flex-shrink-0, DESKTOP: sticky */}
-      <div className={`z-30 bg-[#0f0f0f]/90 backdrop-blur-md border-b border-zinc-800 px-4 py-3 flex items-center gap-3 ${isTabletOrBelow ? 'flex-shrink-0' : 'sticky top-0'}`}>
+      <div className={`z-30 ${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]/90 border-zinc-800' : 'bg-white/90 border-gray-200'} backdrop-blur-md border-b px-4 py-3 flex items-center gap-3 ${isTabletOrBelow ? 'flex-shrink-0' : 'sticky top-0'}`}>
         <button
           onClick={onBack}
           aria-label="Retour au fil d'actualité"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+          className={`w-9 h-9 rounded-full flex items-center justify-center ${resolvedTheme === 'dark' ? 'text-zinc-300 hover:bg-zinc-800' : 'text-gray-600 hover:bg-gray-200'} transition-colors`}
         >
           <span className="w-5 h-5"><ArrowLeftIcon /></span>
         </button>
-        {/* MOBIL: Pwofesyon otè a, DESKTOP: Tit videyo */}
-        <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 truncate flex-1">
-          {isTabletOrBelow ? (video.author?.profession || 'Professionnel') : (video.title || 'Vidéo sans titre')}
+        {/* MOBIL: Pwofesyon otè a, DESKTOP: Pwofesyon otè a */}
+        <span className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-200' : 'text-gray-900'} truncate flex-1`}>
+          {video.author?.profession || 'Professionnel'}
         </span>
       </div>
+
+      {/* MOBILE/TABLET: Premier feed - Profil utilisateur connecté */}
+      {isTabletOrBelow && (
+        <div className={`flex-shrink-0 p-4 border-b ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-200'}`}>
+          {/* Profil de l'utilisateur connecté */}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden flex-shrink-0">
+              {(() => {
+                const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+                if (userProfile?.photo) {
+                  return <img src={userProfile.photo} alt={userProfile.name} className="w-full h-full object-cover" />
+                }
+                return userProfile?.name?.charAt(0).toUpperCase() || 'U'
+              })()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className={`font-semibold text-base ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
+                {(() => {
+                  const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+                  return userProfile?.name || 'Utilisateur'
+                })()}
+              </h2>
+              <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} truncate`}>
+                {(() => {
+                  const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+                  const profession = userProfile?.profession || 'Professionnel'
+                  const speciality = userProfile?.speciality
+                  return speciality ? `${profession} • ${speciality}` : profession
+                })()}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MOBILE/TABLET: Videyo a FIXE an tèt, pa nan zòn ki defile */}
       {isTabletOrBelow && (
@@ -740,7 +958,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       >
 
         {/* Colonne gauche : player + infos */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 md:max-w-3xl">
 
           {/* DESKTOP SELMAN: Videyo nan koulè nòmal la */}
           {!isTabletOrBelow && <VideoPlayer />}
@@ -748,208 +966,15 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
           {/* Zone kontni - MOBILE/TABLET: defile anba videyo a, DESKTOP: nòmal */}
           <div className="p-4 md:p-0 md:mt-4">
             
-            {/* Titre - Tit videyo anba player */}
-            <h1 className="text-lg font-bold text-white leading-snug mb-2">
-              {video.title || 'Vidéo sans titre'}
-            </h1>
-
-            {/* Stats ligne - Views, date */}
-            <div className="flex items-center gap-2 text-sm text-zinc-400 mb-3">
-              <span>{fmtNum(video.views || 0)} vues</span>
-              <span>•</span>
-              <span>il y a {video.postedAt || ''}</span>
-            </div>
-
-            {/* Barre d'actions - Style YouTube mobile horizontal */}
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-hide">
-              {/* Like */}
-              <button
-                onClick={handleLike}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
-                  liked 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white'
-                }`}
-              >
-                <span className="w-5 h-5"><ThumbUpIcon /></span>
-                <span className="text-sm font-medium">{fmtNum(likes)}</span>
-              </button>
-
-              {/* Dislike */}
-              <button 
-                onClick={handleDislike}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
-                  disliked 
-                    ? 'bg-red-600 text-white' 
-                    : 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white'
-                }`}
-              >
-                <span className="w-5 h-5 rotate-180"><ThumbUpIcon /></span>
-              </button>
-
-              {/* Commentaire */}
-              <button
-                onClick={() => isTabletOrBelow ? setCommentsOpen(true) : setTimeout(() => commentRef.current?.focus(), 100)}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors text-white"
-              >
-                <span className="w-5 h-5"><CommentIcon /></span>
-                <span className="text-sm font-medium">{fmtNum(totalComments)}</span>
-              </button>
-
-              {/* Pataje - Mobil/Tablet */}
-              {isTabletOrBelow && (
-                <button
-                  onClick={handleShare}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors text-white"
-                >
-                  <span className="w-5 h-5"><ShareIcon /></span>
-                </button>
-              )}
-
-              {/* Chat - Mobil/Tablet */}
-              {isTabletOrBelow && (
-                <button
-                  onClick={() => setShowContactModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors text-white"
-                >
-                  <span className="w-4 h-4"><MessageCircleIcon /></span>
-                  <span className="text-sm">Chat</span>
-                </button>
-              )}
-
-              {/* Desktop: Save & More */}
-              {!isTabletOrBelow && (
-                <div className="ml-auto flex items-center gap-2">
-                  <button
-                    onClick={handleSave}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
-                      saved 
-                        ? 'bg-yellow-600 text-white' 
-                        : 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white'
-                    }`}
-                  >
-                    <span className="w-5 h-5 text-yellow-400"><HeartIcon filled={saved} /></span>
-                    <span className="text-sm">{saved ? 'Enregistré' : 'Enregistrer'}</span>
-                  </button>
-                  <DotsMenu 
-                    videoId={video.id} 
-                    authorId={video.author?.id || ''} 
-                    show={show}
-                    saved={saved}
-                    onSave={handleSave}
-                    onShare={handleShare}
-                    onContact={() => setShowContactModal(true)}
-                  />
-                </div>
-              )}
-
-            </div>
-
-            {/* Infos auteur - Compact style YouTube */}
-            <div className="flex items-center gap-3 py-3 border-t border-zinc-800">
-              {/* Avatar klikab */}
-              <button 
-                onClick={handleProfileClick}
-                className="flex-shrink-0 hover:scale-105 transition-transform"
-              >
-                {video.author?.avatarUrl ? (
-                  <img 
-                    src={video.author.avatarUrl}
-                    alt={video.author?.name || 'User'}
-                    className="w-10 h-10 rounded-full object-cover border-2 border-zinc-700"
-                  />
-                ) : (
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white border-2 border-zinc-700"
-                    style={{ backgroundColor: video.author?.avatarColor || '#666' }}
-                  >
-                    {video.author?.initials || '?'}
-                  </div>
-                )}
-              </button>
-              <div className="flex-1 min-w-0">
-                <button 
-                  onClick={handleProfileClick}
-                  className="text-sm font-semibold text-white hover:text-blue-400 transition-colors text-left w-full"
-                >
-                  {video.author?.name || 'Inconnu'}
-                </button>
-                {/* Followers */}
-                <p className="text-xs text-zinc-400">{fmtNum(subscribers)} abonnés</p>
-              </div>
-              {/* Bouton Subscribe */}
-              <button 
-                onClick={handleSubscribe}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  subscribed 
-                    ? 'bg-zinc-700 text-white hover:bg-zinc-600' 
-                    : 'bg-white text-black hover:bg-zinc-200'
-                }`}
-              >
-                {subscribed ? 'Abonné' : "S'abonner"}
-              </button>
-            </div>
-
-            {/* Description - bouton ki ouvri bottom sheet */}
-            {isTabletOrBelow ? (
-              <button
-                onClick={() => setDescModalOpen(true)}
-                className="w-full flex items-center justify-between py-3 border-t border-zinc-800 text-sm text-zinc-300 hover:text-white transition-colors text-left"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="text-zinc-500 text-xs uppercase font-medium">Description</span>
-                </span>
-                <span className="text-zinc-500 text-xs ml-2 whitespace-nowrap">Plus</span>
-              </button>
-            ) : (
-              /* Desktop: Description deroulan */
-              <>
-                <button
-                  onClick={() => setDescOpen(o => !o)}
-                  aria-expanded={descOpen}
-                  className="w-full flex items-center justify-between py-3 border-t border-zinc-800 text-sm text-zinc-300 hover:text-white transition-colors text-left"
-                >
-                  <span className="line-clamp-2 flex-1">{video.description || 'Aucune description'}</span>
-                  <span className="text-zinc-500 text-xs ml-2 whitespace-nowrap">{descOpen ? 'Moins' : 'Plus'}</span>
-                </button>
-                <div className={`overflow-hidden transition-all duration-300 ${descOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <p className="text-sm text-zinc-300 leading-relaxed pb-3">{video.description || 'Aucune description'}</p>
-                  <div className="flex flex-wrap gap-2 pb-3">
-                    {(video.tags || []).map(tag => (
-                      <span key={tag} className="text-xs px-3 py-1 rounded-full bg-zinc-800 text-zinc-300">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Bouton Commentaires - YouTube style */}
-          {isTabletOrBelow && (
-            <button
-              onClick={() => setCommentsOpen(true)}
-              className="w-full flex items-center justify-between py-3 border-t border-zinc-800"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-white">Commentaires</span>
-                <span className="text-sm text-zinc-500">{totalComments}</span>
-              </div>
-              <span className="w-5 h-5 text-zinc-400"><ChevronRightIcon /></span>
-            </button>
-          )}
-
-          {/* Desktop: Kòmantè deroulan */}
-          {!isTabletOrBelow && (
-            <div className="mt-4">
-              <p className="text-sm font-semibold text-white mb-3">
+            {/* Commentaires - Directement sous le player vidéo */}
+            <div className="mb-4">
+              <p className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Commentaires ({totalComments})
               </p>
               
               {/* Champ saisie */}
-              <div className="flex gap-2 mb-4">
-                <div className="w-9 h-9 rounded-full bg-blue-950 flex items-center justify-center text-[11px] font-bold text-blue-400 flex-shrink-0">
+              <div className="flex gap-2 mb-3 sm:mb-4">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-950 flex items-center justify-center text-[10px] sm:text-[11px] font-bold text-blue-400 flex-shrink-0">
                   {isAnonymous ? '?' : 'Moi'}
                 </div>
                 <div className="flex-1 flex flex-col gap-1">
@@ -962,15 +987,19 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                       placeholder='Écrire un commentaire…'
                       aria-label='Écrire un commentaire'
                       maxLength={MAX_COMMENT_LENGTH}
-                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded-full px-4 py-2 text-sm text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      className={`flex-1 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                        resolvedTheme === 'dark' 
+                          ? 'bg-zinc-800 border border-zinc-700 text-zinc-100 placeholder-zinc-400' 
+                          : 'bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
                     />
                     <button
                       onClick={sendComment}
                       disabled={!commentInput.trim()}
                       aria-label='Envoyer'
-                      className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
                     >
-                      <span className="w-4 h-4 text-white"><SendIcon /></span>
+                      <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white"><SendIcon /></span>
                     </button>
                   </div>
                   <div className="flex items-center justify-between">
@@ -979,11 +1008,11 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                         type="checkbox"
                         checked={isAnonymous}
                         onChange={e => setIsAnonymous(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded accent-blue-500"
+                        className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded accent-blue-500"
                       />
-                      <span className="text-[11px] text-zinc-400">Anonyme</span>
+                      <span className={`text-[10px] sm:text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Anonyme</span>
                     </label>
-                    <div className={`text-[11px] ${commentInput.length > MAX_COMMENT_LENGTH * 0.9 ? 'text-red-400' : 'text-zinc-600'}`}>
+                    <div className={`text-[10px] sm:text-[11px] ${commentInput.length > MAX_COMMENT_LENGTH * 0.9 ? 'text-red-400' : resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-500'}`}>
                       {commentInput.length}/{MAX_COMMENT_LENGTH}
                     </div>
                   </div>
@@ -993,7 +1022,6 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                     onSend={handleVoiceCommentSend}
                     maxDuration={30}
                     autoDeleteAfter={72}
-                    accessGranted={voiceCommentAccess}
                     commentId={`voice-${video.id}`}
                   />
                 </div>
@@ -1001,247 +1029,237 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
 
               {/* Empty state */}
               {sortedComments.length === 0 && (
-                <div className="text-center py-8 text-zinc-500">
-                  <p className="text-sm">Aucun commentaire pour le moment.</p>
-                  <p className="text-xs mt-1">Soyez le premier à commenter !</p>
+                <div className={`text-center py-6 sm:py-8 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
+                  <p className="text-xs sm:text-sm">Aucun commentaire pour le moment.</p>
+                  <p className="text-[10px] sm:text-xs mt-1">Soyez le premier à commenter !</p>
                 </div>
               )}
 
               {/* Liste commentaires */}
-              <ul className="flex flex-col gap-3" role="list">
-                {sortedComments.map(c => renderComment(c, false))}
+              <ul className="flex flex-col gap-2 sm:gap-3" role="list">
+                {sortedComments.map(c => renderComment(c, isTabletOrBelow))}
               </ul>
             </div>
-          )}
+
+            {/* Titre - Tit videyo anba player (Desktop seulement) */}
+            {!isTabletOrBelow && (
+              <>
+                <h1 className={`text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} leading-snug mb-2`}>
+                  {video.title || 'Vidéo sans titre'}
+                </h1>
+
+                {/* Stats ligne - Views, date (Desktop seulement) */}
+                <div className={`flex items-center gap-2 text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-3`}>
+                  <span>{fmtNum(video.views || 0)} vues</span>
+                  <span>•</span>
+                  <span>{formatYouTubeDate(video.postedAt || '')}</span>
+                </div>
+              </>
+            )}
+
+            {/* Barre d'actions - Simplifiée et uniformisée */}
+            <div className="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-hide" role="group" aria-label="Actions vidéo">
+              {/* Like */}
+              <button
+                onClick={handleLike}
+                aria-label={liked ? "Retirer le like" : "Mettre un like"}
+                aria-pressed={liked}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
+                  liked 
+                    ? 'bg-blue-600 text-white' 
+                    : resolvedTheme === 'dark' ? 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white' : 'bg-gray-200/50 hover:bg-gray-300/50 text-gray-900'
+                }`}
+              >
+                <span className="w-4 h-4"><ThumbUpIcon /></span>
+                <span className="text-sm font-medium">{fmtNum(likes)}</span>
+              </button>
+
+              {/* Dislike */}
+              <button 
+                onClick={handleDislike}
+                aria-label={disliked ? "Retirer le dislike" : "Mettre un dislike"}
+                aria-pressed={disliked}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
+                  disliked 
+                    ? 'bg-red-600 text-white' 
+                    : resolvedTheme === 'dark' ? 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white' : 'bg-gray-200/50 hover:bg-gray-300/50 text-gray-900'
+                }`}
+              >
+                <span className="w-4 h-4 rotate-180"><ThumbUpIcon /></span>
+              </button>
+
+              {/* Commentaire */}
+              <button
+                onClick={() => setTimeout(() => commentRef.current?.focus(), 100)}
+                aria-label={`Commentaires (${totalComments})`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${resolvedTheme === 'dark' ? 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white' : 'bg-gray-200/50 hover:bg-gray-300/50 text-gray-900'}`}
+              >
+                <span className="w-4 h-4"><CommentIcon /></span>
+                <span className="text-sm font-medium">{fmtNum(totalComments)}</span>
+              </button>
+
+              {/* Partager */}
+              <button
+                onClick={handleShare}
+                aria-label="Partager la vidéo"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${resolvedTheme === 'dark' ? 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white' : 'bg-gray-200/50 hover:bg-gray-300/50 text-gray-900'}`}
+              >
+                <span className="w-4 h-4"><ShareIcon /></span>
+              </button>
+
+              {/* Enregistrer */}
+              <button
+                onClick={handleSave}
+                aria-label={saved ? "Retirer des favoris" : "Ajouter aux favoris"}
+                aria-pressed={saved}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${
+                  saved 
+                    ? 'bg-yellow-600 text-white' 
+                    : resolvedTheme === 'dark' ? 'bg-zinc-800/50 hover:bg-zinc-700/50 text-white' : 'bg-gray-200/50 hover:bg-gray-300/50 text-gray-900'
+                }`}
+              >
+                <span className="w-4 h-4 text-yellow-400"><HeartIcon filled={saved} /></span>
+              </button>
+
+              {/* Menu trois points */}
+              <DotsMenu 
+                videoId={video.id} 
+                authorId={video.author?.id || ''} 
+                show={show}
+                saved={saved}
+                onSave={handleSave}
+                onShare={handleShare}
+                onContact={() => setShowContactModal(true)}
+              />
+            </div>
+
+            {/* Infos auteur - Compact style YouTube */}
+            <div className={`flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3 border-t ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-200'}`} role="group" aria-label="Informations de l'auteur">
+              {/* Avatar klikab */}
+              <button 
+                onClick={handleProfileClick}
+                onKeyDown={(e) => e.key === 'Enter' && handleProfileClick()}
+                aria-label={`Voir le profil de ${video.author?.name || 'l\'auteur'}`}
+                className="flex-shrink-0 hover:scale-105 transition-transform"
+              >
+                {video.author?.avatarUrl ? (
+                  <img 
+                    src={video.author.avatarUrl}
+                    alt={video.author?.name || 'User'}
+                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 ${resolvedTheme === 'dark' ? 'border-zinc-700' : 'border-gray-300'}`}
+                  />
+                ) : (
+                  <div
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-white border-2"
+                    style={{ backgroundColor: video.author?.avatarColor || '#666', borderColor: resolvedTheme === 'dark' ? '#525252' : '#d4d4d4' }}
+                  >
+                    {video.author?.initials || '?'}
+                  </div>
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <button 
+                  onClick={handleProfileClick}
+                  onKeyDown={(e) => e.key === 'Enter' && handleProfileClick()}
+                  aria-label={`Voir le profil de ${video.author?.name || 'l\'auteur'}`}
+                  className={`text-xs sm:text-sm font-semibold hover:text-blue-400 transition-colors text-left w-full ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+                >
+                  {video.author?.name || 'Inconnu'}
+                </button>
+                {/* Followers */}
+                <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{fmtNum(subscribers)} abonnés</p>
+              </div>
+              {/* Bouton Subscribe */}
+              <button 
+                onClick={handleSubscribe}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubscribe()}
+                aria-label={subscribed ? "Se désabonner" : "S'abonner"}
+                aria-pressed={subscribed}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
+                  subscribed
+                    ? resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                    : resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-white text-gray-900 hover:bg-gray-200'
+                }`}
+              >
+                {subscribed ? 'Abonné' : "S'abonner"}
+              </button>
+            </div>
+
+            {/* Description - Inline pour mobile et desktop */}
+            <button
+              onClick={() => setDescOpen(o => !o)}
+              aria-expanded={descOpen}
+              className={`w-full flex items-center justify-between py-2.5 sm:py-3 border-t text-xs sm:text-sm hover:text-white transition-colors text-left ${resolvedTheme === 'dark' ? 'border-zinc-800 text-zinc-300' : 'border-gray-200 text-gray-600'}`}
+            >
+              <span className="line-clamp-2 flex-1">{video.description || 'Aucune description'}</span>
+              <span className={`${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} text-[10px] sm:text-xs ml-2 whitespace-nowrap`}>{descOpen ? 'Moins' : 'Plus'}</span>
+            </button>
+            <div className={`overflow-hidden transition-all duration-300 ${descOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <p className={`text-xs sm:text-sm leading-relaxed pb-2.5 sm:pb-3 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{video.description || 'Aucune description'}</p>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 pb-2.5 sm:pb-3">
+                {(video.tags || []).map(tag => (
+                  <span key={tag} className={`text-[10px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-full ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300' : 'bg-gray-200 text-gray-700'}`}>
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
 
         </div>
 
-        {/* MOBILE/TABLET: Paj Kòmantè monte pi wo - Bottom Sheet Style */}
-        {isTabletOrBelow && commentsOpen && (
-          <div className="fixed inset-x-0 bottom-0 z-50 bg-[#0f0f0f] rounded-t-2xl shadow-2xl flex flex-col" style={{ top: '32%' }}>
-            {/* Drag handle */}
-            <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
-              <div className="w-12 h-1 bg-zinc-700 rounded-full"></div>
-            </div>
-
-            {/* Header paj kòmantè */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-              <button
-                onClick={() => setCommentsOpen(false)}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-300 hover:bg-zinc-800 transition-colors"
-              >
-                <span className="w-6 h-6"><XIcon /></span>
-              </button>
-              <span className="text-lg font-semibold text-white">Commentaires</span>
-              <span className="ml-2 px-2 py-0.5 bg-zinc-800 rounded-full text-sm text-zinc-400">{totalComments}</span>
-            </div>
-
-            {/* Filtres kòmantè */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-              <button
-                onClick={() => setCommentSort('popular')}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  commentSort === 'popular'
-                    ? 'bg-white text-black'
-                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                }`}
-              >
-                Les plus populaires
-              </button>
-              <button
-                onClick={() => setCommentSort('recent')}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  commentSort === 'recent'
-                    ? 'bg-white text-black'
-                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                }`}
-              >
-                Les plus récents
-              </button>
-            </div>
-
-            {/* Kontni kòmantè — DEFILAB */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-4">
-              {/* Champ saisie */}
-              <div className="flex gap-2 mb-4 flex-shrink-0">
-                <div className="w-9 h-9 rounded-full bg-blue-950 flex items-center justify-center text-[11px] font-bold text-blue-400 flex-shrink-0">
-                  {isAnonymous ? '?' : 'Moi'}
-                </div>
-                <div className="flex-1 flex flex-col gap-1">
-                  <div className="flex gap-2">
-                    <input
-                      ref={commentRef}
-                      value={commentInput}
-                      onChange={e => setCommentInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendComment()}
-                      placeholder='Ajouter un commentaire…'
-                      aria-label='Ajouter un commentaire'
-                      maxLength={MAX_COMMENT_LENGTH}
-                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded-full px-4 py-2 text-sm text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                    <button
-                      onClick={sendComment}
-                      disabled={!commentInput.trim()}
-                      aria-label='Envoyer'
-                      className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
-                    >
-                      <span className="w-4 h-4 text-white"><SendIcon /></span>
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isAnonymous}
-                        onChange={e => setIsAnonymous(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded accent-blue-500"
-                      />
-                      <span className="text-[11px] text-zinc-400">Anonyme</span>
-                    </label>
-                    <div className={`text-[11px] ${commentInput.length > MAX_COMMENT_LENGTH * 0.9 ? 'text-red-400' : 'text-zinc-600'}`}>
-                      {commentInput.length}/{MAX_COMMENT_LENGTH}
-                    </div>
-                  </div>
-                  
-                  {/* Voice Comment */}
-                  <VoiceComment
-                    onSend={handleVoiceCommentSend}
-                    maxDuration={30}
-                    autoDeleteAfter={72}
-                    accessGranted={voiceCommentAccess}
-                    commentId={`voice-${video.id}`}
-                  />
-                </div>
-              </div>
-
-              {/* Empty state */}
-              {sortedComments.length === 0 && (
-                <div className="text-center py-8 text-zinc-500">
-                  <p className="text-sm">Aucun commentaire pour le moment.</p>
-                  <p className="text-xs mt-1">Soyez le premier à commenter !</p>
-                </div>
-              )}
-
-              {/* Liste commentaires */}
-              <ul className="flex flex-col gap-4 pb-4" role="list">
-                {sortedComments.map(c => renderComment(c, true))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* MOBILE/TABLET: Bottom Sheet Description */}
-        {isTabletOrBelow && descModalOpen && (
-          <div className="fixed inset-x-0 bottom-0 z-50 bg-[#0f0f0f] rounded-t-2xl shadow-2xl" style={{ top: '25%' }}>
-            {/* Drag handle */}
-            <div className="flex justify-center pt-2 pb-1">
-              <div className="w-12 h-1 bg-zinc-700 rounded-full"></div>
-            </div>
-            
-            {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 sticky top-0 bg-[#0f0f0f] z-10">
-              <button
-                onClick={() => setDescModalOpen(false)}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-300 hover:bg-zinc-800 transition-colors"
-              >
-                <span className="w-6 h-6"><XIcon /></span>
-              </button>
-              <span className="text-lg font-semibold text-white">Description</span>
-            </div>
-            
-            {/* Kontni description */}
-            <div className="p-4 overflow-y-auto scrollbar-hide" style={{ maxHeight: 'calc(75vh - 120px)' }}>
-              <h1 className="text-lg font-bold text-white mb-2">{video.title}</h1>
-              
-              {/* Stats */}
-              <div className="flex items-center gap-3 text-sm text-zinc-400 mb-4">
-                <span>{fmtNum(video.views || 0)} vues</span>
-                <span>•</span>
-                <span>{video.postedAt}</span>
-              </div>
-              
-              {/* Description text */}
-              <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap mb-4">
-                {video.description || 'Aucune description'}
-              </p>
-              
-              {/* Tags */}
-              {(video.tags || []).length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {(video.tags || []).map(tag => (
-                    <span key={tag} className="text-xs px-3 py-1 rounded-full bg-zinc-800 text-zinc-300">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* MOBILE/TABLET: Vidéos similaires - sèlman lè kòmantè pa louvri */}
-        {isTabletOrBelow && !commentsOpen && (
-          <aside className="w-full flex-shrink-0 mt-4">
-            <p className="text-sm font-semibold text-white mb-3 px-4">
+        {/* MOBILE/TABLET: Vidéos similaires */}
+        {isTabletOrBelow && (
+          <aside className="w-full flex-shrink-0 mt-3 sm:mt-4">
+            <p className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 px-3 sm:px-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Vidéos similaires
             </p>
-            
+
             {/* MOBILE: 1 kolòn, TABLET: 2 kolòn */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-              {related.map(rv => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 w-full">
+              {related.map((rv) => (
                 <div
                   key={rv.id}
-                  className="bg-[#0f0f0f] rounded-xl overflow-hidden group cursor-pointer text-left"
+                  className={`${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]' : 'bg-gray-100'} overflow-hidden group cursor-pointer text-left`}
                   aria-label={`Regarder : ${rv.title}`}
+                  onClick={() => onSelect(rv)}
                 >
-                  {/* Miniature - Style SimpleVideoCard */}
-                  <div 
-                    className={`relative aspect-video bg-gradient-to-br ${rv.gradient} overflow-hidden`}
-                    onClick={() => onSelect(rv)}
-                  >
-                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors" />
-                    
-                    {/* Play button */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-black/70 flex items-center justify-center group-hover:scale-110 transition-transform backdrop-blur-sm border border-white/20">
-                        <span className="w-5 h-5 text-white"><PlayIcon /></span>
-                      </div>
-                    </div>
-                    
-                    {/* Duration */}
-                    <span className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">
-                      {rv.duration}
-                    </span>
-                  </div>
-                  
+                  {/* VideoPlayer pour thumbnails */}
+                  <VideoPlayer
+                    src={rv.file_url}
+                    poster={rv.cover_url}
+                    autoplay={false}
+                    className="aspect-video"
+                  />
+
                   {/* Info - Style SimpleVideoCard ultra-compact */}
-                  <div className="p-3">
+                  <div className="p-2.5 sm:p-3">
                     {/* Author row - Avatar klikab */}
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
                       {/* Avatar ki klike pou wè pwofil */}
                       <button
                         onClick={(e) => { e.stopPropagation(); }}
-                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white border border-zinc-600 hover:scale-105 transition-transform"
+                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white border hover:scale-105 transition-transform ${resolvedTheme === 'dark' ? 'border-zinc-600' : 'border-gray-400'}`}
                         style={{ backgroundColor: rv.author.avatarColor || '#666' }}
                       >
                         {rv.author.initials || '?'}
                       </button>
-                      
+
                       <div className="flex-1 min-w-0 text-left">
                         <button
                           onClick={(e) => { e.stopPropagation(); }}
-                          className="text-white font-semibold text-sm truncate hover:underline text-left"
+                          className={`${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold text-xs sm:text-sm truncate hover:underline text-left`}
                         >
                           {rv.author.name}
                         </button>
-                        <p className="text-zinc-500 text-[11px] truncate">{rv.author.profession || ''} • {rv.postedAt}</p>
+                        <p className={`text-[10px] sm:text-[11px] truncate ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>{rv.author.profession || ''} • {formatYouTubeDate(rv.postedAt)}</p>
                       </div>
                     </div>
-                    
+
                     {/* Titre + Bouton Chat */}
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 
-                        className="text-white font-semibold text-sm line-clamp-2 flex-1"
+                    <div className="flex items-start justify-between gap-1.5 sm:gap-2">
+                      <h3
+                        className={`${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold text-xs sm:text-sm line-clamp-2 flex-1`}
                         onClick={() => onSelect(rv)}
                       >
                         {rv.title}
@@ -1249,12 +1267,69 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                       {/* BOUTON CHAT - Ouvri ContactModal */}
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedAuthorForContact(rv.author); }}
-                        className="flex-shrink-0 px-3 py-1.5 rounded-full text-white text-xs font-medium flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+                        className="flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-white text-[10px] sm:text-xs font-medium flex items-center gap-1 sm:gap-1.5 hover:opacity-90 transition-opacity"
                         style={{ backgroundColor: rv.author.avatarColor || '#666' }}
                       >
-                        <span className="w-3 h-3"><MessageCircleIcon /></span>
+                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3"><MessageCircleIcon /></span>
                         <span className="hidden sm:inline">Contacter</span>
                         <span className="sm:hidden">Chat</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
+
+        {/* DESKTOP: Sidebar avec vidéos similaires */}
+        {!isTabletOrBelow && (
+          <aside className="w-full md:w-80 lg:w-96 flex-shrink-0 overflow-y-auto scrollbar-hide">
+            <p className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Vidéos similaires
+            </p>
+
+            <div className="space-y-2 sm:space-y-3">
+              {related.map((rv) => (
+                <div
+                  key={rv.id}
+                  className={`${resolvedTheme === 'dark' ? 'bg-[#0f0f0f] hover:bg-zinc-900' : 'bg-gray-100 hover:bg-gray-200'} rounded-xl overflow-hidden group cursor-pointer text-left transition-colors`}
+                  aria-label={`Regarder : ${rv.title}`}
+                  onClick={() => onSelect(rv)}
+                >
+                  {/* Miniature horizontale */}
+                  <div className="flex gap-2 sm:gap-3 p-2 sm:p-3">
+                    <div className="relative flex-shrink-0 w-36 sm:w-40 aspect-video rounded-lg overflow-hidden">
+                      <VideoPlayer
+                        src={rv.file_url}
+                        poster={rv.cover_url}
+                        autoplay={false}
+                        className="aspect-video"
+                      />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
+                        <h3 className={`${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold text-xs sm:text-sm line-clamp-2 mb-0.5 sm:mb-1`}>
+                          {rv.title}
+                        </h3>
+                        <p className={`text-[10px] sm:text-xs truncate mb-0.5 sm:mb-1 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
+                          {rv.author.name}
+                        </p>
+                        <p className={`text-[10px] sm:text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'}`}>
+                          {rv.author.profession || ''} • {formatYouTubeDate(rv.postedAt)}
+                        </p>
+                      </div>
+
+                      {/* Bouton Chat */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedAuthorForContact(rv.author); }}
+                        className="mt-1.5 sm:mt-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-white text-[10px] sm:text-xs font-medium flex items-center gap-0.5 sm:gap-1 hover:opacity-90 transition-opacity self-start"
+                        style={{ backgroundColor: rv.author.avatarColor || '#666' }}
+                      >
+                        <span className="w-2 h-2 sm:w-2.5 sm:h-2.5"><MessageCircleIcon /></span>
+                        <span>Contacter</span>
                       </button>
                     </div>
                   </div>
@@ -1268,7 +1343,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       {/* Toast global */}
       {msg && (
         <div role="status" aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium px-5 py-2.5 rounded-full shadow-xl whitespace-nowrap pointer-events-none">
+          className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-[999] text-xs sm:text-sm font-medium px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-xl whitespace-nowrap pointer-events-none ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
           {msg}
         </div>
       )}
@@ -1286,16 +1361,10 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
             profession: video.author.profession
           }}
           sender={{
-            id: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.id || 'current-user',
-            name: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.name || 'Moi',
-            avatar: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.avatar || null,
-            profession: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.profession || 'Utilisateur'
-          }}
-          dailyRequestCount={0}
-          onSendRequest={(message, category) => {
-            console.log('Message:', message, 'Category:', category);
-            show('Message envoyé !');
-            return { success: true };
+            id: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.id || 'current-user',
+            name: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.name || 'Moi',
+            avatar: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.photo || null,
+            profession: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.profession || 'Utilisateur'
           }}
         />
       )}
@@ -1313,16 +1382,10 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
             profession: selectedAuthorForContact.profession
           }}
           sender={{
-            id: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.id || 'current-user',
-            name: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.name || 'Moi',
-            avatar: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.avatar || null,
-            profession: JSON.parse(localStorage.getItem('exile_profile') || '{}')?.profession || 'Utilisateur'
-          }}
-          dailyRequestCount={0}
-          onSendRequest={(message, category) => {
-            console.log('Message:', message, 'Category:', category);
-            show('Message envoyé !');
-            return { success: true };
+            id: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.id || 'current-user',
+            name: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.name || 'Moi',
+            avatar: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.photo || null,
+            profession: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.profession || 'Utilisateur'
           }}
         />
       )}
@@ -1330,33 +1393,35 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       {/* Report Modal */}
       {reportModal.open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setReportModal({ open: false, commentId: null })}>
-          <div className="bg-zinc-900 rounded-2xl p-6 w-[90%] max-w-sm mx-4 shadow-2xl border border-zinc-800" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-white mb-1">Signaler ce commentaire</h3>
-            <p className="text-sm text-zinc-400 mb-4">Pourquoi signalez-vous ce commentaire ?</p>
-            <div className="flex flex-col gap-2 mb-4">
+          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} rounded-2xl p-4 sm:p-6 w-[90%] max-w-sm mx-4 shadow-2xl border`} onClick={e => e.stopPropagation()}>
+            <h3 className={`text-sm sm:text-lg font-semibold mb-1 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Signaler ce commentaire</h3>
+            <p className={`text-xs sm:text-sm mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>Pourquoi signalez-vous ce commentaire ?</p>
+            <div className="flex flex-col gap-1.5 sm:gap-2 mb-3 sm:mb-4">
               {['Contenu inapproprié', 'Harcèlement', 'Spam', 'Fausse information', 'Autre'].map(reason => (
                 <button
                   key={reason}
                   onClick={() => setReportReason(reason)}
-                  className={`text-left px-4 py-2.5 rounded-xl text-sm transition-colors ${
-                    reportReason === reason ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  className={`text-left px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm transition-colors ${
+                    reportReason === reason 
+                      ? 'bg-blue-600 text-white' 
+                      : resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {reason}
                 </button>
               ))}
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={() => setReportModal({ open: false, commentId: null })}
-                className="flex-1 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 hover:bg-zinc-700 text-sm font-medium transition-colors"
+                className={`flex-1 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
               >
                 Annuler
               </button>
               <button
                 onClick={handleReportComment}
                 disabled={!reportReason}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 text-sm font-medium transition-colors"
+                className="flex-1 py-2 sm:py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 text-xs sm:text-sm font-medium transition-colors"
               >
                 Signaler
               </button>

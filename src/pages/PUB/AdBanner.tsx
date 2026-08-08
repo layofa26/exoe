@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -233,7 +234,7 @@ export function AdBanner({
           transform: entered ? "translateY(0)" : "translateY(10px)",
           transition: "opacity 0.5s ease, transform 0.5s ease",
         }}
-        className="relative my-1"
+        className="relative my-0"
       >
         {/* Ligne "Publicité" discrète */}
         <div className="flex items-center justify-between mb-2 px-1">
@@ -314,7 +315,7 @@ export function AdBanner({
       }}
     >
       {/* Bouton fermer - kache sou mobil pou ekonomize espas */}
-      <div className="flex items-center justify-between mb-1 sm:mb-2">
+      <div className="flex items-center justify-between mb-0 sm:mb-2">
         <SponsoredBadge />
         <button
           onClick={handleClose}
@@ -438,18 +439,19 @@ interface SectionPubProps {
 }
 
 export default function SectionPub({ className = '' }: SectionPubProps) {
+  const { resolvedTheme } = useTheme();
   const [adIdx, setAdIdx] = useState(0);
   const [animatingAds, setAnimatingAds] = useState<number[]>([]);
   const activeAds = DEMO_ADS.filter((a) => a.status === "active");
 
-  // Montrer jiska 9 piblikite (3x3)
+  // Montrer jiska 12 piblikite (4x3)
   const getAdAt = (index: number) => activeAds[index % Math.max(activeAds.length, 1)];
 
-  // Desktop: 9 piblikite (3x3)
-  const desktopAds = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => getAdAt(adIdx + i));
+  // Desktop: 12 piblikite (3x3)
+  const desktopAds = [0, 1, 2, 3, 4, 5, 6, 7, 8,9,10,11].map(i => getAdAt(adIdx + i));
   
-  // Mobile: 4 piblikite nan yon liy
-  const mobileBaseAds = [0, 1, 2, 3].map(i => getAdAt(adIdx + i));
+  // Mobile: 12 piblikite nan yon liy
+  const mobileBaseAds = [0, 1, 2, 3, 4, 5, 6, 7, 8,9,10,11].map(i => getAdAt(adIdx + i));
 
   // Efè wotasyon chak 5 segond pou tout ekran
   useEffect(() => {
@@ -478,19 +480,18 @@ export default function SectionPub({ className = '' }: SectionPubProps) {
   
   if (isSmallScreen) {
     return (
-      <div className={`fixed top-[112px] left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm ${className}`}>
+      <div className={`fixed top-[110px] sm:top-[128px] left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm ${className}`}>
         {/* Header ekstrèmman konpakt */}
-        <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-2 py-1 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-2 py-0 flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <div className="w-1 h-1 bg-white rounded-full animate-pulse" />
+            <div className="pt-6 w-1 h-1  rounded-full animate-pulse" />
             <span className="text-[9px] font-bold text-white tracking-wide">Publicite</span>
           </div>
-          <span className="text-[7px] text-white/70">Ads</span>
         </div>
         
-        {/* Liy horizontal 4 piblikite - ekstrèmman konpakt */}
-        <div className="flex overflow-x-auto gap-1 px-1 py-1 scrollbar-hide" style={{ scrollSnapType: 'x mandatory' }}>
-          {mobileBaseAds.slice(0, 4).map((ad, i) => (
+        {/* Liy horizontal 6 piblikite - ekstrèmman konpakt */}
+        <div className="flex overflow-x-auto gap-1 px-1 py-0 scrollbar-hide" style={{ scrollSnapType: 'x mandatory' }}>
+          {mobileBaseAds.slice(0, 6).map((ad, i) => (
             <div 
               key={`mobile-ad-${ad.id}-${i}`}
               className={`flex-shrink-0 transition-all duration-500 ${
@@ -509,7 +510,7 @@ export default function SectionPub({ className = '' }: SectionPubProps) {
                 className="w-full text-left group bg-white rounded overflow-hidden shadow-sm hover:shadow transition-all duration-200 border border-gray-100 active:scale-95"
               >
                 {/* Image container - pi piti 3:1 ratio */}
-                <div className={`relative aspect-[3/1] overflow-hidden bg-gradient-to-br ${ad.gradient}`}>
+                <div className={`relative aspect-[4/2] overflow-hidden bg-gradient-to-br ${ad.gradient}`}>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-white font-bold text-[9px] tracking-wider drop-shadow">
                       {ad.brandInitials}
@@ -537,20 +538,21 @@ export default function SectionPub({ className = '' }: SectionPubProps) {
 
   // Vèsyon desktop - Grid 3x3 (jiska 9 piblikite) ak menm animasyon
   return (
-    <div className={`space-y-3 ${className}`}>
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-2 flex items-center justify-between mb-6">
+    <div className={`space-y-3 mt-16 ${className}`}>
+      <div className={`${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]' : 'bg-white'} rounded-xl shadow-lg border ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-100'} overflow-hidden`}>
+        {/* Header 
+        <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-2 flex items-center justify-between mb-8">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">Publicite</span>
+            <span className="text-sm font-semibold text-white mb-0">Publicite</span>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 mt-10">
             <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" />
             <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
             <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
           </div>
         </div>
-        
+        */}
+
         {/* Grid 3x3 ak menm animasyon an tankou mobil */}
         <div className="p-3 grid grid-cols-3 gap-3">
           {desktopAds.map((ad, i) => (
@@ -558,8 +560,8 @@ export default function SectionPub({ className = '' }: SectionPubProps) {
               key={`desktop-ad-${i}`}
               onClick={() => window.open(ad.ctaUrl, '_blank')}
               className={`text-left group transition-all duration-500 ${
-                animatingAds.includes(i) 
-                  ? 'scale-95 opacity-70' 
+                animatingAds.includes(i)
+                  ? 'scale-95 opacity-70'
                   : 'scale-100 opacity-100'
               }`}
             >
@@ -573,23 +575,13 @@ export default function SectionPub({ className = '' }: SectionPubProps) {
                 )}
               </div>
               <div className="mt-2 space-y-0.5">
-                <p className="text-xs font-bold text-gray-800 line-clamp-1">{ad.brandName}</p>
-                <p className="text-[10px] text-gray-500 line-clamp-1">{ad.tagline}</p>
+                <p className={`text-xs font-bold line-clamp-1 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{ad.brandName}</p>
+                <p className={`text-[10px] line-clamp-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{ad.tagline}</p>
               </div>
             </button>
           ))}
         </div>
-        
-        {/* Footer */}
-        <div className="px-3 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-          <span className="text-[10px] text-gray-400">{activeAds.length} publicités disponibles</span>
-          <button 
-            onClick={() => setAdIdx(x => x + 3)}
-            className="text-[10px] text-orange-500 hover:text-orange-600 font-medium"
-          >
-            Voir plus →
-          </button>
-        </div>
+
       </div>
     </div>
   );

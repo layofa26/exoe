@@ -1,51 +1,19 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import type { Video } from '../../types/video';
 import { Play, MessageCircle, Trash2 } from 'lucide-react';
 import { ContactModal } from '../modals/ContactModal';
-import { useRequests } from '../../hooks/useRequests';
-
-// Fonksyon pou jwenn koulè kategori
-const getCategoryColor = (category: string) => {
-  const colors: Record<string, string> = {
-    'Mason': '#8B4513',
-    'Plomber': '#3B82F6',
-    'Electricien': '#F59E0B',
-    'Couturier': '#EC4899',
-    'Cuisinier': '#EF4444',
-    'Peintre': '#10B981',
-    'Coiffeur': '#8B5CF6',
-    'Menuisier': '#A16207',
-    'Informaticien': '#06B6D4',
-    'Medecin': '#DC2626',
-    'Avocat': '#1E40AF',
-    'Comptable': '#059669',
-    'Macon': '#92400E',
-    'Chauffeur': '#4B5563',
-    'Securite': '#1F2937',
-    'Jardinier': '#16A34A',
-    'Photographe': '#DB2777',
-    'Musicien': '#7C3AED',
-    'Sport': '#EA580C',
-    'Education': '#0891B2',
-    'Sante': '#DC2626',
-    'Technologie': '#2563EB',
-    'Art': '#D946EF',
-    'Business': '#CA8A04',
-    'Musique': '#9333EA',
-    'Cuisine': '#E11D48',
-    'default': '#F97316'
-  }
-  return colors[category] || colors['default']
-};
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface SimpleVideoCardProps {
   video: Video;
   onClick?: () => void;
   onDelete?: (videoId: string) => void;
+  autoplay?: boolean;
 }
 
-export function SimpleVideoCard({ video, onClick, onDelete }: SimpleVideoCardProps) {
+export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: SimpleVideoCardProps) {
+  const { resolvedTheme } = useTheme();
+  
   // Defensive: asire video ak author egziste
   if (!video) {
     return null;
@@ -61,61 +29,58 @@ export function SimpleVideoCard({ video, onClick, onDelete }: SimpleVideoCardPro
   };
   
   const [showContactModal, setShowContactModal] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Sekurite: verifye si se pwòp itilizatè a
-  const userProfile = JSON.parse(localStorage.getItem('exile_profile') || '{}');
+  // Autoplay logic
+  useEffect(() => {
+    if (autoplay && video.videoUrl && videoRef.current) {
+      const videoElement = videoRef.current;
+      videoElement.muted = true;
+      videoElement.play().catch(err => {
+        console.log('Autoplay prevented:', err);
+      });
+
+      // Ne pas arrêter l'autoplay si la lecture aléatoire est activée
+      const previewEnabled = localStorage.getItem('exile_video_preview_enabled');
+      if (previewEnabled !== 'true') {
+        // Arrêter autoplay après 5 secondes si la lecture aléatoire n'est pas activée
+        const timeout = setTimeout(() => {
+          videoElement.pause();
+        }, 5000);
+
+        return () => {
+          clearTimeout(timeout);
+          videoElement.pause();
+        };
+      }
+
+      return () => {
+        videoElement.pause();
+      };
+    }
+  }, [autoplay, video.videoUrl]);
+
+  // Profil de l'utilisateur connecté
+  const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
   const currentUserId = userProfile?.id || 'current-user-' + Date.now();
-  const isOwnProfile = author.id === currentUserId;
 
-  // Fonksyon pou kontakte otè a
+  const displayUser = {
+    id: userProfile?.id || currentUserId,
+    name: userProfile?.name || 'Utilisateur',
+    profession: userProfile?.profession || 'Professionnel',
+    photo: userProfile?.photo || null,
+    avatarColor: userProfile?.avatarColor || '#666'
+  };
+
   const handleContact = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowContactModal(true);
   };
 
-  const navigate = useNavigate();
-
-  // Fonksyon pou wè profil (ak sekurite)
-  const handleProfileClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Si se pwòp pwofil la, navige nan gran paj pwofil la
-    if (isOwnProfile) {
-      navigate('/pro/settings'); // Rediriger vers les paramètres ou une autre page de profil temporaire
-    }
-  };
-
-  // UseRequests hook pou sistèm kontak
-  const { sendRequest, dailyRequestCount } = useRequests(currentUserId);
-
-  // Handle send request via ContactModal
-  const handleSendRequest = (message: string, requestCategory?: string) => {
-    if (!video.author) {
-      return { success: false, error: 'Aucun auteur trouvé' };
-    }
-
-    const receiver = {
-      id: video.author.id,
-      name: video.author.name,
-      avatar: video.author.avatarUrl || null,
-      profession: video.author.profession,
-    };
-
-    const sender = {
-      id: currentUserId,
-      name: userProfile?.name || 'Moi',
-      avatar: userProfile?.avatar || null,
-      profession: userProfile?.profession || 'Utilisateur',
-    };
-
-    // Voye demand lan (category se yon paramèt opstionèl ki ka itilize nan fiti)
-    console.log('Category:', requestCategory);
-    return sendRequest(receiver, message, sender);
-  };
-
   return (
-    <div className="bg-[#0f0f0f] rounded-xl overflow-hidden group cursor-pointer relative" onClick={onClick}>
+    <div className={`${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]' : 'bg-white'} rounded-xl overflow-hidden group cursor-pointer relative`} onClick={onClick}>
       {/* Miniature - thumbnail oswa gradient CSS + bouton play */}
-      <div className={`relative aspect-video bg-gradient-to-br ${video.gradient} overflow-hidden`}>
+      <div className={`relative aspect-video lg:aspect-video bg-gradient-to-br ${video.gradient} overflow-hidden`}>
         {/* Bouton efase (parèt lè hover) */}
         <button
           onClick={(e) => {
@@ -130,87 +95,97 @@ export function SimpleVideoCard({ video, onClick, onDelete }: SimpleVideoCardPro
           <Trash2 className="w-4 h-4" />
         </button>
         
-        {/* Thumbnail si li egziste */}
-        {video.thumbnail ? (
-          <img 
-            src={video.thumbnail}
-            alt={video.title}
+        {/* Video element for autoplay */}
+        {autoplay && video.videoUrl ? (
+          <video
+            ref={videoRef}
+            src={video.videoUrl}
             className="absolute inset-0 w-full h-full object-cover"
-            onError={(e) => {
-              // Si thumbnail pa chaje, kache l
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
+            muted
+            playsInline
+            loop
           />
-        ) : null}
-        
-        {/* Grain texture overlay (sou thumbnail tou) */}
-        <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIvPjwvc3ZnPg==')]" />
-        
-        <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors" />
-        
-        {/* Play button */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-black/70 flex items-center justify-center group-hover:scale-110 transition-transform backdrop-blur-sm border border-white/20">
-            <Play className="w-5 h-5 text-white fill-white ml-0.5" />
-          </div>
-        </div>
+        ) : (
+          <>
+            {/* Thumbnail si li egziste */}
+            {video.thumbnail ? (
+              <img 
+                src={video.thumbnail}
+                alt={video.title}
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => {
+                  // Si thumbnail pa chaje, kache l
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : null}
+            
+            {/* Grain texture overlay (sou thumbnail tou) */}
+            <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIvPjwvc3ZnPg==')]" />
+            
+            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors" />
+            
+            {/* Play button */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-black/70 flex items-center justify-center group-hover:scale-110 transition-transform backdrop-blur-sm border border-white/20">
+                <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Info ultra-compact */}
-      <div className="p-3">
-        {/* Author row - Avatar + Nom + Profession + Date */}
-        <div className="flex items-center gap-2.5 mb-2">
-          {/* Avatar - foto profil reyèl oswa initials (klikab pou profil) */}
-          <button 
-            onClick={handleProfileClick}
-            className="flex-shrink-0 hover:scale-110 transition-transform"
-          >
-            {author?.avatarUrl ? (
-              <img 
-                src={author.avatarUrl}
-                alt={author?.name || 'User'}
-                className="w-8 h-8 rounded-full object-cover border border-zinc-600"
+      {/* Info ultra-compact - Hauteur réduite */}
+      <div className={`p-2 ${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]' : 'bg-white'}`}>
+        {/* User row - Avatar + Nom */}
+        <div className="flex items-center gap-2 mb-1.5">
+          {/* Avatar - profil utilisateur connecté - Plus petit */}
+          <div className="flex-shrink-0">
+            {displayUser?.photo ? (
+              <img
+                src={displayUser.photo}
+                alt={displayUser?.name || 'User'}
+                className="w-6 h-6 rounded-full object-cover border border-zinc-600"
                 onError={(e) => {
-                  // Si foto a pa chaje, montre initials
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             ) : (
-              <div 
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs border border-zinc-600"
-                style={{ backgroundColor: author?.avatarColor || '#666' }}
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-[10px] border border-zinc-600 bg-gradient-to-br from-blue-500 to-purple-600"
               >
-                {author?.initials || '?'}
+                {displayUser?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
-          </button>
-          
-          <div className="flex-1 min-w-0">
-            <p className="text-white font-semibold text-sm truncate">{author?.name || 'Inconnu'}</p>
-            <p className="text-zinc-500 text-[11px] truncate">
-              {author?.profession || ''} • {video.postedAt}
-            </p>
           </div>
-          
-          {/* Bouton Contacter - koulè dinamik */}
-          <button 
+
+          <div className="flex-1 min-w-0">
+            <p className={`${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold text-xs truncate`}>{displayUser?.name || 'Utilisateur'}</p>
+          </div>
+
+          {/* Bouton Contacter - Plus petit */}
+          <button
             onClick={handleContact}
-            className="px-3 py-1.5 rounded-full text-white text-xs font-medium transition-all hover:opacity-90 active:scale-95 flex items-center gap-1.5"
-            style={{ backgroundColor: author?.avatarColor || getCategoryColor(video.category || 'default') }}
+            className="px-2 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium transition-all hover:opacity-90 active:scale-95 flex items-center gap-1"
           >
-            <MessageCircle className="w-3 h-3" />
+            <MessageCircle className="w-2.5 h-2.5" />
             <span className="hidden sm:inline">Contacter</span>
             <span className="sm:hidden">Chat</span>
           </button>
         </div>
 
-        {/* Titre sèlman - anyen lòt */}
-        <h3 className="text-white font-semibold text-sm line-clamp-2">
+        {/* Titre - 1 ligne seulement */}
+        <h3 className={`${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-sm truncate mb-0.5`}>
           {video.title}
         </h3>
+
+        {/* Vues - Compact */}
+        <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-[10px]`}>
+          {video.views || 0} vues
+        </p>
       </div>
 
-      {/* Modal Kontak Reyèl ak ContactModal */}
+      {/* Modal Kontak */}
       {showContactModal && author && (
         <ContactModal
           isOpen={showContactModal}
@@ -224,24 +199,12 @@ export function SimpleVideoCard({ video, onClick, onDelete }: SimpleVideoCardPro
           sender={{
             id: currentUserId,
             name: userProfile?.name || 'Moi',
-            avatar: userProfile?.avatar || null,
+            avatar: userProfile?.photo || null,
             profession: userProfile?.profession || 'Utilisateur'
           }}
-          dailyRequestCount={dailyRequestCount}
-          onSendRequest={handleSendRequest}
         />
       )}
 
     </div>
   );
-}
-
-// Fonksyon pou fonse yon koulè
-function adjustColor(color: string, amount: number): string {
-  const hex = color.replace('#', '');
-  const num = parseInt(hex, 16);
-  const r = Math.max(0, Math.min(255, (num >> 16) + amount));
-  const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
-  const b = Math.max(0, Math.min(255, (num & 0x00FF) + amount));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }

@@ -1,4 +1,5 @@
 import type { ProfessionValidation } from '../types'
+import { RESERVED_NAMES } from '../constants/reservedNames'
 
 interface ProfessionsDatabase {
   [key: string]: string[]
@@ -36,7 +37,7 @@ export const PROFESSIONS_DATABASE: ProfessionsDatabase = {
   ],
   
   creation: [
-    "Graphiste", "Designer Graphique", "Directeur Artistique",
+    "Créateur de contenu", "Graphiste", "Designer Graphique", "Directeur Artistique",
     "Photographe", "Vidéaste", "Monteur Vidéo", "Cadreur",
     "Rédacteur", "Copywriter", "Journaliste", "Correcteur",
     "Illustrateur", "Motion Designer", "Sound Designer",
@@ -110,14 +111,14 @@ export const isValidProfession = (profession: string): ProfessionValidation => {
     return { valid: false, error: 'Profession trop courte' }
   }
   
-  // Check blacklist
+  // Check blacklist (explicit content patterns)
   for (const pattern of PROHIBITED_PATTERNS) {
     if (pattern.test(profession)) {
       return { valid: false, error: 'Terme non autorisé' }
     }
   }
   
-  // Check if in database (exact match)
+  // Check if in database (exact match) - PRIORITÉ
   const exactMatch = ALL_PROFESSIONS.includes(profession)
   
   if (exactMatch) {
@@ -131,6 +132,15 @@ export const isValidProfession = (profession: string): ProfessionValidation => {
   
   if (partialMatches.length > 0) {
     return { valid: true, type: 'suggestion', suggestions: partialMatches.slice(0, 5) }
+  }
+  
+  // Check reserved names (misleading words, companies, brands)
+  // SEULEMENT pour les nouvelles professions pas dans la base
+  const normalizedProfession = profession.toLowerCase().trim()
+  for (const reservedName of RESERVED_NAMES) {
+    if (normalizedProfession.includes(reservedName)) {
+      return { valid: false, error: 'Ce nom est réservé' }
+    }
   }
   
   // New profession - needs manual review

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Check, X, Building2, Briefcase } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
 
 interface PlanFeature {
   text: string
@@ -18,6 +19,8 @@ interface InstitutionPlan {
 }
 
 export const Pricing = (): JSX.Element => {
+  const { resolvedTheme } = useTheme()
+
   const institutionPlans: InstitutionPlan[] = [
     {
       name: 'Vérifié',
@@ -100,53 +103,53 @@ export const Pricing = (): JSX.Element => {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} py-12 sm:py-16 px-4`}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="text-center mb-8 sm:mb-12 md:mb-16 mt-4 sm:mt-0">
+          <h1 className={`text-2xl sm:text-3xl md:text-4xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>
             Tarifs EXILE
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className={`text-base sm:text-lg md:text-xl ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'} max-w-2xl mx-auto px-4`}>
             Choisissez le plan adapté à vos besoins. Professionnels gratuits, 
             institutions vérifiées.
           </p>
         </div>
 
         {/* Professional Section */}
-        <div className="mb-20">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center space-x-2 bg-pro/10 text-pro px-4 py-2 rounded-full mb-4">
-              <Briefcase className="w-5 h-5" />
-              <span className="font-semibold">Module Professionnel</span>
+        <div className="mb-16 sm:mb-20">
+          <div className="text-center mb-8 sm:mb-12">
+            <div className={`inline-flex items-center space-x-2 bg-pro/10 text-pro px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-3 sm:mb-4`}>
+              <Briefcase className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="font-semibold text-sm sm:text-base">Module Professionnel</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>
               Gratuit pour les professionnels
             </h2>
           </div>
 
-          <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8 border-2 border-pro/20">
-            <div className="text-center mb-8">
-              <div className="text-4xl font-bold text-pro mb-2">
+          <div className={`max-w-2xl mx-auto rounded-2xl shadow-lg p-5 sm:p-6 md:p-8 border-2 border-pro/20 ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'}`}>
+            <div className="text-center mb-6 sm:mb-8">
+              <div className="text-3xl sm:text-4xl font-bold text-pro mb-2">
                 Gratuit
               </div>
-              <p className="text-gray-600">
+              <p className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
                 Commission de 15% sur les transactions uniquement
               </p>
             </div>
 
-            <ul className="space-y-4 mb-8">
+            <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
               {proFeatures.map((feature, index) => (
                 <li key={index} className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-pro flex-shrink-0" />
-                  <span className="text-gray-700">{feature}</span>
+                  <Check className="w-4 h-4 sm:w-5 sm:h-5 text-pro flex-shrink-0" />
+                  <span className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{feature}</span>
                 </li>
               ))}
             </ul>
 
             <Link
               to="/register"
-              className="block w-full text-center bg-pro text-white font-semibold py-4 rounded-xl hover:bg-pro/90"
+              className="block w-full text-center bg-pro text-white font-semibold py-3 sm:py-4 rounded-xl hover:bg-pro/90 text-sm sm:text-base"
             >
               Créer un compte Pro gratuit
             </Link>
@@ -155,55 +158,55 @@ export const Pricing = (): JSX.Element => {
 
         {/* Institution Section */}
         <div>
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center space-x-2 bg-social/10 text-social px-4 py-2 rounded-full mb-4">
-              <Building2 className="w-5 h-5" />
-              <span className="font-semibold">Module Social Institutionnel</span>
+          <div className="text-center mb-8 sm:mb-12">
+            <div className={`inline-flex items-center space-x-2 bg-social/10 text-social px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-3 sm:mb-4`}>
+              <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="font-semibold text-sm sm:text-base">Module Social Institutionnel</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>
               Institutions vérifiées
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {institutionPlans.map((plan, index) => (
               <div
                 key={index}
-                className={`rounded-2xl p-6 ${
+                className={`rounded-2xl p-4 sm:p-6 ${
                   plan.highlighted
                     ? 'bg-gradient-to-br from-social to-blue-600 text-white shadow-xl scale-105'
-                    : 'bg-white border border-gray-200'
+                    : resolvedTheme === 'dark' ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-gray-200'
                 }`}
               >
-                <div className="mb-6">
-                  <h3 className={`text-xl font-bold mb-2 ${plan.highlighted ? 'text-white' : 'text-gray-900'}`}>
+                <div className="mb-4 sm:mb-6">
+                  <h3 className={`text-base sm:text-lg md:text-xl font-bold mb-2 ${plan.highlighted ? 'text-white' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {plan.name}
                   </h3>
-                  <p className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-gray-500'}`}>
+                  <p className={`text-xs sm:text-sm ${plan.highlighted ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                     {plan.description}
                   </p>
                 </div>
 
-                <div className="mb-6">
-                  <span className={`text-4xl font-bold ${plan.highlighted ? 'text-white' : 'text-gray-900'}`}>
+                <div className="mb-4 sm:mb-6">
+                  <span className={`text-2xl sm:text-3xl md:text-4xl font-bold ${plan.highlighted ? 'text-white' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     ${plan.price}
                   </span>
-                  <span className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-gray-500'}`}>
+                  <span className={`text-xs sm:text-sm ${plan.highlighted ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                     {plan.period === 'one-time' ? ' unique' : '/mois'}
                   </span>
                 </div>
 
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-2 sm:space-y-3 mb-6 sm:mb-8">
                   {plan.features.map((feature, fIndex) => (
-                    <li key={fIndex} className="flex items-start space-x-3">
+                    <li key={fIndex} className="flex items-start space-x-2 sm:space-x-3">
                       {feature.included ? (
-                        <Check className={`w-5 h-5 flex-shrink-0 ${plan.highlighted ? 'text-blue-200' : 'text-social'}`} />
+                        <Check className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${plan.highlighted ? 'text-blue-200' : 'text-social'}`} />
                       ) : (
-                        <X className="w-5 h-5 flex-shrink-0 text-gray-300" />
+                        <X className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-gray-300" />
                       )}
-                      <span className={`text-sm ${
+                      <span className={`text-xs sm:text-sm ${
                         feature.included
-                          ? plan.highlighted ? 'text-white' : 'text-gray-700'
+                          ? plan.highlighted ? 'text-white' : resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'
                           : 'text-gray-400'
                       }`}>
                         {feature.text}
@@ -214,10 +217,14 @@ export const Pricing = (): JSX.Element => {
 
                 <Link
                   to={plan.ctaLink}
-                  className={`block w-full text-center font-semibold py-3 rounded-xl ${
+                  className={`block w-full text-center font-semibold py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm ${
                     plan.highlighted
-                      ? 'bg-white text-social hover:bg-gray-100'
-                      : 'bg-social/10 text-social hover:bg-social/20'
+                      ? resolvedTheme === 'dark'
+                        ? 'bg-zinc-700 text-white hover:bg-zinc-600'
+                        : 'bg-white text-social hover:bg-gray-100'
+                      : resolvedTheme === 'dark'
+                        ? 'bg-zinc-700 text-white hover:bg-zinc-600'
+                        : 'bg-social/10 text-social hover:bg-social/20'
                   }`}
                 >
                   {plan.cta}

@@ -217,3 +217,28 @@ body {
 .dark button:active {
   color: inherit;
 }
+
+/* Force text colors in dark mode */
+.dark {
+  color: #f8fafc;
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6,
+.dark p,
+.dark span,
+.dark div,
+.dark input,
+.dark textarea,
+.dark select {
+  color: #f8fafc;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8;
+}

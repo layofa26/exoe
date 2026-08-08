@@ -4,6 +4,7 @@ export interface User {
   email: string;
   username: string;
   fullName: string;
+  avatarUrl?: string;
   roles: string[];
   type: 'professional' | 'institution' | 'admin';
   legacyPro?: boolean;
@@ -60,11 +61,10 @@ export interface InstitutionStep1 {
   email: string;
   phone: string;
   address: string;
+  city: string;
+  country: string;
   website?: string;
-  responsibleName: string;
-  responsibleTitle: string;
-  responsibleIdType: string;
-  responsibleIdNumber: string;
+  description?: string;
 }
 
 export type InstitutionType = 
@@ -75,12 +75,16 @@ export type InstitutionType =
   | 'company' 
   | 'government' 
   | 'religious' 
+  | 'media'
+  | 'training_center'
+  | 'association'
   | 'other';
 
 export interface InstitutionStep2 {
   countryCode: string;
   registrationNumber: string;
-  legalDocument: File;
+  registrationType: string;
+  legalDocument: File | null;
 }
 
 // Country Types
