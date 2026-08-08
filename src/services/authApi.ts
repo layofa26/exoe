@@ -152,6 +152,11 @@ export const authApi = {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        console.error('Erreur backend inscription:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        })
         
         // Handle specific error messages from Django
         if (errorData.error) {
@@ -169,10 +174,13 @@ export const authApi = {
         if (errorData.birth_date) {
           return { success: false, error: Array.isArray(errorData.birth_date) ? errorData.birth_date[0] : errorData.birth_date }
         }
+        if (errorData.non_field_errors) {
+          return { success: false, error: Array.isArray(errorData.non_field_errors) ? errorData.non_field_errors[0] : errorData.non_field_errors }
+        }
         
         return {
           success: false,
-          error: 'Erreur lors de l\'inscription'
+          error: `Erreur ${response.status}: ${JSON.stringify(errorData)}`
         }
       }
 
