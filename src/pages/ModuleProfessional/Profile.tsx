@@ -214,7 +214,7 @@ const Profile = () => {
 
         // Charger les abonnés
         try {
-          const subscribersResponse = await fetch('${API_BASE_URL}/v1/abonnement/abonnements/subscribers/', {
+          const subscribersResponse = await fetch(`${API_BASE_URL}/v1/abonnement/abonnements/subscribers/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -233,7 +233,7 @@ const Profile = () => {
 
         // Charger l'activité récente
         try {
-          const activitiesResponse = await fetch('${API_BASE_URL}/v1/activities/', {
+          const activitiesResponse = await fetch(`${API_BASE_URL}/v1/activities/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -256,7 +256,7 @@ const Profile = () => {
 
         // Charger les badges
         try {
-          const badgesResponse = await fetch('${API_BASE_URL}/v1/user-badges/', {
+          const badgesResponse = await fetch(`${API_BASE_URL}/v1/user-badges/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -283,7 +283,7 @@ const Profile = () => {
         
       } catch (error) {
         console.error('Error loading profile:', error)
-        setError('Impossible de charger le profil')
+        setError('Impossible de charger le profil. Réessayez.')
         
         // Si erreur 401 (token expiré), déconnecter et rediriger
         if (error instanceof Error && error.message.includes('401')) {

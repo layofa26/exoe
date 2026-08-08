@@ -27,8 +27,10 @@ export const Header = (): JSX.Element => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Cacher la barre de recherche sur la page d'accueil
+  // Cacher la barre de recherche sur la page d'accueil, login, register et forgot password
   const isLandingPage = location.pathname === '/'
+  const isAuthPage = ['/login', '/register', '/forgot-password', '/forgot-email', '/reset-password'].includes(location.pathname)
+  const hideSearchBar = isLandingPage || isAuthPage
 
   // Scroll behavior - header suit le feed et redescente immédiatement
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
@@ -359,8 +361,8 @@ export const Header = (): JSX.Element => {
           <div className="flex-1 flex items-center justify-end space-x-1 md:space-x-2">
             {!isAuthenticated ? (
               <div className="flex items-center space-x-2">
-                {/* Search Icon - Non connecté avec logique complète - Caché sur page d'accueil */}
-                {!isLandingPage && (
+                {/* Search Icon - Non connecté avec logique complète - Caché sur page d'accueil et auth pages */}
+                {!hideSearchBar && (
                   <div className="relative" ref={searchRef}>
                     <button
                       onClick={() => {
@@ -548,8 +550,8 @@ export const Header = (): JSX.Element => {
               </div>
             ) : (
               <div className="flex items-center space-x-2 md:space-x-3">
-                {/* Search Icon - Connecté avec logique complète - Caché sur page d'accueil */}
-                {!isLandingPage && (
+                {/* Search Icon - Connecté avec logique complète - Caché sur page d'accueil et auth pages */}
+                {!hideSearchBar && (
                   <div className="relative" ref={searchRef}>
                     <button
                       onClick={() => {

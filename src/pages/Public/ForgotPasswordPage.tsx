@@ -26,12 +26,44 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 sm:p-6 ${
-      resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'
+    <div className={`min-h-screen flex items-center justify-center py-6 sm:py-12 px-3 sm:px-4 relative overflow-hidden ${
+      resolvedTheme === 'dark' 
+        ? 'bg-slate-900' 
+        : 'bg-gray-50'
     }`}>
-      <div className={`w-full max-w-md ${
-        resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'
-      } rounded-2xl shadow-xl p-6 sm:p-8`}>
+      {/* Animated Background with Color Mixing - Same as Login */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Animated gradient background */}
+        <div className="absolute inset-0 animate-gradient-x" style={{
+          background: `linear-gradient(45deg, 
+            ${resolvedTheme === 'dark' ? '#1e3a8a' : '#3b82f6'}, 
+            ${resolvedTheme === 'dark' ? '#7c3aed' : '#8b5cf6'}, 
+            ${resolvedTheme === 'dark' ? '#059669' : '#10b981'}, 
+            ${resolvedTheme === 'dark' ? '#dc2626' : '#ef4444'}
+          )`,
+          backgroundSize: '400% 400%',
+          animation: 'gradient 15s ease infinite',
+        }} />
+        
+        {/* Simple geometric shapes */}
+        <div className="absolute top-20 left-10 w-32 h-32 bg-white/10 rounded-full animate-bounce" style={{ animationDuration: '3s' }} />
+        <div className="absolute top-40 right-20 w-24 h-24 bg-white/10 rounded-lg animate-spin" style={{ animationDuration: '10s' }} />
+        <div className="absolute bottom-32 left-1/4 w-20 h-20 bg-white/10 animate-pulse" />
+        <div className="absolute bottom-20 right-1/3 w-16 h-16 bg-white/10 rounded-full animate-ping" style={{ animationDuration: '2s' }} />
+        
+        {/* Simple lines */}
+        <div className="absolute top-1/3 left-0 w-full h-px bg-white/10" />
+        <div className="absolute top-2/3 left-0 w-full h-px bg-white/10" />
+        <div className="absolute top-0 left-1/3 h-full w-px bg-white/10" />
+        <div className="absolute top-0 right-1/3 h-full w-px bg-white/10" />
+      </div>
+
+      <div className="max-w-md w-full relative z-10">
+        <div className={`rounded-2xl shadow-2xl p-4 sm:p-8 backdrop-blur-sm ${
+          resolvedTheme === 'dark' 
+            ? 'bg-slate-800/80 border border-slate-700' 
+            : 'bg-white/80 border border-gray-200'
+        }`}>
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
           <h1 className={`text-2xl sm:text-3xl font-bold ${
@@ -131,6 +163,7 @@ export default function ForgotPasswordPage() {
             </div>
           </form>
         )}
+        </div>
       </div>
     </div>
   );

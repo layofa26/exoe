@@ -314,8 +314,8 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     setUser(null)
     setIsAuthenticated(false)
     
-    // Force page reload to clear any cached data
-    window.location.href = '/login'
+    // Navigate to home page
+    window.location.href = '/'
   }
 
   const hasRole = (role: string): boolean => {
