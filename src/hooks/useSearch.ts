@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
 interface SearchResults {
   professionals: any[];
   videos: any[];
@@ -29,11 +31,76 @@ export const useSearch = () => {
         try {
           setLoading(true);
           setError(null);
-          // Backend removed - search disabled
-          setError('Backend service not available');
+
+          const token = localStorage.getItem('accessToken');
+          
+          // Recherche parallèle professionnels et vidéos
+          const [profilsResponse, videosResponse] = await Promise.all([
+            fetch(`${API_BASE_URL}/v1/profil/profils/?search=${searchQuery}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }),
+            fetch(`${API_BASE_URL}/v1/accueil/videos/?search=${searchQuery}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+          ]);
+
+          const profilsData = profilsResponse.ok ? await profilsResponse.json() : { results: [] };
+          const videosData = videosResponse.ok ? await videosResponse.json() : { results: [] };
+
+          const professionals = profilsData.results ? profilsData.results.map((p: any) => ({
+            id: p.id,
+            username: p.username,
+            fullName: p.username,
+            profession: '',
+            company: '',
+            followersCount: 0,
+            videosCount: 0
+          })) : [];
+
+          const videos = videosData.results ? videosData.results.map((v: any) => ({
+            id: v.id,
+            title: v.title,
+            description: v.description,
+            thumbnail: v.cover,
+            videoUrl: v.file,
+            author: {
+              id: v.owner,
+              fullName: 'Utilisateur',
+              profession: ''
+            },
+            views: 0,
+            createdAt: v.created_at
+          })) : [];
+
+          const filteredProfessionals = searchType === 'video' ? [] : professionals;
+          const filteredVideos = searchType === 'professional' ? [] : videos;
+
+          setResults({
+            professionals: filteredProfessionals,
+            videos: filteredVideos,
+            total: filteredProfessionals.length + filteredVideos.length,
+            page: searchPage,
+            limit: 20,
+            hasMore: false
+          });
+
         } catch (err) {
           console.error('Search error:', err);
           setError('Erreur lors de la recherche');
+          setResults({
+            professionals: [],
+            videos: [],
+            total: 0,
+            page: 1,
+            limit: 20,
+            hasMore: false
+          });
         } finally {
           setLoading(false);
         }
