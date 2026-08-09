@@ -189,14 +189,14 @@ export const Header = (): JSX.Element => {
     try {
       const token = localStorage.getItem('accessToken')
       
-      const profilsResponse = await fetch(`${API_BASE_URL}/v1/profil/profils/?search=${query}`, {
+      const profilsResponse = await fetch(`${API_BASE_URL}/profil/profils/?search=${query}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
       
-      const videosResponse = await fetch(`${API_BASE_URL}/v1/accueil/videos/?search=${query}`, {
+      const videosResponse = await fetch(`${API_BASE_URL}/accueil/videos/?search=${query}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

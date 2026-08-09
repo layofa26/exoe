@@ -149,7 +149,7 @@ const Profile = () => {
 
         // Charger le profil depuis le backend
         console.log('Loading profile from backend...')
-        const response = await fetch(`${API_BASE_URL}/v1/profil/profils/`, {
+        const response = await fetch(`${API_BASE_URL}/profil/profils/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -218,7 +218,7 @@ const Profile = () => {
 
         // Charger les abonnés
         try {
-          const subscribersResponse = await fetch(`${API_BASE_URL}/v1/abonnement/abonnements/subscribers/`, {
+          const subscribersResponse = await fetch(`${API_BASE_URL}/abonnement/abonnements/subscribers/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -237,7 +237,7 @@ const Profile = () => {
 
         // Charger l'activité récente
         try {
-          const activitiesResponse = await fetch(`${API_BASE_URL}/v1/activities/`, {
+          const activitiesResponse = await fetch(`${API_BASE_URL}/activities/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -260,7 +260,7 @@ const Profile = () => {
 
         // Charger les badges
         try {
-          const badgesResponse = await fetch(`${API_BASE_URL}/v1/user-badges/`, {
+          const badgesResponse = await fetch(`${API_BASE_URL}/user-badges/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -388,7 +388,7 @@ const Profile = () => {
           console.log('Adding skill:', skill)
           
           // Récupérer d'abord le profil existant pour avoir son ID
-          const getResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+          const getResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -428,7 +428,7 @@ const Profile = () => {
           console.log('Sending to backend:', { name: newSkill.name, category: englishCategory, level: englishLevel, profile: existingProfile.id })
           
           // Créer la compétence via le backend avec l'ID du profil
-          const response = await fetch('${API_BASE_URL}/v1/profil/skills/', {
+          const response = await fetch(`${API_BASE_URL}/profil/skills/`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -514,7 +514,7 @@ const Profile = () => {
       console.log('File created:', file.name, file.size, file.type)
       
       // Récupérer d'abord le profil existant
-      const getResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+      const getResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -546,7 +546,7 @@ const Profile = () => {
         const userId = localStorage.getItem('exile_user_id')
         if (!userId) {
           // Si pas d'ID en localStorage, essayer de le récupérer depuis l'API users
-          const userResponse = await fetch('${API_BASE_URL}/v1/users/profile/', {
+          const userResponse = await fetch(`${API_BASE_URL}/users/profile/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -565,7 +565,7 @@ const Profile = () => {
         console.log('Creating profile with FormData...')
         console.log('User ID:', userId)
         
-        const createResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+        const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -594,7 +594,7 @@ const Profile = () => {
         console.log('Updating profile with FormData...')
         
         // Utiliser l'endpoint custom /me/ pour éviter les problèmes de permission
-        const updateResponse = await fetch('${API_BASE_URL}/v1/profil/profils/me/', {
+        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -730,7 +730,7 @@ const Profile = () => {
       console.log('Banner file created:', file.name, file.size, file.type)
       
       // Récupérer d'abord le profil existant
-      const getResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+      const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -742,7 +742,7 @@ const Profile = () => {
       }
 
       const getData = await getResponse.json()
-      const existingProfile = getData.results?.[0] || getData[0]
+      const existingProfile = getData
 
       if (!existingProfile) {
         alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
@@ -759,7 +759,7 @@ const Profile = () => {
 
       console.log('Updating profile with banner...')
       
-      const updateResponse = await fetch(`${API_BASE_URL}/v1/profil/profils/${existingProfile.id}/`, {
+      const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -810,7 +810,7 @@ const Profile = () => {
         console.log('Updating bio to:', newBio)
         
         // Récupérer d'abord le profil existant
-        const getResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+        const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -822,12 +822,12 @@ const Profile = () => {
         }
 
         const getData = await getResponse.json()
-        const existingProfile = getData.results?.[0] || getData[0]
+        const existingProfile = getData
 
         if (!existingProfile) {
           alert('Profil non trouvé. Création d\'un nouveau profil...')
           // Créer un nouveau profil
-          const createResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+          const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -848,7 +848,7 @@ const Profile = () => {
           console.log('Updating existing profile with bio:', newBio)
           console.log('Existing profile data:', existingProfile)
           
-          const updateResponse = await fetch(`${API_BASE_URL}/v1/profil/profils/${existingProfile.id}/`, {
+          const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
             method: 'PUT',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -907,7 +907,7 @@ const Profile = () => {
         console.log('Adding website:', formattedWebsite)
         
         // Récupérer d'abord le profil existant
-        const getResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+        const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -924,7 +924,7 @@ const Profile = () => {
         if (!existingProfile) {
           alert('Profil non trouvé. Création d\'un nouveau profil...')
           // Créer un nouveau profil
-          const createResponse = await fetch('${API_BASE_URL}/v1/profil/profils/', {
+          const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -945,7 +945,7 @@ const Profile = () => {
           console.log('Updating existing profile with website:', formattedWebsite)
           console.log('Existing profile data:', existingProfile)
           
-          const updateResponse = await fetch(`${API_BASE_URL}/v1/profil/profils/${existingProfile.id}/`, {
+          const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
             method: 'PUT',
             headers: {
               'Authorization': `Bearer ${token}`,
