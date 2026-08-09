@@ -158,6 +158,15 @@ const Profile = () => {
 
         console.log('Profile response status:', response.status)
         
+        if (response.status === 404) {
+          console.log('Profile not found (404), creating empty profile')
+          setProfile({
+            username: localStorage.getItem('exile_username') || 'Utilisateur',
+            fullName: localStorage.getItem('exile_username') || 'Utilisateur'
+          })
+          return
+        }
+        
         if (!response.ok) {
           throw new Error(`Erreur HTTP: ${response.status}`)
         }

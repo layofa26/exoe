@@ -154,7 +154,6 @@ export const Header = (): JSX.Element => {
   const handleLogout = (): void => {
     if (window.confirm('Voulez-vous vraiment vous déconnecter ?')) {
       logout()
-      navigate('/')
     }
   }
 
@@ -204,8 +203,8 @@ export const Header = (): JSX.Element => {
         }
       })
       
-      const profilsData = await profilsResponse.json()
-      const videosData = await videosResponse.json()
+      const profilsData = profilsResponse.ok ? await profilsResponse.json() : { results: [] }
+      const videosData = videosResponse.ok ? await videosResponse.json() : { results: [] }
       
       const professionals = profilsData.results ? profilsData.results.map((p: any) => ({
         id: p.id,
