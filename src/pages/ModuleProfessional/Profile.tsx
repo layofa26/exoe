@@ -166,28 +166,23 @@ const Profile = () => {
         console.log('Profile data received:', data)
         
         // Transformer les données du backend vers le format frontend
+        let backendProfile = null
+        
         if (data.results && data.results.length > 0) {
-          const backendProfile = data.results[0]
+          // Chercher le profil de l'utilisateur connecté
+          const currentUserId = localStorage.getItem('userId')
+          backendProfile = data.results.find((p: any) => p.user?.toString() === currentUserId) || data.results[0]
           console.log('Setting profile from results:', backendProfile)
-          setProfile({
-            id: backendProfile.id,
-            username: backendProfile.username,
-            photo: backendProfile.photo,
-            bio: backendProfile.bio,
-            location: backendProfile.location,
-            country: backendProfile.country,
-            city: backendProfile.city,
-            websites: backendProfile.website ? [backendProfile.website] : [],
-            fullName: backendProfile.username,
-            avatarUrl: backendProfile.photo,
-            banner: backendProfile.banner,
-            profession: backendProfile.profession,
-            speciality: backendProfile.speciality,
-            lastProfessionUpdate: backendProfile.lastProfessionUpdate
-          })
-        } else if (data.length > 0) {
-          const backendProfile = data[0]
+        } else if (Array.isArray(data) && data.length > 0) {
+          const currentUserId = localStorage.getItem('userId')
+          backendProfile = data.find((p: any) => p.user?.toString() === currentUserId) || data[0]
           console.log('Setting profile from array:', backendProfile)
+        } else if (data.id) {
+          backendProfile = data
+          console.log('Setting profile from single object:', backendProfile)
+        }
+        
+        if (backendProfile) {
           setProfile({
             id: backendProfile.id,
             username: backendProfile.username,
@@ -197,7 +192,7 @@ const Profile = () => {
             country: backendProfile.country,
             city: backendProfile.city,
             websites: backendProfile.website ? [backendProfile.website] : [],
-            fullName: backendProfile.username,
+            fullName: backendProfile.full_name || backendProfile.username,
             avatarUrl: backendProfile.photo,
             banner: backendProfile.banner,
             profession: backendProfile.profession,

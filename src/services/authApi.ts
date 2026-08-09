@@ -1,7 +1,7 @@
 import { LoginResponseSchema, RegisterResponseSchema, ApiErrorSchema } from '../schemas/authSchemas'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
-const API_TIMEOUT = 15000 // 15 seconds timeout
+const API_TIMEOUT = 10000 // 10 seconds timeout for faster feedback
 
 // Helper functions for cookie management (for reading httpOnly cookies set by backend)
 const getCookie = (name: string): string | null => {

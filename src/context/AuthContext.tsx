@@ -314,8 +314,8 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     setUser(null)
     setIsAuthenticated(false)
     
-    // Navigate to home page
-    window.location.href = '/'
+    // Navigate to ProSidebar home
+    window.location.href = '/pro'
   }
 
   const hasRole = (role: string): boolean => {
