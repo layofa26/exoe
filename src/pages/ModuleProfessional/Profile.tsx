@@ -133,6 +133,66 @@ const Profile = () => {
   const bannerInputRef = useRef<HTMLInputElement>(null)
   const { showProfileUpdated } = useNotifications()
 
+  // Helper function pour récupérer le profil avec fallback
+  const getProfileWithFallback = async (token: string) => {
+    console.log('Getting profile with fallback...')
+    
+    // Essayer d'abord l'endpoint /me/
+    try {
+      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      console.log('/me/ response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Profile received from /me/:', data)
+        return data
+      } else if (response.status === 404) {
+        console.log('/me/ endpoint not found (404), falling back to list endpoint')
+      } else {
+        throw new Error(`Erreur HTTP: ${response.status}`)
+      }
+    } catch (error) {
+      console.log('Error with /me/ endpoint, falling back to list endpoint:', error)
+    }
+
+    // Fallback: utiliser la liste complète
+    console.log('Trying fallback: loading from list endpoint')
+    const listResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('List response status:', listResponse.status)
+    
+    if (!listResponse.ok) {
+      throw new Error(`Erreur HTTP: ${listResponse.status}`)
+    }
+
+    const data = await listResponse.json()
+    console.log('Profile list data received:', data)
+    
+    // Chercher le profil de l'utilisateur connecté
+    const currentUserId = localStorage.getItem('userId')
+    
+    if (data.results && data.results.length > 0) {
+      return data.results.find((p: any) => p.user?.toString() === currentUserId) || data.results[0]
+    } else if (Array.isArray(data) && data.length > 0) {
+      return data.find((p: any) => p.user?.toString() === currentUserId) || data[0]
+    } else if (data.id) {
+      return data
+    }
+    
+    return null
+  }
+
   // Charger le profil depuis API
   useEffect(() => {
     const loadProfile = async () => {
@@ -149,29 +209,7 @@ const Profile = () => {
 
         // Charger le profil depuis le backend
         console.log('Loading profile from backend...')
-        const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        console.log('Profile response status:', response.status)
-        
-        if (response.status === 404) {
-          console.log('Profile not found (404), creating empty profile')
-          setProfile({
-            username: localStorage.getItem('exile_username') || 'Utilisateur',
-            fullName: localStorage.getItem('exile_username') || 'Utilisateur'
-          })
-          return
-        }
-        
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP: ${response.status}`)
-        }
-
-        const backendProfile = await response.json()
+        const backendProfile = await getProfileWithFallback(token)
         console.log('Profile data received:', backendProfile)
         
         if (backendProfile) {
@@ -371,19 +409,8 @@ const Profile = () => {
           console.log('Adding skill:', skill)
           
           // Récupérer d'abord le profil existant pour avoir son ID
-          const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          })
-
-          if (!getResponse.ok) {
-            throw new Error(`Erreur lors de la récupération du profil: ${getResponse.status}`)
-          }
-
-          const getData = await getResponse.json()
-          const existingProfile = getData.results?.[0] || getData[0]
+          const existingProfile = await getProfileWithFallback(token)
+          console.log('Get profile data:', existingProfile)
 
           if (!existingProfile) {
             alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
@@ -497,24 +524,8 @@ const Profile = () => {
       console.log('File created:', file.name, file.size, file.type)
       
       // Récupérer d'abord le profil existant
-      const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      console.log('Get profile response status:', getResponse.status)
-      
-      if (!getResponse.ok) {
-        throw new Error(`Erreur lors de la récupération du profil: ${getResponse.status}`)
-      }
-
-      const getData = await getResponse.json()
-      console.log('Get profile data:', getData)
-      
-      // L'endpoint /me/ retourne directement le profil de l'utilisateur connecté
-      const existingProfile = getData
+      const existingProfile = await getProfileWithFallback(token)
+      console.log('Get profile data:', existingProfile)
 
       if (!existingProfile) {
         console.log('No existing profile, creating new one...')
@@ -713,19 +724,8 @@ const Profile = () => {
       console.log('Banner file created:', file.name, file.size, file.type)
       
       // Récupérer d'abord le profil existant
-      const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!getResponse.ok) {
-        throw new Error(`Erreur lors de la récupération du profil: ${getResponse.status}`)
-      }
-
-      const getData = await getResponse.json()
-      const existingProfile = getData
+      const existingProfile = await getProfileWithFallback(token)
+      console.log('Get profile data:', existingProfile)
 
       if (!existingProfile) {
         alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
@@ -793,19 +793,8 @@ const Profile = () => {
         console.log('Updating bio to:', newBio)
         
         // Récupérer d'abord le profil existant
-        const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (!getResponse.ok) {
-          throw new Error(`Erreur lors de la récupération du profil: ${getResponse.status}`)
-        }
-
-        const getData = await getResponse.json()
-        const existingProfile = getData
+        const existingProfile = await getProfileWithFallback(token)
+        console.log('Get profile data:', existingProfile)
 
         if (!existingProfile) {
           alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
@@ -874,19 +863,8 @@ const Profile = () => {
         console.log('Adding website:', formattedWebsite)
         
         // Récupérer d'abord le profil existant
-        const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (!getResponse.ok) {
-          throw new Error(`Erreur lors de la récupération du profil: ${getResponse.status}`)
-        }
-
-        const getData = await getResponse.json()
-        const existingProfile = getData
+        const existingProfile = await getProfileWithFallback(token)
+        console.log('Get profile data:', existingProfile)
 
         if (!existingProfile) {
           alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
