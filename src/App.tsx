@@ -133,7 +133,7 @@ function App(): JSX.Element {
         const token = localStorage.getItem('accessToken')
         if (token) {
           const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
-          const response = await fetch(`${API_BASE_URL}/v1/videos/drafts`, {
+          const response = await fetch(`${API_BASE_URL}/videos/drafts`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

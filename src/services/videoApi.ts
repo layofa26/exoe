@@ -48,7 +48,7 @@ export const videoApi = {
       if (params?.visibility) queryParams.append('visibility', params.visibility)
       if (params?.search) queryParams.append('search', params.search)
 
-      const url = `${API_BASE_URL}/v1/videos/videos/${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+      const url = `${API_BASE_URL}/videos/videos/${queryParams.toString() ? '?' + queryParams.toString() : ''}`
 
       const response = await fetch(url, {
         method: 'GET',
@@ -79,7 +79,7 @@ export const videoApi = {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/v1/videos/videos/${id}/`, {
+      const response = await fetch(`${API_BASE_URL}/videos/videos/${id}/`, {
         method: 'GET',
         headers,
       })
@@ -117,7 +117,7 @@ export const videoApi = {
         formData.append('visibility', videoData.is_public ? 'public' : 'private')
       }
 
-      const response = await fetch(`${API_BASE_URL}/v1/videos/videos/${id}/`, {
+      const response = await fetch(`${API_BASE_URL}/videos/videos/${id}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -145,7 +145,7 @@ export const videoApi = {
 
   async deleteVideo(id: number, token: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/videos/videos/${id}/`, {
+      const response = await fetch(`${API_BASE_URL}/videos/videos/${id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -175,7 +175,7 @@ export const videoApi = {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/v1/videos/videos/${id}/increment_view/`, {
+      const response = await fetch(`${API_BASE_URL}/videos/videos/${id}/increment_view/`, {
         method: 'POST',
         headers,
       })

@@ -249,7 +249,7 @@ const Profile = () => {
             const subscribersData = await subscribersResponse.json()
             setStatistics(prev => ({
               ...prev,
-              subscriptions: { followers: subscribersData.length || 0 }
+              subscriptions: { followers: subscribersData.count || subscribersData.length || 0 }
             }))
           }
         } catch (error) {
@@ -281,7 +281,7 @@ const Profile = () => {
 
         // Charger les badges
         try {
-          const badgesResponse = await fetch(`${API_BASE_URL}/user-badges/`, {
+          const badgesResponse = await fetch(`${API_BASE_URL}/badges/user-badges/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -611,20 +611,26 @@ const Profile = () => {
       setUploadedImage('')
       showProfileUpdated()
 
-      // Mettre à jour le profil dans localStorage pour synchronisation globale
-      const currentProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-      const updatedProfile = {
-        ...currentProfile,
-        photo: uploadedImage,
-        avatarUrl: uploadedImage
+      // Recharger le profil depuis le backend au lieu de recharger la page
+      const updatedProfile = await getProfileWithFallback(token)
+      if (updatedProfile) {
+        setProfile({
+          id: updatedProfile.id,
+          username: updatedProfile.username,
+          photo: updatedProfile.photo,
+          bio: updatedProfile.bio,
+          location: updatedProfile.location,
+          country: updatedProfile.country,
+          city: updatedProfile.city,
+          websites: updatedProfile.website ? [updatedProfile.website] : [],
+          fullName: updatedProfile.full_name || updatedProfile.username,
+          avatarUrl: updatedProfile.photo,
+          banner: updatedProfile.banner,
+          profession: updatedProfile.profession,
+          speciality: updatedProfile.speciality,
+          lastProfessionUpdate: updatedProfile.lastProfessionUpdate
+        })
       }
-      localStorage.setItem('exile_user_profile', JSON.stringify(updatedProfile))
-
-      // Mettre à jour toutes les vidéos de l'utilisateur avec la nouvelle photo
-      updateVideosWithNewPhoto(uploadedImage)
-      
-      // Recharger la page
-      window.location.reload()
       
     } catch (error) {
       console.error('Error updating photo:', error)
@@ -764,8 +770,26 @@ const Profile = () => {
       setUploadedBanner('')
       showProfileUpdated()
       
-      // Recharger la page
-      window.location.reload()
+      // Recharger le profil depuis le backend au lieu de recharger la page
+      const updatedProfile = await getProfileWithFallback(token)
+      if (updatedProfile) {
+        setProfile({
+          id: updatedProfile.id,
+          username: updatedProfile.username,
+          photo: updatedProfile.photo,
+          bio: updatedProfile.bio,
+          location: updatedProfile.location,
+          country: updatedProfile.country,
+          city: updatedProfile.city,
+          websites: updatedProfile.website ? [updatedProfile.website] : [],
+          fullName: updatedProfile.full_name || updatedProfile.username,
+          avatarUrl: updatedProfile.photo,
+          banner: updatedProfile.banner,
+          profession: updatedProfile.profession,
+          speciality: updatedProfile.speciality,
+          lastProfessionUpdate: updatedProfile.lastProfessionUpdate
+        })
+      }
       
     } catch (error) {
       console.error('Error updating banner:', error)
@@ -833,8 +857,26 @@ const Profile = () => {
         setShowBioModal(false)
         showProfileUpdated()
         
-        // Recharger le profil
-        window.location.reload()
+        // Recharger le profil depuis le backend au lieu de recharger la page
+        const updatedProfile = await getProfileWithFallback(token)
+        if (updatedProfile) {
+          setProfile({
+            id: updatedProfile.id,
+            username: updatedProfile.username,
+            photo: updatedProfile.photo,
+            bio: updatedProfile.bio,
+            location: updatedProfile.location,
+            country: updatedProfile.country,
+            city: updatedProfile.city,
+            websites: updatedProfile.website ? [updatedProfile.website] : [],
+            fullName: updatedProfile.full_name || updatedProfile.username,
+            avatarUrl: updatedProfile.photo,
+            banner: updatedProfile.banner,
+            profession: updatedProfile.profession,
+            speciality: updatedProfile.speciality,
+            lastProfessionUpdate: updatedProfile.lastProfessionUpdate
+          })
+        }
         
       } catch (error) {
         console.error('Error updating bio:', error)
@@ -903,8 +945,26 @@ const Profile = () => {
         setShowWebsitesModal(false)
         showProfileUpdated()
         
-        // Recharger la page
-        window.location.reload()
+        // Recharger le profil depuis le backend au lieu de recharger la page
+        const updatedProfile = await getProfileWithFallback(token)
+        if (updatedProfile) {
+          setProfile({
+            id: updatedProfile.id,
+            username: updatedProfile.username,
+            photo: updatedProfile.photo,
+            bio: updatedProfile.bio,
+            location: updatedProfile.location,
+            country: updatedProfile.country,
+            city: updatedProfile.city,
+            websites: updatedProfile.website ? [updatedProfile.website] : [],
+            fullName: updatedProfile.full_name || updatedProfile.username,
+            avatarUrl: updatedProfile.photo,
+            banner: updatedProfile.banner,
+            profession: updatedProfile.profession,
+            speciality: updatedProfile.speciality,
+            lastProfessionUpdate: updatedProfile.lastProfessionUpdate
+          })
+        }
         
       } catch (error) {
         console.error('Error adding website:', error)

@@ -163,7 +163,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
         video.src = URL.createObjectURL(videoFile)
       })
       
-      const result = await api.post('/v1/videos/videos/upload/', {
+      const result = await api.post('/videos/videos/upload/', {
         title: title.trim(),
         description: description.trim(),
         visibility,
