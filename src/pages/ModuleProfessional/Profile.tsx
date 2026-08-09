@@ -149,7 +149,7 @@ const Profile = () => {
 
         // Charger le profil depuis le backend
         console.log('Loading profile from backend...')
-        const response = await fetch(`${API_BASE_URL}/profil/profils/`, {
+        const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -171,25 +171,8 @@ const Profile = () => {
           throw new Error(`Erreur HTTP: ${response.status}`)
         }
 
-        const data = await response.json()
-        console.log('Profile data received:', data)
-        
-        // Transformer les données du backend vers le format frontend
-        let backendProfile = null
-        
-        if (data.results && data.results.length > 0) {
-          // Chercher le profil de l'utilisateur connecté
-          const currentUserId = localStorage.getItem('userId')
-          backendProfile = data.results.find((p: any) => p.user?.toString() === currentUserId) || data.results[0]
-          console.log('Setting profile from results:', backendProfile)
-        } else if (Array.isArray(data) && data.length > 0) {
-          const currentUserId = localStorage.getItem('userId')
-          backendProfile = data.find((p: any) => p.user?.toString() === currentUserId) || data[0]
-          console.log('Setting profile from array:', backendProfile)
-        } else if (data.id) {
-          backendProfile = data
-          console.log('Setting profile from single object:', backendProfile)
-        }
+        const backendProfile = await response.json()
+        console.log('Profile data received:', backendProfile)
         
         if (backendProfile) {
           setProfile({
@@ -388,7 +371,7 @@ const Profile = () => {
           console.log('Adding skill:', skill)
           
           // Récupérer d'abord le profil existant pour avoir son ID
-          const getResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
+          const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -514,7 +497,7 @@ const Profile = () => {
       console.log('File created:', file.name, file.size, file.type)
       
       // Récupérer d'abord le profil existant
-      const getResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
+      const getResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -530,8 +513,8 @@ const Profile = () => {
       const getData = await getResponse.json()
       console.log('Get profile data:', getData)
       
-      // Le backend retourne maintenant seulement le profil de l'utilisateur connecté
-      const existingProfile = Array.isArray(getData) ? getData[0] : (getData.results?.[0] || getData)
+      // L'endpoint /me/ retourne directement le profil de l'utilisateur connecté
+      const existingProfile = getData
 
       if (!existingProfile) {
         console.log('No existing profile, creating new one...')
@@ -825,53 +808,37 @@ const Profile = () => {
         const existingProfile = getData
 
         if (!existingProfile) {
-          alert('Profil non trouvé. Création d\'un nouveau profil...')
-          // Créer un nouveau profil
-          const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              bio: newBio,
-              location: profile.location || '',
-              website: profile.websites?.[0] || ''
-            })
-          })
-
-          if (!createResponse.ok) {
-            throw new Error(`Erreur lors de la création du profil: ${createResponse.status}`)
-          }
-        } else {
-          // Mettre à jour le profil existant
-          console.log('Updating existing profile with bio:', newBio)
-          console.log('Existing profile data:', existingProfile)
-          
-          const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              user: existingProfile.user,
-              bio: newBio,
-              location: existingProfile.location || '',
-              website: existingProfile.website || ''
-            })
-          })
-
-          console.log('Update profile response status:', updateResponse.status)
-          
-          if (!updateResponse.ok) {
-            const errorText = await updateResponse.text()
-            console.error('Update profile error:', errorText)
-            throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
-          }
-          
-          console.log('Profile updated successfully')
+          alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
+          return
         }
+
+        // Mettre à jour le profil existant
+        console.log('Updating existing profile with bio:', newBio)
+        console.log('Existing profile data:', existingProfile)
+        
+        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user: existingProfile.user,
+            bio: newBio,
+            location: existingProfile.location || '',
+            website: existingProfile.website || ''
+          })
+        })
+
+        console.log('Update profile response status:', updateResponse.status)
+        
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text()
+          console.error('Update profile error:', errorText)
+          throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
+        }
+        
+        console.log('Profile updated successfully')
 
         setNewBio('')
         setShowBioModal(false)
@@ -919,56 +886,40 @@ const Profile = () => {
         }
 
         const getData = await getResponse.json()
-        const existingProfile = getData.results?.[0] || getData[0]
+        const existingProfile = getData
 
         if (!existingProfile) {
-          alert('Profil non trouvé. Création d\'un nouveau profil...')
-          // Créer un nouveau profil
-          const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              bio: profile.bio || '',
-              location: profile.location || '',
-              website: formattedWebsite
-            })
-          })
-
-          if (!createResponse.ok) {
-            throw new Error(`Erreur lors de la création du profil: ${createResponse.status}`)
-          }
-        } else {
-          // Mettre à jour le profil existant
-          console.log('Updating existing profile with website:', formattedWebsite)
-          console.log('Existing profile data:', existingProfile)
-          
-          const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              user: existingProfile.user,
-              bio: existingProfile.bio || '',
-              location: existingProfile.location || '',
-              website: formattedWebsite
-            })
-          })
-
-          console.log('Update profile response status:', updateResponse.status)
-          
-          if (!updateResponse.ok) {
-            const errorText = await updateResponse.text()
-            console.error('Update profile error:', errorText)
-            throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
-          }
-          
-          console.log('Profile updated successfully')
+          alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
+          return
         }
+
+        // Mettre à jour le profil existant
+        console.log('Updating existing profile with website:', formattedWebsite)
+        console.log('Existing profile data:', existingProfile)
+        
+        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user: existingProfile.user,
+            bio: existingProfile.bio || '',
+            location: existingProfile.location || '',
+            website: formattedWebsite
+          })
+        })
+
+        console.log('Update profile response status:', updateResponse.status)
+        
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text()
+          console.error('Update profile error:', errorText)
+          throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
+        }
+        
+        console.log('Profile updated successfully')
 
         setNewWebsite('')
         setShowWebsitesModal(false)
