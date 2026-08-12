@@ -149,7 +149,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
     try {
       // Use backend upload endpoint
       const formData = new FormData()
-      formData.append('video', videoFile)
+      formData.append('file', videoFile)
       formData.append('title', title.trim())
       formData.append('description', description.trim())
       formData.append('is_public', visibility === 'public' ? 'true' : 'false')
