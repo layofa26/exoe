@@ -80,9 +80,29 @@ export const BlockedUsers = (): JSX.Element => {
 
   const handleUnblock = async (userId: string) => {
     try {
-      // Backend removed - unblock disabled
-      alert('Backend service not available');
-      setTimeout(() => setToast(''), 3000)
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ blocked_user: userId })
+      })
+
+      if (response.ok) {
+        setToast('Utilisateur débloqué avec succès')
+        setTimeout(() => setToast(''), 3000)
+        // Reload the blocked users list
+        loadBlockedUsers()
+      } else {
+        throw new Error('Erreur lors du déblocage')
+      }
     } catch (err) {
       console.error('Error unblocking user:', err)
       setToast('Erreur lors du déblocage')

@@ -18,10 +18,23 @@ export default function VideoPage() {
       return;
     }
 
-    // Backend removed - video loading disabled
     const fetchVideo = async () => {
       try {
         setLoading(true);
+        const token = localStorage.getItem('accessToken')
+        if (!token) return
+
+        const response = await fetch(`${API_BASE_URL}/accueil/videos/${videoId}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setVideo(data)
+        } else {
+          setError('Impossible de charger la vidéo')
+        }
+      } catch (error) {
         setError('Backend service not available');
       } catch (err) {
         setError('Erreur lors du chargement de la vidéo');

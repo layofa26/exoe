@@ -72,9 +72,27 @@ export function SocialHeader({
     // Déclencher la recherche dès 1 caractère
     setSearchLoading(true)
     try {
-      // Backend removed - search disabled
-      setSearchResults({ professionals: [], videos: [] })
-      setShowDropdown(true)
+      const token = localStorage.getItem('accessToken')
+      const headers: Record<string, string> = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${API_BASE_URL}/profil/profils/?search=${query}`, {
+        headers
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults({
+          professionals: data.results || data,
+          videos: []
+        })
+        setShowDropdown(true)
+      } else {
+        setSearchResults({ professionals: [], videos: [] })
+        setShowDropdown(true)
+      }
       
       // Ajouter aux recherches récentes si la recherche a réussi
       if (query.trim()) {
@@ -91,7 +109,8 @@ export function SocialHeader({
   // Charger les résultats récents et populaires
   const loadRecentAndPopular = async () => {
     try {
-      // Backend removed - recent/popular loading disabled
+      // This would require a specific endpoint for recent/popular content
+      // For now, set to null as this feature is not implemented
       setRecentAndPopular(null)
     } catch (error) {
       console.error('Erreur lors du chargement des résultats récents/populaires:', error)

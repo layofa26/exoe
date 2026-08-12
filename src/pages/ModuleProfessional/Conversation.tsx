@@ -100,9 +100,23 @@ export const ConversationPage = (): JSX.Element => {
           setIsLoading(false)
           return
         }
-        
-        // Backend removed - conversation loading disabled
-        setError('Backend service not available');
+
+        const token = localStorage.getItem('accessToken')
+        if (!token) {
+          setError('Token non trouvé')
+          return
+        }
+
+        const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setMessages(data.messages || [])
+        } else {
+          setError('Impossible de charger la conversation')
+        }
       } catch (err) {
         console.error('Error loading conversation:', err)
       } finally {
@@ -120,8 +134,24 @@ export const ConversationPage = (): JSX.Element => {
     try {
       setLoadingMore(true)
       const offset = messages.length
-      // Backend removed - messages loading disabled
-      setHasMore(false)
+
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setHasMore(false)
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/messages/?offset=${offset}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessages([...messages, ...(data.messages || [])])
+        setHasMore(data.has_more || false)
+      } else {
+        setHasMore(false)
+      }
     } catch (err) {
       console.error('Error loading more messages:', err)
     } finally {
@@ -225,8 +255,22 @@ export const ConversationPage = (): JSX.Element => {
   const togglePin = async () => {
     if (!id) return
     try {
-      // Backend removed - pin toggle disabled
-      alert('Backend service not available');
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/pin/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        alert('Conversation épinglée avec succès')
+      } else {
+        throw new Error('Erreur lors de l\'épinglage')
+      }
     } catch (err) {
       console.error('Error toggling pin:', err)
     }
@@ -236,8 +280,22 @@ export const ConversationPage = (): JSX.Element => {
   const toggleArchive = async () => {
     if (!id) return
     try {
-      // Backend removed - archive toggle disabled
-      alert('Backend service not available');
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/archive/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        alert('Conversation archivée avec succès')
+      } else {
+        throw new Error('Erreur lors de l\'archivage')
+      }
     } catch (err) {
       console.error('Error toggling archive:', err)
     }
@@ -248,10 +306,28 @@ export const ConversationPage = (): JSX.Element => {
     if (!conversation || !currentUserId) return
     const otherParticipant = getOtherParticipant()
     if (!otherParticipant) return
-    
+
     try {
-      // Backend removed - block user disabled
-      alert('Backend service not available');
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ blocked_user: otherParticipant.id })
+      })
+
+      if (response.ok) {
+        alert('Utilisateur bloqué avec succès')
+      } else {
+        throw new Error('Erreur lors du blocage')
+      }
     } catch (err) {
       console.error('Error blocking user:', err)
     }
@@ -268,10 +344,25 @@ export const ConversationPage = (): JSX.Element => {
   // Delete conversation definitively
   const handleDelete = async () => {
     if (!id) return
-    
+
     try {
-      // Backend removed - conversation deletion disabled
-      alert('Backend service not available');
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        alert('Conversation supprimée avec succès')
+        navigate('/conversations')
+      } else {
+        throw new Error('Erreur lors de la suppression')
+      }
     } catch (err) {
       console.error('Error deleting conversation:', err)
     }

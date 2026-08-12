@@ -287,8 +287,12 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     _step1Data: InstitutionStep1, 
     _step2Data: InstitutionStep2
   ): Promise<RegisterResult> => {
-    // Backend removed - registration functionality disabled
-    return { success: false, error: 'Backend service not available' }
+    try {
+      const response = await authApi.registerPro(_step1Data, _step2Data)
+      return response
+    } catch (error) {
+      return { success: false, error: 'Registration failed' }
+    }
   }
 
   const logout = (): void => {

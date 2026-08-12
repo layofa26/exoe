@@ -16,8 +16,18 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      // Backend removed - forgot password disabled
-      setError('Backend service not available');
+      const response = await fetch(`${API_BASE_URL}/users/reset-password/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, new_password })
+      });
+
+      if (response.ok) {
+        setSuccess(true);
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Une erreur est survenue');
+      }
     } catch (err: any) {
       setError(err.message || 'Une erreur est survenue');
     } finally {

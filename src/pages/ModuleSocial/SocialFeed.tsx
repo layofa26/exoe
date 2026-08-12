@@ -55,8 +55,17 @@ export const SocialFeed = (): JSX.Element => {
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        // Backend removed - alerts loading disabled
-        setFeedItems([])
+        const token = localStorage.getItem('accessToken')
+        if (!token) return
+
+        const response = await fetch(`${API_BASE_URL}/activities/activities/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setFeedItems(data.results || data)
+        }
       } catch (error) {
         console.error('[SocialFeed] Failed to fetch alerts:', error)
         setFeedItems([]) // Set empty array on error to prevent crash
@@ -101,10 +110,27 @@ export const SocialFeed = (): JSX.Element => {
         formData.append('tags', JSON.stringify(videoForm.hashtags))
       }
 
-      // Backend removed - video creation disabled
-      alert('Backend service not available');
-      handleRemoveVideo()
-      setVideoForm({ title: '', description: '', hashtags: [] })
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/accueil/videos/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      })
+
+      if (response.ok) {
+        alert('Vidéo créée avec succès')
+        handleRemoveVideo()
+        setVideoForm({ title: '', description: '', hashtags: [] })
+        fetchAlerts()
+      } else {
+        throw new Error('Erreur lors de la création')
+      }
+    } catch (error) {
       setShowVideoImportModal(false)
       showToast('Vidéo publiée avec succès!')
     } catch (error) {

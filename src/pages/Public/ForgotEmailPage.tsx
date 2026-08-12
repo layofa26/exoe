@@ -23,8 +23,9 @@ export default function ForgotEmailPage() {
     setLoading(true);
 
     try {
-      // Backend removed - forgot email disabled
-      setError('Backend service not available');
+      // This functionality would need to be implemented in the backend
+      // For now, show a message that this feature is not available
+      setError('Cette fonctionnalité n\'est pas encore disponible');
     } catch (err: any) {
       setError(err.message || 'Une erreur est survenue');
     } finally {

@@ -176,8 +176,17 @@ export const Requests = (): JSX.Element => {
       const loadImportantMessages = async () => {
         try {
           setLoadingImportant(true)
-          // Backend removed - important messages loading disabled
-          setImportantMessages([])
+          const token = localStorage.getItem('accessToken')
+          if (!token) return
+
+          const response = await fetch(`${API_BASE_URL}/conversations/messages/important/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            setImportantMessages(data.results || data)
+          }
         } catch (err) {
           console.error('Error loading important messages:', err)
         } finally {
@@ -194,8 +203,17 @@ export const Requests = (): JSX.Element => {
       const loadBlockedUsers = async () => {
         try {
           setLoadingBlocked(true)
-          // Backend removed - blocked users loading disabled
-          setBlockedUsers([])
+          const token = localStorage.getItem('accessToken')
+          if (!token) return
+
+          const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            setBlockedUsers(data.results || data)
+          }
         } catch (err) {
           console.error('Error loading blocked users:', err)
         } finally {
@@ -208,9 +226,29 @@ export const Requests = (): JSX.Element => {
 
   const handleUnblock = async (userId: string) => {
     try {
-      // Backend removed - unblock disabled
-      setToast('Backend service not available')
-      setTimeout(() => setToast(''), 3000)
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setToast('Token non trouvé')
+        setTimeout(() => setToast(''), 3000)
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ blocked_user: userId })
+      })
+
+      if (response.ok) {
+        setToast('Utilisateur débloqué avec succès')
+        setTimeout(() => setToast(''), 3000)
+        loadBlockedUsers()
+      } else {
+        throw new Error('Erreur lors du déblocage')
+      }
     } catch (err) {
       console.error('Error unblocking user:', err)
       setToast('Erreur lors du déblocage')
@@ -295,9 +333,29 @@ export const Requests = (): JSX.Element => {
 
   const handleBlockFromRequest = async (_requestId: string, senderId: string) => {
     try {
-      // Backend removed - block user disabled
-      setToast('Backend service not available')
-      setTimeout(() => setToast(''), 3000)
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setToast('Token non trouvé')
+        setTimeout(() => setToast(''), 3000)
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ blocked_user: senderId })
+      })
+
+      if (response.ok) {
+        setToast('Utilisateur bloqué avec succès')
+        setTimeout(() => setToast(''), 3000)
+        loadBlockedUsers()
+      } else {
+        throw new Error('Erreur lors du blocage')
+      }
     } catch (err) {
       console.error('Error blocking user:', err)
       setToast('Erreur lors du blocage')

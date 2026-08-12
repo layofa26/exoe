@@ -41,8 +41,23 @@ export const useProfessionalVideos = (professionalId: string, initialPage: numbe
     try {
       setLoading(true);
       setError(null);
-      // Backend removed - video loading disabled
-      setError('Backend service not available');
+
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setError('Token non trouvé')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/accueil/videos/my_videos/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setVideos(data.results || data)
+      } else {
+        setError('Impossible de charger les vidéos')
+      }
     } catch (err) {
       console.error('Error loading professional videos:', err);
       setError('Impossible de charger les vidéos');

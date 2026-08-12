@@ -62,8 +62,17 @@ export const SocialEvents = (): JSX.Element => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        // Backend removed - events loading disabled
-        setEvents([])
+        const token = localStorage.getItem('accessToken')
+        if (!token) return
+
+        const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setEvents(data.results || data)
+        }
       } catch (error) {
         console.error('Failed to fetch events:', error)
       } finally {

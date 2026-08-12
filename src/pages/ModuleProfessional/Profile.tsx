@@ -1044,10 +1044,31 @@ const Profile = () => {
   const handleDeleteConfirm = async () => {
     if (!profile || !showDeleteConfirm) return
     try {
-      // Backend removed - delete disabled
-      alert('Backend service not available');
-      setShowDeleteConfirm(null)
-      showProfileUpdated()
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        alert('Profil supprimé avec succès')
+        setShowDeleteConfirm(null)
+        showProfileUpdated()
+      } else {
+        throw new Error('Erreur lors de la suppression')
+      }
+    } catch (error) {
+      console.error('Error deleting profile:', error)
+      alert('Erreur lors de la suppression du profil')
+    }
+  }
     } catch (error) {
       console.error('Error deleting item:', error)
       alert('Erreur lors de la suppression')

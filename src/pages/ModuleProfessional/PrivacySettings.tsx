@@ -61,8 +61,22 @@ const PrivacySettings = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      // Backend removed - privacy settings loading disabled
-      setMessage({ type: 'error', text: 'Backend service not available' });
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
+
+      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPrivacySettings({
+          showEmail: data.show_email || false,
+          showPhone: data.show_phone || false,
+          allowMessages: data.allow_messages || true,
+          showLocation: data.show_location || false
+        })
+      }
     } catch (error) {
       console.error('Error loading privacy settings:', error);
       setMessage({ type: 'error', text: 'Erreur lors du chargement des paramètres' });
@@ -75,8 +89,27 @@ const PrivacySettings = () => {
     try {
       setSaving(true);
       setMessage(null);
-      // Backend removed - privacy settings save disabled
-      setMessage({ type: 'error', text: 'Backend service not available' });
+
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setMessage({ type: 'error', text: 'Token non trouvé' });
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(privacySettings)
+      })
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Paramètres de confidentialité mis à jour' });
+      } else {
+        throw new Error('Erreur lors de la mise à jour')
+      }
     } catch (error) {
       console.error('Error saving privacy settings:', error);
       setMessage({ type: 'error', text: 'Erreur lors de la sauvegarde' });

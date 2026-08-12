@@ -29,8 +29,22 @@ export const DraftDetectionModal = ({ isOpen, onClose }: DraftDetectionModalProp
   const checkDrafts = async () => {
     try {
       setLoading(true)
-      // Backend removed - drafts disabled
-      setError('Backend service not available');
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setError('Token non trouvé')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/accueil/videos/drafts/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setDrafts(data.results || data)
+      } else {
+        setError('Impossible de charger les brouillons')
+      }
     } catch (error) {
       console.error('Error checking drafts:', error)
     } finally {
@@ -47,8 +61,23 @@ export const DraftDetectionModal = ({ isOpen, onClose }: DraftDetectionModalProp
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce brouillon ?')) return
 
     try {
-      // Backend removed - draft deletion disabled
-      alert('Backend service not available');
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/accueil/videos/${draftId}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        alert('Brouillon supprimé avec succès')
+        loadDrafts()
+      } else {
+        throw new Error('Erreur lors de la suppression')
+      }
     } catch (error) {
       console.error('Error deleting draft:', error)
       alert('Erreur lors de la suppression')

@@ -155,8 +155,27 @@ export const PublicProfile = () => {
 
     if (confirm(isBlocked ? 'Voulez-vous vraiment débloquer cet utilisateur ?' : 'Voulez-vous vraiment bloquer cet utilisateur ?')) {
       try {
-        // Backend removed - block/unblock disabled
-        alert('Backend service not available');
+        const token = localStorage.getItem('accessToken')
+        if (!token) {
+          alert('Token non trouvé. Veuillez vous reconnecter.')
+          return
+        }
+
+        const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+          method: isBlocked ? 'DELETE' : 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ blocked_user: userId })
+        })
+
+        if (response.ok) {
+          alert(isBlocked ? 'Utilisateur débloqué avec succès' : 'Utilisateur bloqué avec succès')
+          setIsBlocked(!isBlocked)
+        } else {
+          throw new Error('Erreur lors de l\'opération')
+        }
       } catch (error) {
         console.error('Error blocking user:', error);
       }

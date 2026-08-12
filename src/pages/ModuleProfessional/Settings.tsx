@@ -146,8 +146,28 @@ const Settings = () => {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        // Backend removed - profile loading disabled
-        console.log('Backend service not available');
+        const token = localStorage.getItem('accessToken')
+        if (!token) return
+
+        const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setProfileData({
+            fullName: data.full_name || '',
+            email: data.email || '',
+            phone: data.phone_number || '',
+            profession: data.profession || '',
+            specialty: data.speciality || '',
+            bio: data.bio || '',
+            location: data.location || '',
+            country: data.country || '',
+            city: data.city || '',
+            skills: data.skills?.map((skill: any) => skill.name) || []
+          })
+        }
       } catch (error) {
         console.error('Error loading profile:', error)
       }
@@ -168,10 +188,33 @@ const Settings = () => {
         websites: profileData.website ? [profileData.website] : [],
         skills: profileData.skills.map(name => ({ name, category: 'Technique', level: 'Intermédiaire' }))
       }
-      
-      // Backend removed - profile update disabled
-      alert('Backend service not available');
-      window.location.reload()
+
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          bio: profileData.bio,
+          location: profileData.location,
+          profession: profileData.profession,
+          speciality: profileData.specialty
+        })
+      })
+
+      if (response.ok) {
+        alert('Profil mis à jour avec succès')
+        window.location.reload()
+      } else {
+        throw new Error('Erreur lors de la mise à jour')
+      }
     } catch (error) {
       console.error('Error updating profile:', error)
       alert('Erreur lors de la mise à jour du profil')
@@ -213,10 +256,26 @@ const Settings = () => {
       const response = await fetch(uploadedPhoto)
       const blob = await response.blob()
       const formData = new FormData()
-      formData.append('avatar', blob)
+      formData.append('photo', blob)
 
-      // Backend removed - avatar upload disabled
-      alert('Backend service not available');
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      })
+
+      if (response.ok) {
+        alert('Photo de profil mise à jour avec succès')
+        loadProfile()
+      } else {
+        throw new Error('Erreur lors de l\'upload')
+      }
     } catch (error) {
       console.error('Error uploading photo:', error)
       alert('Erreur lors de l\'upload de la photo')
