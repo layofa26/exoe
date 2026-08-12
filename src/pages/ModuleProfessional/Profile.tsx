@@ -230,13 +230,15 @@ const Profile = () => {
             profession: backendProfile.profession || backendProfile.user_profession,
             speciality: backendProfile.speciality || backendProfile.user_speciality,
             lastProfessionUpdate: backendProfile.lastProfessionUpdate,
-            skills: backendProfile.skills || []
+            skills: backendProfile.skills || [],
+            email: backendProfile.email || ''
           })
         } else {
           console.log('No profile data found, creating empty profile')
           setProfile({
             username: localStorage.getItem('exile_username') || 'Utilisateur',
-            fullName: localStorage.getItem('exile_username') || 'Utilisateur'
+            fullName: localStorage.getItem('exile_username') || 'Utilisateur',
+            email: ''
           })
         }
 
@@ -311,14 +313,22 @@ const Profile = () => {
         
       } catch (error) {
         console.error('Error loading profile:', error)
-        setError('Impossible de charger le profil. Réessayez.')
-        
+        setError('Impossible de charger le profil. Veuillez vérifier votre connexion ou réessayer.')
+
         // Si erreur 401 (token expiré), déconnecter et rediriger
         if (error instanceof Error && error.message.includes('401')) {
           localStorage.removeItem('accessToken')
           localStorage.removeItem('refreshToken')
           navigate('/login')
         }
+
+        // Create a basic profile from localStorage as fallback
+        const username = localStorage.getItem('exile_username') || 'Utilisateur'
+        setProfile({
+          username: username,
+          fullName: username,
+          email: ''
+        })
       } finally {
         setLoading(false)
       }

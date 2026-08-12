@@ -296,30 +296,42 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
   }
 
   const logout = (): void => {
-    // Show logout notification
-    showLogoutSuccess()
-    
-    // Clear all authentication tokens from localStorage
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    
-    // Clear all localStorage data
-    localStorage.clear()
-    
-    // Clear all sessionStorage data
-    sessionStorage.clear()
-    document.cookie.split(';').forEach(cookie => {
-      const eqPos = cookie.indexOf('=')
-      const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie
-      document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
-    })
-    
-    // Reset all user state
-    setUser(null)
-    setIsAuthenticated(false)
-    
-    // Navigate to ProSidebar home
-    window.location.href = '/pro'
+    try {
+      // Show logout notification
+      showLogoutSuccess()
+
+      // Clear all authentication tokens from localStorage
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+
+      // Clear all localStorage data
+      localStorage.clear()
+
+      // Clear all sessionStorage data
+      sessionStorage.clear()
+
+      // Clear cookies
+      document.cookie.split(';').forEach(cookie => {
+        const eqPos = cookie.indexOf('=')
+        const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie
+        document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
+      })
+
+      // Reset all user state
+      setUser(null)
+      setIsAuthenticated(false)
+
+      // Navigate to ProSidebar home
+      window.location.href = '/pro'
+    } catch (error) {
+      console.error('Error during logout:', error)
+      // Even if there's an error, force logout
+      localStorage.clear()
+      sessionStorage.clear()
+      setUser(null)
+      setIsAuthenticated(false)
+      window.location.href = '/pro'
+    }
   }
 
   const hasRole = (role: string): boolean => {
