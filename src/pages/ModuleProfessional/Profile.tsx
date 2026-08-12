@@ -1079,11 +1079,6 @@ const Profile = () => {
       alert('Erreur lors de la suppression du profil')
     }
   }
-    } catch (error) {
-      console.error('Error deleting item:', error)
-      alert('Erreur lors de la suppression')
-    }
-  }
 
   const triggerFileInput = () => {
     fileInputRef.current?.click()
