@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { ActionGateProps } from '../../types'
 import { X, Lock } from 'lucide-react'
 

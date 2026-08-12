@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useProfessionalProfile } from '../../hooks/useProfessionalProfile';
 import { useProfessionalVideos } from '../../hooks/useProfessionalVideos';
 import { useProfessionalEvents } from '../../hooks/useProfessionalEvents';

@@ -1,16 +1,16 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { jwtDecode } from 'jwt-decode'
-import type { 
-  User, 
-  AuthContextType, 
-  LoginResult, 
+import type {
+  User,
+  AuthContextType,
+  LoginResult,
   RegisterResult,
   ProRegistrationData,
   InstitutionStep1,
   InstitutionStep2
 } from '../types'
-import { useNotifications } from '../contexts/NotificationContext'
+import { useNotifications } from './NotificationContext'
 import { authApi } from '../services/authApi'
 
 // Clear all old data on login

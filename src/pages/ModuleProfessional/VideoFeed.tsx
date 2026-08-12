@@ -4,7 +4,7 @@ import { VideoPlayerPage } from '../../components/video/VideoPlayerPage';
 import { VideoPlayer } from '../../components/video/VideoPlayer';
 import SectionPub from '../../pages/PUB/SectionPub';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAccueilAlgo } from '../../algoPro/signals/useAccueilAlgo';
 import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
 import { useRequestsAlgo } from '../../algoPro/signals/useRequestsAlgo';

@@ -10,7 +10,7 @@ import {
   MessageCircle
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { Video, Professional } from '../../types'
 

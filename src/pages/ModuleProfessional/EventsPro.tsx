@@ -8,7 +8,7 @@ import {
 import TicketModal from '../../components/modals/TicketModal'
 import EventStatsModal from '../../components/modals/EventStatsModal'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 

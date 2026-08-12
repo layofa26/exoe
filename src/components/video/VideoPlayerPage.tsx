@@ -11,7 +11,7 @@ import { PlayIcon, HeartIcon, CommentIcon, ShareIcon, ArrowLeftIcon, SendIcon, C
 import { useAccueilAlgo } from '../../algoPro/signals/useAccueilAlgo';
 import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { VideoPlayer } from './VideoPlayer';
 import { videoApi } from '../../services/videoApi';
 

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { UploadVideo } from '../video/UploadVideo'
 import CameraRecord from '../video/CameraRecord'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 const ProSubHeader = (): JSX.Element | null => {
   const navigate = useNavigate()

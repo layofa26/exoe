@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { UploadVideo } from '../video/UploadVideo'
 import CameraRecord from '../video/CameraRecord'
 import { getCurrentUserId } from '../../services/apiClient'
