@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { VideoPlayerPage } from '../../components/video/VideoPlayerPage';
 import type { Video } from '../../types/video';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+
 export default function VideoPage() {
   const { videoId } = useParams<{ videoId: string }>();
   const navigate = useNavigate();
@@ -34,8 +36,6 @@ export default function VideoPage() {
         } else {
           setError('Impossible de charger la vidéo')
         }
-      } catch (error) {
-        setError('Backend service not available');
       } catch (err) {
         setError('Erreur lors du chargement de la vidéo');
         console.error('Error fetching video:', err);
