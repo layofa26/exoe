@@ -81,7 +81,8 @@ export const Register = (): JSX.Element => {
     // Sanitize input to prevent XSS
     const { name, value } = e.target
     // Ne pas trim() le mot de passe pour préserver les caractères spéciaux
-    const sanitizedValue = name === 'password' || name === 'confirmPassword' ? value : value.trim()
+    // Ne pas trim() le nom complet pour préserver les espaces (nom et prénom)
+    const sanitizedValue = name === 'password' || name === 'confirmPassword' || name === 'fullName' ? value : value.trim()
     setFormData({
       ...formData,
       [name]: sanitizedValue
@@ -141,8 +142,14 @@ export const Register = (): JSX.Element => {
       return false
     }
 
+    // Vérifier que le nom contient au moins deux parties (nom et prénom)
+    const nameParts = trimmedFullName.split(/\s+/).filter(part => part.length > 0)
+    if (nameParts.length < 2) {
+      setError('Le nom complet doit contenir au moins un nom et un prénom')
+      return false
+    }
+
     // Validation nom réservé (mots interdits)
-    const nameParts = trimmedFullName.split(' ')
     if (nameParts.some(part => isReservedName(part))) {
       setError('Ce nom ne peut pas être utilisé')
       return false
@@ -210,7 +217,7 @@ export const Register = (): JSX.Element => {
     const birthDateStr = `${formData.birthYear}-${formData.birthMonth.padStart(2, '0')}-${formData.birthDay.padStart(2, '0')}`
 
     const result = await registerPro({
-      fullName: formData.fullName.trim(),
+      fullName: formData.fullName, // Ne pas trim pour préserver les espaces entre nom et prénom
       email: formData.contact.includes('@') ? formData.contact : '',
       phone: formData.contact.includes('@') ? '' : formData.contact,
       password: formData.password,

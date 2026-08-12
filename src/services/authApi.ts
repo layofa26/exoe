@@ -1,7 +1,7 @@
 import { LoginResponseSchema, RegisterResponseSchema, ApiErrorSchema } from '../schemas/authSchemas'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
-const API_TIMEOUT = 10000 // 10 seconds timeout for faster feedback
+const API_TIMEOUT = 30000 // 30 seconds timeout for better connectivity
 
 // Helper functions for cookie management (for reading httpOnly cookies set by backend)
 const getCookie = (name: string): string | null => {
@@ -96,6 +96,21 @@ export const authApi = {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Erreur backend connexion:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        })
+        
+        // Handle specific error messages from Django
+        if (errorData.detail) {
+          return { success: false, error: errorData.detail }
+        }
+        if (errorData.error) {
+          return { success: false, error: errorData.error }
+        }
+        
         return {
           success: false,
           error: 'Identifiants incorrects'
@@ -209,7 +224,7 @@ export const authApi = {
 
   async getProfile(token: string): Promise<{ success: boolean; error?: string; data?: UserProfile }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/users/profile/`, {
+      const response = await fetch(`${API_BASE_URL}/users/profile/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -236,7 +251,7 @@ export const authApi = {
 
   async refreshToken(refreshToken: string): Promise<{ success: boolean; error?: string; data?: LoginResponse }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/users/token/refresh/`, {
+      const response = await fetch(`${API_BASE_URL}/users/token/refresh/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

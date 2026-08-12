@@ -51,9 +51,14 @@ export const MyVideos = (): JSX.Element => {
     const loadVideos = async () => {
       try {
         setLoading(true)
-        const token = localStorage.getItem('accessToken')
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
         
-        const response = await fetch(`${API_BASE_URL}/v1/videos/`, {
+        if (!token) {
+          setError('Vous devez être connecté pour voir vos vidéos')
+          return
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/accueil/videos/my_videos/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -65,20 +70,20 @@ export const MyVideos = (): JSX.Element => {
         }
         
         const data = await response.json()
-        const videosData = data.results || data
+        const videosData = Array.isArray(data) ? data : (data.results || [])
         
         setVideos(videosData.map((video: any) => ({
           id: video.id,
           title: video.title,
-          thumbnailUrl: video.thumbnail_url,
+          thumbnailUrl: video.cover_url,
           duration: video.duration,
-          viewsCount: video.views_count,
-          likesCount: video.likes_count,
-          commentsCount: video.comments_count,
-          status: video.status,
+          viewsCount: video.views_count || 0,
+          likesCount: video.likes_count || 0,
+          commentsCount: video.comments_count || 0,
+          status: video.is_public ? 'PUBLISHED' : 'DRAFT',
           createdAt: video.created_at,
-          visibility: video.visibility,
-          author: video.author
+          visibility: video.is_public ? 'public' : 'private',
+          author: video.owner
         })))
       } catch (error) {
         console.error('Error loading videos:', error)
@@ -121,8 +126,21 @@ export const MyVideos = (): JSX.Element => {
   const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette vidéo ?')) {
       try {
-        // Backend removed - video deletion disabled
-        alert('Backend service not available');
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+        
+        const response = await fetch(`${API_BASE_URL}/accueil/videos/${id}/`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (response.ok) {
+          setVideos(videos.filter(v => v.id !== id))
+        } else {
+          alert('Erreur lors de la suppression de la vidéo')
+        }
       } catch (error) {
         console.error('Error deleting video:', error)
         alert('Erreur lors de la suppression de la vidéo')

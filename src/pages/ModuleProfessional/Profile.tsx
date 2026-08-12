@@ -30,6 +30,7 @@ interface UserProfile {
   profession?: string
   speciality?: string
   lastProfessionUpdate?: string
+  last_profession_update?: string
   bio?: string
   location?: string
   country?: string
@@ -37,6 +38,7 @@ interface UserProfile {
   websites?: string[]
   status?: 'online' | 'offline'
   createdAt?: string
+  date_joined?: string
   skills?: Skill[]
   username?: string
   fullName?: string
@@ -223,11 +225,12 @@ const Profile = () => {
             city: backendProfile.city,
             websites: backendProfile.website ? [backendProfile.website] : [],
             fullName: backendProfile.full_name || backendProfile.username,
-            avatarUrl: backendProfile.photo,
-            banner: backendProfile.banner,
-            profession: backendProfile.profession,
-            speciality: backendProfile.speciality,
-            lastProfessionUpdate: backendProfile.lastProfessionUpdate
+            avatarUrl: backendProfile.photo_url || backendProfile.photo,
+            banner: backendProfile.banner_url || backendProfile.banner,
+            profession: backendProfile.profession || backendProfile.user_profession,
+            speciality: backendProfile.speciality || backendProfile.user_speciality,
+            lastProfessionUpdate: backendProfile.lastProfessionUpdate,
+            skills: backendProfile.skills || []
           })
         } else {
           console.log('No profile data found, creating empty profile')
@@ -370,16 +373,55 @@ const Profile = () => {
     return Math.max(0, Math.ceil(daysRemaining))
   }
 
+  const getDaysSinceLastProfessionUpdate = (lastUpdate?: string): number => {
+    if (!lastUpdate) return 30 // Pas de mise à jour précédente, donc autorisé
+    const lastDate = new Date(lastUpdate)
+    const now = new Date()
+    const daysSinceUpdate = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
+    return Math.floor(daysSinceUpdate)
+  }
+
   // Modifier la profession
   const handleProfessionUpdate = async () => {
     if (!profile) return
     if (newProfession.trim() && newProfession.length >= 3 && newProfession.length <= 50) {
       try {
-        // Backend removed - profession update disabled
-        alert('Backend service not available');
-        setNewProfession('')
-        setShowProfessionModal(false)
-        showProfileUpdated()
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+        if (!token) {
+          alert('Vous devez être connecté pour modifier votre profession')
+          return
+        }
+
+        // Vérifier restriction 30 jours
+        const lastUpdate = profile.last_profession_update || profile.lastProfessionUpdate
+        if (lastUpdate) {
+          const daysSinceUpdate = getDaysSinceLastProfessionUpdate(lastUpdate)
+          if (daysSinceUpdate < 30) {
+            const daysRemaining = 30 - daysSinceUpdate
+            alert(`Vous devez attendre ${daysRemaining} jours avant de modifier votre profession à nouveau`)
+            return
+          }
+        }
+
+        const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ profession: newProfession.trim() })
+        })
+
+        if (response.ok) {
+          const updatedProfile = await response.json()
+          setProfile(updatedProfile)
+          setNewProfession('')
+          setShowProfessionModal(false)
+          showProfileUpdated()
+        } else {
+          const errorData = await response.json()
+          alert(errorData.detail || 'Erreur lors de la mise à jour de la profession')
+        }
       } catch (error) {
         console.error('Error updating profession:', error)
         alert('Erreur lors de la mise à jour de la profession')
@@ -422,6 +464,8 @@ const Profile = () => {
             'Technique': 'technical',
             'Soft Skills': 'soft',
             'Langue': 'language',
+            'Communication': 'communication',
+            'Management': 'management',
             'Autre': 'other'
           }
           
@@ -447,8 +491,7 @@ const Profile = () => {
             body: JSON.stringify({
               name: newSkill.name,
               category: englishCategory,
-              level: englishLevel,
-              profile: existingProfile.id
+              level: englishLevel
             })
           })
 
@@ -617,18 +660,19 @@ const Profile = () => {
         setProfile({
           id: updatedProfile.id,
           username: updatedProfile.username,
-          photo: updatedProfile.photo,
+          photo: updatedProfile.photo_url || updatedProfile.photo,
           bio: updatedProfile.bio,
           location: updatedProfile.location,
           country: updatedProfile.country,
           city: updatedProfile.city,
           websites: updatedProfile.website ? [updatedProfile.website] : [],
           fullName: updatedProfile.full_name || updatedProfile.username,
-          avatarUrl: updatedProfile.photo,
-          banner: updatedProfile.banner,
-          profession: updatedProfile.profession,
-          speciality: updatedProfile.speciality,
-          lastProfessionUpdate: updatedProfile.lastProfessionUpdate
+          avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
+          banner: updatedProfile.banner_url || updatedProfile.banner,
+          profession: updatedProfile.profession || updatedProfile.user_profession,
+          speciality: updatedProfile.speciality || updatedProfile.user_speciality,
+          lastProfessionUpdate: updatedProfile.lastProfessionUpdate,
+          skills: updatedProfile.skills || []
         })
       }
       
@@ -729,19 +773,38 @@ const Profile = () => {
       
       console.log('Banner file created:', file.name, file.size, file.type)
       
-      // Récupérer d'abord le profil existant
-      const existingProfile = await getProfileWithFallback(token)
+      // Récupérer d'abord le profil existant ou le créer
+      let existingProfile = await getProfileWithFallback(token)
       console.log('Get profile data:', existingProfile)
 
       if (!existingProfile) {
-        alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
-        return
+        // Créer le profil s'il n'existe pas
+        console.log('Creating new profile...')
+        const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            bio: '',
+            location: '',
+            website: ''
+          })
+        })
+
+        if (createResponse.ok) {
+          existingProfile = await createResponse.json()
+          console.log('Profile created:', existingProfile)
+        } else {
+          alert('Erreur lors de la création du profil.')
+          return
+        }
       }
 
       // Mettre à jour le profil existant avec bannière
       const formData = new FormData()
       formData.append('banner', file)
-      formData.append('user', existingProfile.user)
       formData.append('bio', existingProfile.bio || '')
       formData.append('location', existingProfile.location || '')
       formData.append('website', existingProfile.website || '')
@@ -776,18 +839,19 @@ const Profile = () => {
         setProfile({
           id: updatedProfile.id,
           username: updatedProfile.username,
-          photo: updatedProfile.photo,
+          photo: updatedProfile.photo_url || updatedProfile.photo,
           bio: updatedProfile.bio,
           location: updatedProfile.location,
           country: updatedProfile.country,
           city: updatedProfile.city,
           websites: updatedProfile.website ? [updatedProfile.website] : [],
           fullName: updatedProfile.full_name || updatedProfile.username,
-          avatarUrl: updatedProfile.photo,
-          banner: updatedProfile.banner,
-          profession: updatedProfile.profession,
-          speciality: updatedProfile.speciality,
-          lastProfessionUpdate: updatedProfile.lastProfessionUpdate
+          avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
+          banner: updatedProfile.banner_url || updatedProfile.banner,
+          profession: updatedProfile.profession || updatedProfile.user_profession,
+          speciality: updatedProfile.speciality || updatedProfile.user_speciality,
+          lastProfessionUpdate: updatedProfile.lastProfessionUpdate,
+          skills: updatedProfile.skills || []
         })
       }
       
@@ -836,7 +900,6 @@ const Profile = () => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            user: existingProfile.user,
             bio: newBio,
             location: existingProfile.location || '',
             website: existingProfile.website || ''
@@ -863,14 +926,14 @@ const Profile = () => {
           setProfile({
             id: updatedProfile.id,
             username: updatedProfile.username,
-            photo: updatedProfile.photo,
+            photo: updatedProfile.photo_url || updatedProfile.photo,
             bio: updatedProfile.bio,
             location: updatedProfile.location,
             country: updatedProfile.country,
             city: updatedProfile.city,
             websites: updatedProfile.website ? [updatedProfile.website] : [],
             fullName: updatedProfile.full_name || updatedProfile.username,
-            avatarUrl: updatedProfile.photo,
+            avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
             banner: updatedProfile.banner,
             profession: updatedProfile.profession,
             speciality: updatedProfile.speciality,
@@ -924,7 +987,6 @@ const Profile = () => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            user: existingProfile.user,
             bio: existingProfile.bio || '',
             location: existingProfile.location || '',
             website: formattedWebsite
@@ -951,14 +1013,14 @@ const Profile = () => {
           setProfile({
             id: updatedProfile.id,
             username: updatedProfile.username,
-            photo: updatedProfile.photo,
+            photo: updatedProfile.photo_url || updatedProfile.photo,
             bio: updatedProfile.bio,
             location: updatedProfile.location,
             country: updatedProfile.country,
             city: updatedProfile.city,
             websites: updatedProfile.website ? [updatedProfile.website] : [],
             fullName: updatedProfile.full_name || updatedProfile.username,
-            avatarUrl: updatedProfile.photo,
+            avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
             banner: updatedProfile.banner,
             profession: updatedProfile.profession,
             speciality: updatedProfile.speciality,
@@ -1031,7 +1093,7 @@ const Profile = () => {
   const badges: any[] = []
 
   // Catégories de compétences
-  const skillCategories = ['Technique', 'Créatif', 'Business', 'Communication', 'Autre']
+  const skillCategories = ['Technique', 'Soft Skills', 'Langue', 'Communication', 'Management', 'Autre']
   const skillLevels = ['Débutant', 'Intermédiaire', 'Avancé', 'Expert']
 
   return (
@@ -1143,10 +1205,10 @@ const Profile = () => {
               {/* Photo centrée avec upload - chevauchant la bannière */}
               <div className="relative group">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl sm:text-2xl md:text-3xl font-bold overflow-hidden border-4 border-white dark:border-zinc-800 shadow-lg">
-                  {profile?.photo ? (
-                    <img src={profile.photo} alt="Profile" className="w-full h-full object-cover" />
+                  {profile?.avatarUrl || profile?.photo_url || profile?.photo ? (
+                    <img src={profile?.avatarUrl || profile?.photo_url || profile?.photo} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    profile?.name?.charAt(0) || '?'
+                    profile?.name?.charAt(0) || profile?.fullName?.charAt(0) || '?'
                   )}
                 </div>
                 {canModifyPhoto() ? (
@@ -1242,7 +1304,7 @@ const Profile = () => {
                   <div className="flex items-center justify-center gap-1.5">
                     <Calendar className={`w-3 h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                     <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                      Membre depuis {new Date(profile.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                      Membre depuis {profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : 'Date inconnue'}
                     </span>
                   </div>
                 )}
@@ -1320,7 +1382,7 @@ const Profile = () => {
                 <div className="flex items-center justify-center gap-1.5">
                   <Calendar className={`w-3 h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                   <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                    Membre depuis {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('fr-FR') : ''}
+                    Membre depuis {profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString('fr-FR') : 'Date inconnue'}
                   </span>
                 </div>
               </div>
@@ -1347,14 +1409,16 @@ const Profile = () => {
                   <div
                     key={skill.id}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] md:text-xs ${
-                      skill.category === 'Technique'
+                      skill.category === 'Technique' || skill.category === 'technical'
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                        : skill.category === 'Créatif'
+                        : skill.category === 'Soft Skills' || skill.category === 'soft'
                         ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                        : skill.category === 'Business'
+                        : skill.category === 'Langue' || skill.category === 'language'
                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        : skill.category === 'Communication'
+                        : skill.category === 'Communication' || skill.category === 'communication'
                         ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                        : skill.category === 'Management' || skill.category === 'management'
+                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300'
                     }`}
                   >
@@ -1384,14 +1448,16 @@ const Profile = () => {
                           <div key={skill.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-700">
                             <div className="flex items-center gap-2">
                               <span className={`text-xs ${
-                                skill.category === 'Technique'
+                                skill.category === 'Technique' || skill.category === 'technical'
                                   ? 'text-blue-600'
-                                  : skill.category === 'Créatif'
+                                  : skill.category === 'Soft Skills' || skill.category === 'soft'
                                   ? 'text-purple-600'
-                                  : skill.category === 'Business'
+                                  : skill.category === 'Langue' || skill.category === 'language'
                                   ? 'text-green-600'
-                                  : skill.category === 'Communication'
+                                  : skill.category === 'Communication' || skill.category === 'communication'
                                   ? 'text-orange-600'
+                                  : skill.category === 'Management' || skill.category === 'management'
+                                  ? 'text-yellow-600'
                                   : 'text-gray-600'
                               }`}>
                                 {skill.name}

@@ -36,13 +36,13 @@ export const useSearch = () => {
           
           // Recherche parallèle professionnels et vidéos
           const [profilsResponse, videosResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/v1/profil/profils/?search=${searchQuery}`, {
+            fetch(`${API_BASE_URL}/profil/profils/?search=${searchQuery}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
               }
             }),
-            fetch(`${API_BASE_URL}/v1/accueil/videos/?search=${searchQuery}`, {
+            fetch(`${API_BASE_URL}/accueil/videos/?search=${searchQuery}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -56,22 +56,23 @@ export const useSearch = () => {
           const professionals = profilsData.results ? profilsData.results.map((p: any) => ({
             id: p.id,
             username: p.username,
-            fullName: p.username,
-            profession: '',
+            fullName: p.full_name || p.username,
+            profession: p.profession || p.user_profession || '',
             company: '',
             followersCount: 0,
-            videosCount: 0
+            videosCount: 0,
+            avatarUrl: p.photo_url || p.photo
           })) : [];
 
           const videos = videosData.results ? videosData.results.map((v: any) => ({
             id: v.id,
             title: v.title,
             description: v.description,
-            thumbnail: v.cover,
-            videoUrl: v.file,
+            thumbnail: v.cover_url || v.cover,
+            videoUrl: v.file_url || v.file,
             author: {
               id: v.owner,
-              fullName: 'Utilisateur',
+              fullName: v.owner || 'Utilisateur',
               profession: ''
             },
             views: 0,

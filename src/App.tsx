@@ -93,11 +93,9 @@ function App(): JSX.Element {
   // Always show main header for module navigation
   const showMainHeader = !isLiveRoom && !isNoHeaderPage
 
-  // Cacher header et prosidebar sur mobile lors upload vidéo et pages de gestion
+  // Cacher header et prosidebar sur mobile lors upload vidéo uniquement
   const isMobile = window.innerWidth < 1024
-  const isManagementPage = location.pathname.startsWith('/pro/my-videos') || 
-                           location.pathname.startsWith('/pro/drafts')
-  const shouldHideHeaderOnMobileUpload = isMobile && (isUploadingVideo || isManagementPage)
+  const shouldHideHeaderOnMobileUpload = isMobile && isUploadingVideo
 
   // Detekte si nou nan paj ki pa dwe gen SubHeader (events, requests, subscriptions)
   const isNoSubHeaderPage = location.pathname.startsWith('/pro/events') ||

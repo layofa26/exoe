@@ -65,15 +65,20 @@ export const apiClient = async <T>(
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`
   
   // Add auth header if token exists (fallback from localStorage)
-  const token = localStorage.getItem('accessToken')
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
-  }
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+  const headers: Record<string, string> = {}
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
+  
+  // Only set Content-Type for non-FormData requests
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json'
+  }
+  
+  // Merge with provided headers
+  Object.assign(headers, options.headers as Record<string, string> || {})
 
   try {
     const response = await fetch(url, {
@@ -162,7 +167,7 @@ export const api = {
     apiClient<T>(endpoint, {
       method: 'POST',
       body: formData,
-      headers: {} // Don't set Content-Type for FormData
+      headers: {} // Empty headers to avoid Content-Type override
     }, schema),
 }
 

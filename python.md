@@ -1,1 +1,2 @@
-cd C:\yaml\EXILE_BACKEND\EXILE_BACKEND\EXILE_B; python manage.py runserver
+
+cd C:\yaml\EXILE_BACKEND;python manage.py runserver

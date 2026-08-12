@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '../services/apiClient';
 
 interface ProfessionalProfile {
   id: string;
@@ -48,8 +49,14 @@ export const useProfessionalProfile = (professionalId: string) => {
       try {
         setLoading(true);
         setError(null);
-        // Backend removed - profile loading disabled
-        setError('Backend service not available');
+        
+        const result = await api.get(`/profil/profils/${professionalId}/`);
+        
+        if (result.success && result.data) {
+          setProfile(result.data);
+        } else {
+          setError(result.error || 'Impossible de charger le profil');
+        }
       } catch (err) {
         console.error('Error loading professional profile:', err);
         setError('Impossible de charger le profil');

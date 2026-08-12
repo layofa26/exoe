@@ -54,7 +54,7 @@ export default function VideoFeed() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('accessToken')
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
       const { videoApi } = await import('../../services/videoApi')
       // Ne pas envoyer le token pour les vidéos publiques
       const result = await videoApi.getVideos()
@@ -93,6 +93,7 @@ export default function VideoFeed() {
         setError(result.error || 'Erreur lors du chargement des vidéos')
       }
     } catch (error) {
+      console.error('Error loading videos:', error)
       setVideos([]);
       setError('Erreur lors du chargement des vidéos');
     } finally {

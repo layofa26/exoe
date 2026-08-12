@@ -1,7 +1,7 @@
 ﻿import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload, X, Loader2, AlertCircle, CheckCircle, Edit3 } from 'lucide-react'
-import { uploadVideoToSupabase, uploadThumbnailToSupabase, getPublicVideoUrl } from '../../services/supabaseClient'
+import { getPublicVideoUrl } from '../../services/supabaseClient'
 import { api } from '../../services/apiClient'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { VideoEditor } from './VideoEditor'
@@ -37,6 +37,15 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
   
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Gérer l'état d'upload pour le header mobile
+  useEffect(() => {
+    if (isUploading) {
+      localStorage.setItem('exile_uploading_video', 'true')
+    } else {
+      localStorage.removeItem('exile_uploading_video')
+    }
+  }, [isUploading])
   const [error, setError] = useState<string | null>(null)
   
   const [showVideoEditor, setShowVideoEditor] = useState(false)
@@ -138,42 +147,30 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
     setUploadProgress(0)
     
     try {
-      const videoUploadResult = await uploadVideoToSupabase(videoFile, (progress) => {
-        setUploadProgress(progress)
-      })
+      // Use backend upload endpoint
+      const formData = new FormData()
+      formData.append('video', videoFile)
+      formData.append('title', title.trim())
+      formData.append('description', description.trim())
+      formData.append('is_public', visibility === 'public' ? 'true' : 'false')
       
-      if (videoUploadResult.error) {
-        throw new Error(videoUploadResult.error)
-      }
-      
-      let thumbnailUrl = ''
       if (thumbnailFile) {
-        const thumbnailUploadResult = await uploadThumbnailToSupabase(thumbnailFile, videoUploadResult.path)
-        if (thumbnailUploadResult.error) {
-          throw new Error(thumbnailUploadResult.error)
-        }
-        thumbnailUrl = getPublicVideoUrl(thumbnailUploadResult.path)
+        formData.append('thumbnail', thumbnailFile)
       }
       
-      const video = document.createElement('video')
-      video.preload = 'metadata'
-      const duration = await new Promise<number>((resolve) => {
-        video.onloadedmetadata = () => resolve(video.duration)
-        video.onerror = () => resolve(0)
-        video.src = URL.createObjectURL(videoFile)
-      })
+      // Simulate upload progress for UX
+      let progress = 0
+      const progressInterval = setInterval(() => {
+        progress += 10
+        if (progress <= 90) {
+          setUploadProgress(progress)
+        }
+      }, 200)
       
-      const result = await api.post('/videos/videos/upload/', {
-        title: title.trim(),
-        description: description.trim(),
-        visibility,
-        supabase_storage_path: videoUploadResult.path,
-        thumbnail_url: thumbnailUrl,
-        duration: duration || null,
-        file_size: videoFile.size,
-        mime_type: videoFile.type,
-        video_filters: videoFilters
-      })
+      const result = await api.upload('/accueil/videos/', formData)
+      
+      clearInterval(progressInterval)
+      setUploadProgress(100)
       
       if (result.success) {
         addNotification('success', 'Vidéo uploadée avec succès!')
