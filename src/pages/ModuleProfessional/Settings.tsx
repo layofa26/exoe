@@ -253,8 +253,8 @@ const Settings = () => {
 
     try {
       // Convertir base64 en blob
-      const response = await fetch(uploadedPhoto)
-      const blob = await response.blob()
+      const photoResponse = await fetch(uploadedPhoto)
+      const blob = await photoResponse.blob()
       const formData = new FormData()
       formData.append('photo', blob)
 

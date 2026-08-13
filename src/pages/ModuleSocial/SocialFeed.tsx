@@ -123,16 +123,14 @@ export const SocialFeed = (): JSX.Element => {
       })
 
       if (response.ok) {
-        alert('Vidéo créée avec succès')
+        setShowVideoImportModal(false)
+        showToast('Vidéo publiée avec succès!')
         handleRemoveVideo()
         setVideoForm({ title: '', description: '', hashtags: [] })
         fetchAlerts()
       } else {
         throw new Error('Erreur lors de la création')
       }
-    } catch (error) {
-      setShowVideoImportModal(false)
-      showToast('Vidéo publiée avec succès!')
     } catch (error) {
       console.error('Error publishing video:', error)
       showToast('Erreur lors de la publication de la vidéo')
