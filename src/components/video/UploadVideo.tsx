@@ -182,6 +182,12 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
         setUploadProgress(0)
         if (videoInputRef.current) videoInputRef.current.value = ''
         if (thumbnailInputRef.current) thumbnailInputRef.current.value = ''
+
+        // Rafraîchir le feed de vidéos en appelant une fonction globale
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('video-uploaded'))
+        }
+
         if (onSuccess) onSuccess()
         if (onClose) onClose()
       } else {

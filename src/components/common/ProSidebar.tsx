@@ -39,14 +39,25 @@ export const ProSidebar = (): JSX.Element | null => {
 
     checkGlobalUIState()
     window.addEventListener('storage', checkGlobalUIState)
-    
+
     // Poll localStorage every 100ms to detect changes from same window
     const interval = setInterval(checkGlobalUIState, 100)
-    
+
     return () => {
       window.removeEventListener('storage', checkGlobalUIState)
       clearInterval(interval)
     }
+  }, [])
+
+  // Écouter l'événement de vidéo uploadée pour s'assurer que le sidebar reste visible
+  useEffect(() => {
+    const handleVideoUploaded = () => {
+      console.log('Video uploaded event detected in ProSidebar')
+      setIsUploadingVideo(false)
+    }
+
+    window.addEventListener('video-uploaded', handleVideoUploaded)
+    return () => window.removeEventListener('video-uploaded', handleVideoUploaded)
   }, [])
 
   useEffect(() => {

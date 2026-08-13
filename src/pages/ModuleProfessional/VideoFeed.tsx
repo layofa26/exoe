@@ -58,7 +58,7 @@ export default function VideoFeed() {
       const { videoApi } = await import('../../services/videoApi')
       // Ne pas envoyer le token pour les vidéos publiques
       const result = await videoApi.getVideos()
-      
+
       if (result.success && result.data) {
         // Transformer les données Django vers le format frontend
         const transformedVideos = result.data.map((djangoVideo: any) => ({
@@ -100,6 +100,17 @@ export default function VideoFeed() {
       setLoading(false);
     }
   };
+
+  // Écouter l'événement de vidéo uploadée
+  useEffect(() => {
+    const handleVideoUploaded = () => {
+      console.log('Video uploaded event detected, refreshing feed')
+      loadVideos()
+    }
+
+    window.addEventListener('video-uploaded', handleVideoUploaded)
+    return () => window.removeEventListener('video-uploaded', handleVideoUploaded)
+  }, [])
 
   // Wrapper useCallback pour loadVideos
   const loadVideosCallback = useCallback(loadVideos, []);
