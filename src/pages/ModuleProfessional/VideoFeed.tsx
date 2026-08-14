@@ -200,8 +200,8 @@ export default function VideoFeed() {
         {/* Video Player */}
         <div className="pointer-events-none">
           <VideoPlayer
-            src={video.file_url}
-            poster={video.cover_url}
+            src={video.videoUrl}
+            poster={video.thumbnail}
             autoplay={false}
             className="rounded-xl overflow-hidden"
           />
