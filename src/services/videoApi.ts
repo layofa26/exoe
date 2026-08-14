@@ -1,4 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+// Ensure API_BASE_URL always ends with /api/v1 for production URLs
+const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
+  ? API_BASE_URL.replace('/api', '/api/v1') 
+  : API_BASE_URL
 
 export interface VideoData {
   title: string
@@ -48,7 +52,7 @@ export const videoApi = {
       if (params?.visibility) queryParams.append('visibility', params.visibility)
       if (params?.search) queryParams.append('search', params.search)
 
-      const url = `${API_BASE_URL}/accueil/videos/${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+      const url = `${FINAL_API_BASE_URL}/accueil/videos/${queryParams.toString() ? '?' + queryParams.toString() : ''}`
 
       const response = await fetch(url, {
         method: 'GET',
@@ -79,7 +83,7 @@ export const videoApi = {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/accueil/videos/${id}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/${id}/`, {
         method: 'GET',
         headers,
       })
@@ -117,7 +121,7 @@ export const videoApi = {
         formData.append('visibility', videoData.is_public ? 'public' : 'private')
       }
 
-      const response = await fetch(`${API_BASE_URL}/accueil/videos/${id}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/${id}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -145,7 +149,7 @@ export const videoApi = {
 
   async deleteVideo(id: number, token: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/accueil/videos/${id}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/${id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -175,7 +179,7 @@ export const videoApi = {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/accueil/videos/${id}/increment_view/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/${id}/increment_view/`, {
         method: 'POST',
         headers,
       })
@@ -199,7 +203,7 @@ export const videoApi = {
 
   async likeVideo(videoId: number, token: string): Promise<{ success: boolean; error?: string; data?: any }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/videos/likes/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/v1/videos/likes/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -228,7 +232,7 @@ export const videoApi = {
 
   async unlikeVideo(likeId: number, token: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/videos/likes/${likeId}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/v1/videos/likes/${likeId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -253,7 +257,7 @@ export const videoApi = {
 
   async dislikeVideo(videoId: number, token: string): Promise<{ success: boolean; error?: string; data?: any }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/videos/dislikes/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/v1/videos/dislikes/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -282,7 +286,7 @@ export const videoApi = {
 
   async undislikeVideo(dislikeId: number, token: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/videos/dislikes/${dislikeId}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/v1/videos/dislikes/${dislikeId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -312,7 +316,7 @@ export const videoApi = {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/v1/videos/comments/?video=${videoId}`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/v1/videos/comments/?video=${videoId}`, {
         method: 'GET',
         headers,
       })
@@ -352,7 +356,7 @@ export const videoApi = {
         body.parent_id = parentId
       }
 
-      const response = await fetch(`${API_BASE_URL}/v1/videos/comments/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/v1/videos/comments/`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),

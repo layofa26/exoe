@@ -19,6 +19,10 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+// Ensure API_BASE_URL always ends with /api/v1 for production URLs
+const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
+  ? API_BASE_URL.replace('/api', '/api/v1') 
+  : API_BASE_URL
 
 interface Request {
   id: string
@@ -125,7 +129,7 @@ export const Requests = (): JSX.Element => {
         setCurrentUserId(userId)
         
         // Fetch requests from backend
-        const response = await fetch(`${API_BASE_URL}/demande/demandes/`, {
+        const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -179,7 +183,7 @@ export const Requests = (): JSX.Element => {
           const token = localStorage.getItem('accessToken')
           if (!token) return
 
-          const response = await fetch(`${API_BASE_URL}/conversations/messages/important/`, {
+          const response = await fetch(`${FINAL_API_BASE_URL}/conversations/messages/important/`, {
             headers: { 'Authorization': `Bearer ${token}` }
           })
 
@@ -206,7 +210,7 @@ export const Requests = (): JSX.Element => {
           const token = localStorage.getItem('accessToken')
           if (!token) return
 
-          const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+          const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
             headers: { 'Authorization': `Bearer ${token}` }
           })
 
@@ -233,7 +237,7 @@ export const Requests = (): JSX.Element => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -270,7 +274,7 @@ export const Requests = (): JSX.Element => {
       
       const newStatus = action === 'accept' ? 'accepte' : 'refuse'
       
-      const response = await fetch(`${API_BASE_URL}/demande/demandes/${requestId}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/${requestId}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -307,7 +311,7 @@ export const Requests = (): JSX.Element => {
         return
       }
       
-      const response = await fetch(`${API_BASE_URL}/demande/demandes/${requestId}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/${requestId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -340,7 +344,7 @@ export const Requests = (): JSX.Element => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

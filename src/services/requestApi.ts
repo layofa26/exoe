@@ -1,4 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+// Ensure API_BASE_URL always ends with /api/v1 for production URLs
+const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
+  ? API_BASE_URL.replace('/api', '/api/v1') 
+  : API_BASE_URL
 
 export interface Demande {
   id: number
@@ -23,7 +27,7 @@ export const requestApi = {
       if (status) params.append('status', status)
       if (search) params.append('search', search)
 
-      const response = await fetch(`${API_BASE_URL}/demandes/?${params.toString()}`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -55,7 +59,7 @@ export const requestApi = {
         return { success: false, error: 'Utilisateur non connecté' }
       }
 
-      const response = await fetch(`${API_BASE_URL}/demandes/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -85,7 +89,7 @@ export const requestApi = {
     try {
       const token = localStorage.getItem('accessToken')
 
-      const response = await fetch(`${API_BASE_URL}/demandes/${id}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${id}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -111,7 +115,7 @@ export const requestApi = {
     try {
       const token = localStorage.getItem('accessToken')
 
-      const response = await fetch(`${API_BASE_URL}/demandes/${id}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

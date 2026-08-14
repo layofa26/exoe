@@ -123,7 +123,10 @@ export const Header = (): JSX.Element => {
         if (!token) return
 
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
-        const response = await fetch(`${API_BASE_URL}/demande/demandes/`, {
+        const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
+          ? API_BASE_URL.replace('/api', '/api/v1') 
+          : API_BASE_URL
+        const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
