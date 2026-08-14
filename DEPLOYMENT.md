@@ -28,8 +28,8 @@ vercel --prod
 ```
 
 ### 4. Configuration Environment Variables sur Vercel
-- `VITE_API_BASE_URL`: https://exile-16qm.onrender.com/api
-- `VITE_APP_URL`: https://exile-frontend.vercel.app
+- `VITE_API_BASE_URL`: https://exile-backend-9q6o.onrender.com/api/v1
+- `VITE_APP_URL`: https://exoe.vercel.app
 - `VITE_JITSI_DOMAIN`: meet.jit.si
 - `VITE_SUPABASE_URL`: https://gbermbfhuajpguipyjfc.supabase.co
 - `VITE_SUPABASE_ANON_KEY`: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -46,9 +46,9 @@ vercel --prod
 - `SECRET_KEY`: [Clé secrète forte]
 - `DATABASE_URL`: [URL de base de données PostgreSQL]
 - `DEBUG`: False
-- `ALLOWED_HOSTS`: exile-16qm.onrender.com
-- `CORS_ALLOWED_ORIGINS`: https://exile-frontend.vercel.app
-- `CSRF_TRUSTED_ORIGINS`: https://exile-frontend.vercel.app
+- `ALLOWED_HOSTS`: exile-backend-9q6o.onrender.com
+- `CORS_ALLOWED_ORIGINS`: https://exoe.vercel.app
+- `CSRF_TRUSTED_ORIGINS`: https://exoe.vercel.app
 
 ### 3. Build Command
 ```bash
@@ -84,22 +84,22 @@ gunicorn EXILE_B.wsgi:application
 
 ### 1. Test de connexion
 ```bash
-curl -X POST https://exile-16qm.onrender.com/api/v1/users/login/ \
+curl -X POST https://exile-backend-9q6o.onrender.com/api/v1/users/login/ \
   -H "Content-Type: application/json" \
   -d '{"username":"test","password":"test123"}'
 ```
 
 ### 2. Test d'inscription
 ```bash
-curl -X POST https://exile-16qm.onrender.com/api/v1/users/register/ \
+curl -X POST https://exile-backend-9q6o.onrender.com/api/v1/users/register/ \
   -H "Content-Type: application/json" \
   -d '{"full_name":"Test User","email":"test@example.com","password":"Test123!","birth_date":"2000-01-01","profession":"Developer"}'
 ```
 
 ### 3. Test CORS
 ```bash
-curl -X OPTIONS https://exile-16qm.onrender.com/api/v1/users/login/ \
-  -H "Origin: https://exile-frontend.vercel.app" \
+curl -X OPTIONS https://exile-backend-9q6o.onrender.com/api/v1/users/login/ \
+  -H "Origin: https://exoe.vercel.app" \
   -H "Access-Control-Request-Method: POST"
 ```
 
@@ -152,6 +152,6 @@ git push origin main
 
 ## 📞 Support
 
-- Backend: https://exile-16qm.onrender.com
-- Frontend: https://exile-frontend.vercel.app
+- Backend: https://exile-backend-9q6o.onrender.com
+- Frontend: https://exoe.vercel.app
 - Documentation: /docs
