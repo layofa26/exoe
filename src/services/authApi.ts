@@ -1,6 +1,11 @@
 import { LoginResponseSchema, RegisterResponseSchema, ApiErrorSchema } from '../schemas/authSchemas'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+// Ensure API_BASE_URL always ends with /api/v1 for production URLs
+const PROD_API_BASE_URL = 'https://exile-backend-9q6o.onrender.com/api/v1'
+const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
+  ? API_BASE_URL.replace('/api', '/api/v1') 
+  : API_BASE_URL
 const API_TIMEOUT = 30000 // 30 seconds timeout for better connectivity
 
 // Helper functions for cookie management (for reading httpOnly cookies set by backend)
@@ -80,7 +85,7 @@ export const authApi = {
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
 
     try {
-      const url = `${API_BASE_URL}/users/login/`
+      const url = `${FINAL_API_BASE_URL}/users/login/`
       console.log('Tentative de connexion vers:', url)
 
       const response = await fetch(url, {
@@ -151,7 +156,7 @@ export const authApi = {
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
 
     try {
-      const url = `${API_BASE_URL}/users/register/`
+      const url = `${FINAL_API_BASE_URL}/users/register/`
       console.log('Tentative d\'inscription vers:', url)
 
       const response = await fetch(url, {
@@ -224,7 +229,7 @@ export const authApi = {
 
   async getProfile(token: string): Promise<{ success: boolean; error?: string; data?: UserProfile }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/profile/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/profile/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -251,7 +256,7 @@ export const authApi = {
 
   async refreshToken(refreshToken: string): Promise<{ success: boolean; error?: string; data?: LoginResponse }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/token/refresh/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/token/refresh/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

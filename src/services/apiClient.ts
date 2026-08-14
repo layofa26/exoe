@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+// Ensure API_BASE_URL always ends with /api/v1 for production URLs
+const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
+  ? API_BASE_URL.replace('/api', '/api/v1') 
+  : API_BASE_URL
 const API_TIMEOUT = 15000 // 15 seconds
 const MAX_RETRIES = 3
 const RETRY_DELAY = 1000 // 1 second
@@ -62,7 +66,7 @@ export const apiClient = async <T>(
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
 
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`
+  const url = endpoint.startsWith('http') ? endpoint : `${FINAL_API_BASE_URL}${endpoint}`
   
   // Add auth header if token exists (fallback from localStorage)
   const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
