@@ -56,6 +56,7 @@ export interface Video {
   videoUrl?: string; // URL videyo a (optional)
   thumbnail?: string; // URL thumbnail la (optional)
   thumbnailUrl?: string; // URL thumbnail la (backend field)
+  videoAvailable?: boolean; // Indique si la vidéo est disponible
   visibility?: 'PUBLIC' | 'PRIVATE' | 'SUBSCRIBERS_ONLY';
   status?: 'PUBLISHED' | 'DRAFT' | 'UPLOADING' | 'FAILED' | 'READY';
   allowComments?: boolean;

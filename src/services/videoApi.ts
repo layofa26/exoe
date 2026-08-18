@@ -19,8 +19,13 @@ export interface Video {
   uploader: number
   uploader_name?: string
   uploader_avatar?: string
+  owner?: number
+  owner_username?: string
+  owner_avatar?: string
   slug: string
   supabase_storage_path: string
+  file_url?: string
+  cover_url?: string
   thumbnail_url?: string
   duration?: number
   file_size?: number
@@ -30,6 +35,7 @@ export interface Video {
   created_at: string
   updated_at: string
   published_at?: string
+  video_available?: boolean
   stats?: {
     views: number
     likes: number

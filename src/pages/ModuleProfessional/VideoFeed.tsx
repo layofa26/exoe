@@ -17,7 +17,7 @@ import EntrepriseEnVedette from '../../pages/PUB/EntrepriseEnVedette';
 export default function VideoFeed() {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const [activeVideo, setActiveVideo] = useState<Video | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -61,34 +61,48 @@ export default function VideoFeed() {
 
       if (result.success && result.data) {
         // Transformer les données Django vers le format frontend
-        const transformedVideos = result.data.map((djangoVideo: any) => ({
-          id: djangoVideo.id.toString(),
-          title: djangoVideo.title,
-          description: djangoVideo.description || '',
-          videoUrl: djangoVideo.file_url,
-          thumbnail: djangoVideo.cover_url,
-          thumbnailUrl: djangoVideo.cover_url,
-          author: {
-            id: djangoVideo.owner || 'unknown',
-            name: djangoVideo.owner || 'Unknown',
-            profession: 'Professionnel',
-            location: 'Unknown',
-            initials: (djangoVideo.owner || 'U').charAt(0).toUpperCase(),
-            avatarColor: '#F97316',
-          },
-          views: 0,
-          likes: 0,
-          comments: [],
-          postedAt: djangoVideo.created_at,
-          createdAt: djangoVideo.created_at,
-          category: 'Vidéo',
-          visibility: (djangoVideo.is_public ? 'PUBLIC' : 'PRIVATE') as 'PUBLIC' | 'PRIVATE',
-          status: 'PUBLISHED',
-          allowComments: true,
-          allowLikes: true,
-          allowShares: true,
-        }))
-        setVideos(transformedVideos)
+        const transformedVideos = result.data.map((djangoVideo: any) => {
+          console.log('DEBUG: Django video data:', djangoVideo);
+          console.log('DEBUG: Available fields:', Object.keys(djangoVideo));
+          console.log('DEBUG: file_url:', djangoVideo.file_url);
+          console.log('DEBUG: cover_url:', djangoVideo.cover_url);
+          console.log('DEBUG: video_available:', djangoVideo.video_available);
+
+          // Utiliser file_url si disponible, sinon utiliser le nom de fichier pour construire une URL
+          const videoUrl = djangoVideo.file_url || '';
+          const thumbnail = djangoVideo.cover_url || '';
+          const isAvailable = djangoVideo.video_available || false;
+
+          return {
+            id: djangoVideo.id.toString(),
+            title: djangoVideo.title,
+            description: djangoVideo.description || '',
+            videoUrl: videoUrl,
+            thumbnail: thumbnail,
+            thumbnailUrl: thumbnail,
+            videoAvailable: isAvailable,
+            author: {
+              id: djangoVideo.owner?.toString() || 'unknown',
+              name: djangoVideo.owner_username || djangoVideo.owner || 'Unknown',
+              profession: 'Professionnel',
+              location: 'Unknown',
+              initials: (djangoVideo.owner_username || djangoVideo.owner || 'Unknown').charAt(0).toUpperCase(),
+              avatarColor: '#F97316',
+              avatarUrl: djangoVideo.owner_avatar || null,
+            },
+            views: 0,
+            likes: 0,
+            comments: [],
+            postedAt: djangoVideo.created_at,
+            createdAt: djangoVideo.created_at,
+            category: 'Vidéo',
+            visibility: (djangoVideo.is_public ? 'PUBLIC' : 'PRIVATE') as 'PUBLIC' | 'PRIVATE',
+            status: 'PUBLISHED',
+            allowComments: true,
+            allowLikes: true,
+            allowShares: true,
+          };
+        })
       } else {
         setError(result.error || 'Erreur lors du chargement des vidéos')
       }
@@ -146,6 +160,15 @@ export default function VideoFeed() {
     setShowContactModal(true);
   }, [isAuthenticated, navigate]);
 
+  const handleProfileClick = useCallback((authorId: string) => {
+    const currentUserId = user?.id?.toString() || ''
+    if (authorId === currentUserId) {
+      navigate('/pro/profile')
+    } else {
+      navigate(`/pro/profile/${authorId}`)
+    }
+  }, [navigate, user]);
+
 
   // Cacher body + html scroll quand on est dans le player
   useEffect(() => {
@@ -197,32 +220,50 @@ export default function VideoFeed() {
           onClick();
         }}
       >
-        {/* Video Player */}
-        <div className="pointer-events-none">
-          <VideoPlayer
-            src={video.videoUrl}
-            poster={video.thumbnail}
-            autoplay={false}
-            className="rounded-xl overflow-hidden"
-          />
-        </div>
+        {/* Video Player - seulement si URL valide */}
+        {video.videoUrl ? (
+          <div className="pointer-events-none">
+            <VideoPlayer
+              src={video.videoUrl}
+              poster={video.thumbnail}
+              autoplay={false}
+              className="rounded-xl overflow-hidden"
+            />
+          </div>
+        ) : (
+          <div className="aspect-video bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Vidéo en cours de traitement</p>
+          </div>
+        )}
         
         {/* Info Section - Design compact selon image */}
         <div className="p-3">
           {/* User Info */}
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {userProfile?.photo ? (
-                <img src={userProfile.photo} alt={userProfile.name} className="w-full h-full object-cover" />
+            <div 
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleProfileClick(video.author.id)
+              }}
+            >
+              {video.author.avatarUrl ? (
+                <img src={video.author.avatarUrl} alt={video.author.name} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-white font-bold text-xs">
-                  {userProfile?.name?.charAt(0).toUpperCase() || 'U'}
+                  {video.author.initials || 'U'}
                 </span>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
-                {userProfile?.name || 'Utilisateur'}
+              <p 
+                className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate cursor-pointer`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleProfileClick(video.author.id)
+                }}
+              >
+                {video.author.name || 'Utilisateur'}
               </p>
             </div>
             <button
