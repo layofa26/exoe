@@ -43,6 +43,8 @@ interface UserProfile {
   username?: string
   fullName?: string
   avatarUrl?: string
+  photo_url?: string
+  banner_url?: string
   professionalProfile?: {
     profession?: string
     specialty?: string
@@ -57,24 +59,25 @@ interface UserProfile {
 }
 
 interface UserStatistics {
-  videos: {
+  videos?: {
     total: number
     totalViews: number
     totalLikes: number
     totalComments: number
   }
-  events: {
+  events?: {
     total: number
   }
-  engagement: {
+  engagement?: {
     views: number
     likes: number
     comments: number
   }
-  subscriptions: {
-    following: number
-    followers: number
+  subscriptions?: {
+    following?: number
+    followers?: number
   }
+  badges?: Array<{ id: number | string; name: string; description: string; [key: string]: unknown }>
 }
 
 interface RecentActivity {

@@ -31,7 +31,7 @@ export const Subscribers = (): JSX.Element => {
         setLoading(true)
         const token = localStorage.getItem('accessToken')
         
-        const response = await fetch('${API_BASE_URL}/v1/abonnement/abonnements/subscribers/', {
+        const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/subscribers/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

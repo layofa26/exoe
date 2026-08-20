@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, Edit, Trash2, Clock, AlertCircle, CheckCircle } from 'lucide-react'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+
 interface Draft {
   id: string
   title: string

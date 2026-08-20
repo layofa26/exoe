@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Lock, Mail, Trash2, Shield, Bell, Palette, Globe,
@@ -7,6 +7,8 @@ import {
   User, Camera, MapPin, Briefcase, Plus, X
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
 const Settings = () => {
   const { resolvedTheme, theme, setTheme } = useTheme()
@@ -143,50 +145,51 @@ const Settings = () => {
   }
 
   // Charger les données du profil
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) return
+  const loadProfile = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
 
-        const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const fullName: string = data.full_name || ''
+        const [firstName, ...rest] = fullName.split(' ')
+        setProfileData({
+          firstName: firstName || '',
+          lastName: rest.join(' '),
+          username: data.username || '',
+          profession: data.profession || data.user_profession || '',
+          bio: data.bio || '',
+          city: data.city || data.location || '',
+          country: data.country || '',
+          website: data.website || '',
+          skills: data.skills?.map((skill: any) => skill.name) || []
         })
-
-        if (response.ok) {
-          const data = await response.json()
-          setProfileData({
-            fullName: data.full_name || '',
-            email: data.email || '',
-            phone: data.phone_number || '',
-            profession: data.profession || '',
-            specialty: data.speciality || '',
-            bio: data.bio || '',
-            location: data.location || '',
-            country: data.country || '',
-            city: data.city || '',
-            skills: data.skills?.map((skill: any) => skill.name) || []
-          })
-        }
-      } catch (error) {
-        console.error('Error loading profile:', error)
       }
+    } catch (error) {
+      console.error('Error loading profile:', error)
     }
-    loadProfile()
   }, [])
+
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
 
   // Handler pour l'édition du profil
   const handleProfileEdit = async () => {
     try {
       const updateData = {
-        fullName: `${profileData.firstName} ${profileData.lastName}`.trim(),
-        username: profileData.username,
+        full_name: `${profileData.firstName} ${profileData.lastName}`.trim(),
         profession: profileData.profession,
         bio: profileData.bio,
         city: profileData.city,
         country: profileData.country,
-        websites: profileData.website ? [profileData.website] : [],
-        skills: profileData.skills.map(name => ({ name, category: 'Technique', level: 'Intermédiaire' }))
+        location: profileData.city,
+        website: profileData.website
       }
 
       const token = localStorage.getItem('accessToken')
@@ -196,17 +199,12 @@ const Settings = () => {
       }
 
       const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          bio: profileData.bio,
-          location: profileData.location,
-          profession: profileData.profession,
-          speciality: profileData.specialty
-        })
+        body: JSON.stringify(updateData)
       })
 
       if (response.ok) {
@@ -256,7 +254,7 @@ const Settings = () => {
       const photoResponse = await fetch(uploadedPhoto)
       const blob = await photoResponse.blob()
       const formData = new FormData()
-      formData.append('photo', blob)
+      formData.append('photo', blob, 'photo.jpg')
 
       const token = localStorage.getItem('accessToken')
       if (!token) {

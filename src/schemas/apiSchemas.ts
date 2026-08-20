@@ -1,5 +1,17 @@
 import { z } from 'zod'
 
+/**
+ * DRF peut renvoyer une liste simple ou une réponse paginée: on accepte les
+ * deux formes et on normalise vers { results, count }.
+ */
+const listOf = <T extends z.ZodTypeAny>(item: T) =>
+  z.union([
+    z.object({ results: z.array(item), count: z.number().optional() }),
+    z
+      .array(item)
+      .transform((results) => ({ results, count: results.length })),
+  ])
+
 // Profile schemas
 export const ProfileSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -16,10 +28,7 @@ export const ProfileSchema = z.object({
   lastLoginAt: z.string().optional(),
 })
 
-export const ProfileListSchema = z.object({
-  results: z.array(ProfileSchema),
-  count: z.number().optional(),
-})
+export const ProfileListSchema = listOf(ProfileSchema)
 
 // Video schemas
 export const VideoSchema = z.object({
@@ -34,10 +43,7 @@ export const VideoSchema = z.object({
   views: z.number().optional(),
 })
 
-export const VideoListSchema = z.object({
-  results: z.array(VideoSchema),
-  count: z.number().optional(),
-})
+export const VideoListSchema = listOf(VideoSchema)
 
 // Event schemas
 export const EventSchema = z.object({
@@ -62,10 +68,7 @@ export const EventSchema = z.object({
   price: z.number(),
 })
 
-export const EventListSchema = z.object({
-  results: z.array(EventSchema),
-  count: z.number().optional(),
-})
+export const EventListSchema = listOf(EventSchema)
 
 // Subscription/Abonnement schemas
 export const AbonnementSchema = z.object({
@@ -75,10 +78,7 @@ export const AbonnementSchema = z.object({
   created_at: z.string(),
 })
 
-export const AbonnementListSchema = z.object({
-  results: z.array(AbonnementSchema),
-  count: z.number().optional(),
-})
+export const AbonnementListSchema = listOf(AbonnementSchema)
 
 // Request/Demande schemas
 export const RequestSchema = z.object({
@@ -89,10 +89,7 @@ export const RequestSchema = z.object({
   created_at: z.string(),
 })
 
-export const RequestListSchema = z.object({
-  results: z.array(RequestSchema),
-  count: z.number().optional(),
-})
+export const RequestListSchema = listOf(RequestSchema)
 
 // Skill schemas
 export const SkillSchema = z.object({
@@ -104,10 +101,7 @@ export const SkillSchema = z.object({
   created_at: z.string(),
 })
 
-export const SkillListSchema = z.object({
-  results: z.array(SkillSchema),
-  count: z.number().optional(),
-})
+export const SkillListSchema = listOf(SkillSchema)
 
 // Activity schemas
 export const ActivitySchema = z.object({
@@ -119,10 +113,7 @@ export const ActivitySchema = z.object({
   user_full_name: z.string().optional(),
 })
 
-export const ActivityListSchema = z.object({
-  results: z.array(ActivitySchema),
-  count: z.number().optional(),
-})
+export const ActivityListSchema = listOf(ActivitySchema)
 
 // Badge schemas
 export const BadgeSchema = z.object({
@@ -133,10 +124,7 @@ export const BadgeSchema = z.object({
   earned_at: z.string().optional(),
 })
 
-export const BadgeListSchema = z.object({
-  results: z.array(BadgeSchema),
-  count: z.number().optional(),
-})
+export const BadgeListSchema = listOf(BadgeSchema)
 
 // Conversation schemas
 export const ConversationSchema = z.object({
@@ -147,10 +135,7 @@ export const ConversationSchema = z.object({
   unread_count: z.number().optional(),
 })
 
-export const ConversationListSchema = z.object({
-  results: z.array(ConversationSchema),
-  count: z.number().optional(),
-})
+export const ConversationListSchema = listOf(ConversationSchema)
 
 // Message schemas
 export const MessageSchema = z.object({
@@ -162,7 +147,4 @@ export const MessageSchema = z.object({
   read: z.boolean().optional(),
 })
 
-export const MessageListSchema = z.object({
-  results: z.array(MessageSchema),
-  count: z.number().optional(),
-})
+export const MessageListSchema = listOf(MessageSchema)

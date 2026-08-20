@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   Users, 
@@ -201,32 +201,33 @@ export const Requests = (): JSX.Element => {
     }
   }, [activeTab])
 
+  const loadBlockedUsers = useCallback(async () => {
+    try {
+      setLoadingBlocked(true)
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
+
+      const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setBlockedUsers(data.results || data)
+      }
+    } catch (err) {
+      console.error('Error loading blocked users:', err)
+    } finally {
+      setLoadingBlocked(false)
+    }
+  }, [])
+
   // Load blocked users when tab changes
   useEffect(() => {
     if (activeTab === 'blocked') {
-      const loadBlockedUsers = async () => {
-        try {
-          setLoadingBlocked(true)
-          const token = localStorage.getItem('accessToken')
-          if (!token) return
-
-          const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            setBlockedUsers(data.results || data)
-          }
-        } catch (err) {
-          console.error('Error loading blocked users:', err)
-        } finally {
-          setLoadingBlocked(false)
-        }
-      }
       loadBlockedUsers()
     }
-  }, [activeTab])
+  }, [activeTab, loadBlockedUsers])
 
   const handleUnblock = async (userId: string) => {
     try {

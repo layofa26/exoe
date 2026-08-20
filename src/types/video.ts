@@ -54,6 +54,7 @@ export interface Video {
   postedAt?: string;
   createdAt?: string;
   videoUrl?: string; // URL videyo a (optional)
+  mimeType?: string; // Type MIME reyèl videyo a (optional)
   thumbnail?: string; // URL thumbnail la (optional)
   thumbnailUrl?: string; // URL thumbnail la (backend field)
   videoAvailable?: boolean; // Indique si la vidéo est disponible

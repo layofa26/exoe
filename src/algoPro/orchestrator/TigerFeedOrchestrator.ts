@@ -252,10 +252,10 @@ export class TigerFeedOrchestrator {
     let score = 50
 
     // Score de base selon les vues
-    score += Math.min(50, video.views / 100)
+    score += Math.min(50, (video.views ?? 0) / 100)
 
     // Score selon les likes
-    score += Math.min(30, video.likes / 10)
+    score += Math.min(30, (video.likes ?? 0) / 10)
 
     // Score selon la catégorie préférée
     if (this.config.signals.mostEngagedCategory === video.category) {

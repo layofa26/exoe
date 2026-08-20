@@ -339,7 +339,7 @@ export const ProSidebar = (): JSX.Element | null => {
         <UploadVideo
           isOpen={isUploadModalOpen}
           onClose={() => setIsUploadModalOpen(false)}
-          initialVideoData={cameraVideoData}
+          initialVideoData={cameraVideoData ?? undefined}
         />
       )}
 
@@ -348,7 +348,7 @@ export const ProSidebar = (): JSX.Element | null => {
         <CameraRecord
           isOpen={isCameraModalOpen}
           onClose={() => setIsCameraModalOpen(false)}
-          onComplete={handleCameraRecordComplete}
+          onRecordComplete={handleCameraRecordComplete}
         />
       )}
     </div>

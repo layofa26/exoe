@@ -1,3 +1,5 @@
+import type { Video as FeedVideo } from '../types/video'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 // Ensure API_BASE_URL always ends with /api/v1 for production URLs
 const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
@@ -12,50 +14,195 @@ export interface VideoData {
   is_public?: boolean
 }
 
+/**
+ * Forme réelle renvoyée par VideoSerializer (backend Django).
+ */
 export interface Video {
   id: number
   title: string
   description: string
-  uploader: number
-  uploader_name?: string
-  uploader_avatar?: string
-  owner?: number
+  owner: number
   owner_username?: string
-  owner_avatar?: string
-  slug: string
-  supabase_storage_path: string
-  file_url?: string
-  cover_url?: string
-  thumbnail_url?: string
-  duration?: number
-  file_size?: number
-  mime_type?: string
-  processing_status: string
-  visibility: string
+  owner_full_name?: string
+  owner_avatar?: string | null
+  file?: string
+  file_url?: string | null
+  cover?: string | null
+  cover_url?: string | null
+  mime_type?: string | null
   created_at: string
-  updated_at: string
-  published_at?: string
+  is_public: boolean
+  views?: number
   video_available?: boolean
-  stats?: {
-    views: number
-    likes: number
-    dislikes: number
-    comments_count: number
-    shares: number
+}
+
+/**
+ * DRF peut renvoyer une liste simple ou une réponse paginée.
+ */
+export const unwrapList = <T,>(data: any): T[] => {
+  if (Array.isArray(data)) return data as T[]
+  if (data && Array.isArray(data.results)) return data.results as T[]
+  return []
+}
+
+const AVATAR_COLORS = ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#0EA5E9']
+
+/**
+ * Convertit une vidéo de l'API en vidéo utilisée par l'UI.
+ * L'auteur affiché est toujours le propriétaire de la vidéo.
+ */
+export const mapApiVideo = (apiVideo: Video): FeedVideo => {
+  const authorName =
+    apiVideo.owner_full_name || apiVideo.owner_username || 'Utilisateur'
+  const authorId = apiVideo.owner != null ? String(apiVideo.owner) : ''
+  const colorIndex = Math.abs(Number(apiVideo.owner) || 0) % AVATAR_COLORS.length
+  const videoUrl = apiVideo.file_url || ''
+  const thumbnail = apiVideo.cover_url || ''
+
+  return {
+    id: String(apiVideo.id),
+    title: apiVideo.title,
+    description: apiVideo.description || '',
+    videoUrl,
+    mimeType: apiVideo.mime_type || undefined,
+    thumbnail,
+    thumbnailUrl: thumbnail,
+    videoAvailable: Boolean(apiVideo.video_available ?? videoUrl),
+    author: {
+      id: authorId,
+      name: authorName,
+      profession: 'Professionnel',
+      location: '',
+      initials: authorName.charAt(0).toUpperCase(),
+      avatarColor: AVATAR_COLORS[colorIndex],
+      avatarUrl: apiVideo.owner_avatar || undefined,
+    },
+    views: apiVideo.views ?? 0,
+    viewsCount: apiVideo.views ?? 0,
+    likes: 0,
+    comments: [],
+    postedAt: apiVideo.created_at,
+    createdAt: apiVideo.created_at,
+    category: 'Vidéo',
+    visibility: apiVideo.is_public ? 'PUBLIC' : 'PRIVATE',
+    status: 'PUBLISHED',
+    allowComments: true,
+    allowLikes: true,
+    allowShares: true,
   }
 }
 
+const getStoredToken = (token?: string): string | null =>
+  token ||
+  localStorage.getItem('accessToken') ||
+  localStorage.getItem('access_token')
+
+export interface UploadVideoInput {
+  file: File
+  title: string
+  description?: string
+  isPublic?: boolean
+  cover?: File | null
+}
+
 export const videoApi = {
-  async getVideos(token?: string, params?: { uploader?: string; visibility?: string; search?: string }): Promise<{ success: boolean; error?: string; data?: Video[] }> {
+  /**
+   * Upload multipart vers /accueil/videos/ avec progression réelle (XHR).
+   */
+  uploadVideo(
+    input: UploadVideoInput,
+    onProgress?: (percent: number) => void,
+    token?: string
+  ): Promise<{ success: boolean; error?: string; data?: Video }> {
+    return new Promise((resolve) => {
+      const authToken = getStoredToken(token)
+      if (!authToken) {
+        resolve({ success: false, error: 'Vous devez être connecté pour publier une vidéo' })
+        return
+      }
+
+      const formData = new FormData()
+      formData.append('file', input.file)
+      formData.append('title', input.title)
+      formData.append('description', input.description || '')
+      formData.append('is_public', input.isPublic === false ? 'false' : 'true')
+      if (input.cover) {
+        formData.append('cover', input.cover)
+      }
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${FINAL_API_BASE_URL}/accueil/videos/`)
+      xhr.setRequestHeader('Authorization', `Bearer ${authToken}`)
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          onProgress(Math.round((event.loaded / event.total) * 100))
+        }
+      }
+
+      xhr.onload = () => {
+        let payload: any = null
+        try {
+          payload = JSON.parse(xhr.responseText)
+        } catch {
+          payload = null
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ success: true, data: payload as Video })
+        } else {
+          resolve({
+            success: false,
+            error:
+              payload?.error ||
+              payload?.detail ||
+              `Erreur lors de l'upload (code ${xhr.status})`,
+          })
+        }
+      }
+
+      xhr.onerror = () => resolve({ success: false, error: 'Erreur de connexion au serveur' })
+      xhr.onabort = () => resolve({ success: false, error: 'Upload annulé' })
+
+      xhr.send(formData)
+    })
+  },
+
+  /**
+   * Vidéos de l'utilisateur connecté (publiques et privées).
+   */
+  async getMyVideos(token?: string): Promise<{ success: boolean; error?: string; data?: Video[] }> {
+    try {
+      const authToken = getStoredToken(token)
+      if (!authToken) {
+        return { success: false, error: 'Non authentifié' }
+      }
+
+      const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/my_videos/`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+
+      if (!response.ok) {
+        return { success: false, error: 'Erreur lors de la récupération de vos vidéos' }
+      }
+
+      return { success: true, data: unwrapList<Video>(await response.json()) }
+    } catch {
+      return { success: false, error: 'Erreur de connexion au serveur' }
+    }
+  },
+
+  async getVideos(token?: string, params?: { owner?: string; search?: string }): Promise<{ success: boolean; error?: string; data?: Video[] }> {
     try {
       const headers: Record<string, string> = {}
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
+      const authToken = token || localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
       }
 
       const queryParams = new URLSearchParams()
-      if (params?.uploader) queryParams.append('uploader', params.uploader)
-      if (params?.visibility) queryParams.append('visibility', params.visibility)
+      if (params?.owner) queryParams.append('owner', params.owner)
       if (params?.search) queryParams.append('search', params.search)
 
       const url = `${FINAL_API_BASE_URL}/accueil/videos/${queryParams.toString() ? '?' + queryParams.toString() : ''}`
@@ -72,7 +219,7 @@ export const videoApi = {
         }
       }
 
-      const data: Video[] = await response.json()
+      const data = unwrapList<Video>(await response.json())
       return { success: true, data }
     } catch (error) {
       return {
@@ -85,8 +232,9 @@ export const videoApi = {
   async getVideo(id: number, token?: string): Promise<{ success: boolean; error?: string; data?: Video }> {
     try {
       const headers: Record<string, string> = {}
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
+      const authToken = token || localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
       }
 
       const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/${id}/`, {
@@ -97,7 +245,9 @@ export const videoApi = {
       if (!response.ok) {
         return {
           success: false,
-          error: 'Erreur lors de la récupération de la vidéo'
+          error: response.status === 404
+            ? 'Cette vidéo n\'existe pas ou n\'est plus disponible'
+            : 'Erreur lors de la récupération de la vidéo'
         }
       }
 
@@ -185,7 +335,7 @@ export const videoApi = {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/${id}/increment_view/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/accueil/videos/${id}/view/`, {
         method: 'POST',
         headers,
       })

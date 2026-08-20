@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { VideoPlayerPage } from '../../components/video/VideoPlayerPage';
+import { videoApi, mapApiVideo } from '../../services/videoApi';
 import type { Video } from '../../types/video';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
 export default function VideoPage() {
   const { videoId } = useParams<{ videoId: string }>();
@@ -23,18 +22,39 @@ export default function VideoPage() {
     const fetchVideo = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem('accessToken')
-        if (!token) return
+        setError(null);
 
-        const response = await fetch(`${API_BASE_URL}/accueil/videos/${videoId}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        const numericId = Number(videoId)
+        if (Number.isNaN(numericId)) {
+          setError('Identifiant de vidéo invalide')
+          return
+        }
+
+        const result = await videoApi.getVideo(numericId)
+
+        if (!result.success || !result.data) {
+          setError(result.error || 'Impossible de charger la vidéo')
+          return
+        }
+
+        const current = mapApiVideo(result.data)
+        setVideo(current)
+
+        // Comptabiliser la vue
+        videoApi.incrementView(numericId).then((viewResult) => {
+          if (viewResult.success && typeof viewResult.views === 'number') {
+            setVideo(prev => (prev ? { ...prev, views: viewResult.views } : prev))
+          }
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          setVideo(data)
-        } else {
-          setError('Impossible de charger la vidéo')
+        // Vidéos similaires : les autres vidéos publiques
+        const listResult = await videoApi.getVideos()
+        if (listResult.success && listResult.data) {
+          setRelated(
+            listResult.data
+              .map(mapApiVideo)
+              .filter(v => v.id !== current.id)
+          )
         }
       } catch (err) {
         setError('Erreur lors du chargement de la vidéo');

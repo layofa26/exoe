@@ -100,7 +100,7 @@ const ProSubHeader = (): JSX.Element | null => {
         <UploadVideo
           isOpen={isUploadModalOpen}
           onClose={() => setIsUploadModalOpen(false)}
-          initialVideoData={cameraVideoData}
+          initialVideoData={cameraVideoData ?? undefined}
         />
       )}
 

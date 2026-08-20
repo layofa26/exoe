@@ -85,10 +85,10 @@ export const Subscriptions = (): JSX.Element => {
         const userId = getCurrentUserId()
         
         // Load subscriptions from backend
-        const result = await api.get('/v1/abonnement/abonnements/', AbonnementListSchema)
+        const result = await api.get('/abonnement/abonnements/', AbonnementListSchema)
         
         if (result.success && result.data) {
-          const subscriptions = (result.data.results || result.data).map((sub: any) => ({
+          const subscriptions = result.data.results.map((sub: any) => ({
             id: String(sub.professionnel),
             name: 'Professional',
             avatar: null,

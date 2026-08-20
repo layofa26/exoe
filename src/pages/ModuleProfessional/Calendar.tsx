@@ -47,19 +47,17 @@ export const Calendar = (): JSX.Element => {
           return
         }
 
-        const userId = getCurrentUserId()
-        
         // Load events from backend
-        const result = await api.get('/v1/evenement/evenements/', EventListSchema)
+        const result = await api.get('/evenement/evenements/', EventListSchema)
         
         if (result.success && result.data) {
-          const calendarEvents = (result.data.results || result.data).map((event: any) => ({
+          const calendarEvents: CalendarEvent[] = result.data.results.map((event: any) => ({
             id: String(event.id),
             title: event.title,
             date: event.start_date?.split('T')[0] || event.created_at?.split('T')[0] || '',
             time: event.start_date?.split('T')[1]?.substring(0, 5) || '00:00',
             duration: '1h',
-            type: 'event',
+            type: 'event' as const,
             description: event.description
           }))
           setEvents(calendarEvents)

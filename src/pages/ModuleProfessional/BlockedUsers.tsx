@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/apiClient'
 import { getCurrentUserId } from '../../services/apiClient'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
 interface BlockedUser {
   id: string
@@ -40,8 +42,7 @@ export const BlockedUsers = (): JSX.Element => {
     navigate('/pro/requests')
   }
 
-  useEffect(() => {
-    const loadBlockedUsers = async () => {
+  const loadBlockedUsers = useCallback(async () => {
       try {
         setLoading(true)
         setError(null)
@@ -52,10 +53,8 @@ export const BlockedUsers = (): JSX.Element => {
           return
         }
         
-        const userId = getCurrentUserId()
-        
         // Load blocked users from backend
-        const result = await api.get('/v1/blocked/blocked/')
+        const result = await api.get<any>('/blocked/blocked/')
         
         if (result.success && result.data) {
           const blockedUsersData = (result.data.results || result.data).map((block: any) => ({
@@ -73,10 +72,11 @@ export const BlockedUsers = (): JSX.Element => {
       } finally {
         setLoading(false)
       }
-    }
-    
-    loadBlockedUsers()
   }, [navigate])
+
+  useEffect(() => {
+    loadBlockedUsers()
+  }, [loadBlockedUsers])
 
   const handleUnblock = async (userId: string) => {
     try {

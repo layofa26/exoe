@@ -10,7 +10,7 @@ import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
 import { useRequestsAlgo } from '../../algoPro/signals/useRequestsAlgo';
 import { useSearch } from '../../hooks/useSearch';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, MessageCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { ContactModal } from '../../components/modals/ContactModal';
 import EntrepriseEnVedette from '../../pages/PUB/EntrepriseEnVedette';
 
@@ -39,7 +39,7 @@ export default function VideoFeed() {
   const searchResultsRef = useRef<HTMLDivElement>(null);
 
   // Use search hook
-  const { query, setQuery, type, setType, results, loading: searchLoading, error: searchError, reset, loadMore } = useSearch();
+  const { query, setQuery, type, results, loading: searchLoading, error: searchError, reset, loadMore } = useSearch();
 
   // Récupérer ou créer un userId pour les signaux algorithmiques
   const userId = localStorage.getItem('exile_user_id') || 'user_default'
@@ -54,56 +54,13 @@ export default function VideoFeed() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
-      const { videoApi } = await import('../../services/videoApi')
-      // Ne pas envoyer le token pour les vidéos publiques
+      const { videoApi, mapApiVideo } = await import('../../services/videoApi')
       const result = await videoApi.getVideos()
 
       if (result.success && result.data) {
-        // Transformer les données Django vers le format frontend
-        const transformedVideos = result.data.map((djangoVideo: any) => {
-          console.log('DEBUG: Django video data:', djangoVideo);
-          console.log('DEBUG: Available fields:', Object.keys(djangoVideo));
-          console.log('DEBUG: file_url:', djangoVideo.file_url);
-          console.log('DEBUG: cover_url:', djangoVideo.cover_url);
-          console.log('DEBUG: video_available:', djangoVideo.video_available);
-
-          // Utiliser file_url si disponible, sinon utiliser le nom de fichier pour construire une URL
-          const videoUrl = djangoVideo.file_url || '';
-          const thumbnail = djangoVideo.cover_url || '';
-          const isAvailable = djangoVideo.video_available || false;
-
-          return {
-            id: djangoVideo.id.toString(),
-            title: djangoVideo.title,
-            description: djangoVideo.description || '',
-            videoUrl: videoUrl,
-            thumbnail: thumbnail,
-            thumbnailUrl: thumbnail,
-            videoAvailable: isAvailable,
-            author: {
-              id: djangoVideo.owner?.toString() || 'unknown',
-              name: djangoVideo.owner_username || djangoVideo.owner || 'Unknown',
-              profession: 'Professionnel',
-              location: 'Unknown',
-              initials: (djangoVideo.owner_username || djangoVideo.owner || 'Unknown').charAt(0).toUpperCase(),
-              avatarColor: '#F97316',
-              avatarUrl: djangoVideo.owner_avatar || null,
-            },
-            views: 0,
-            likes: 0,
-            comments: [],
-            postedAt: djangoVideo.created_at,
-            createdAt: djangoVideo.created_at,
-            category: 'Vidéo',
-            visibility: (djangoVideo.is_public ? 'PUBLIC' : 'PRIVATE') as 'PUBLIC' | 'PRIVATE',
-            status: 'PUBLISHED',
-            allowComments: true,
-            allowLikes: true,
-            allowShares: true,
-          };
-        })
+        setVideos(result.data.map(mapApiVideo))
       } else {
+        setVideos([])
         setError(result.error || 'Erreur lors du chargement des vidéos')
       }
     } catch (error) {
@@ -134,7 +91,18 @@ export default function VideoFeed() {
   }, [loadVideosCallback]);
 
   const handleOpen = useCallback((video: Video) => {
-    console.log('handleOpen called with video:', video);
+    // Comptabiliser la vue côté backend, sans bloquer l'ouverture
+    const numericId = Number(video.id)
+    if (!Number.isNaN(numericId)) {
+      import('../../services/videoApi').then(({ videoApi }) => {
+        videoApi.incrementView(numericId).then((res) => {
+          if (res.success && typeof res.views === 'number') {
+            setVideos(prev => prev.map(v => (v.id === video.id ? { ...v, views: res.views } : v)))
+          }
+        })
+      })
+    }
+
     // Tracker le clic sur la vidéo avec useAccueilAlgo
     accueilAlgo.trackVideoClick(video, 0, false, false)
     
@@ -211,20 +179,17 @@ export default function VideoFeed() {
 
   // Wrapper component pour afficher vidéo avec infos utilisateur - Design selon image de référence
   const VideoCardWithInfo = ({ video, onClick }: { video: Video; onClick: () => void }) => {
-    console.log('VideoCardWithInfo rendering for video:', video.id, video.title);
     return (
       <div 
         className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shadow-sm`}
-        onClick={() => {
-          console.log('VideoCard clicked for video:', video.id);
-          onClick();
-        }}
+        onClick={onClick}
       >
         {/* Video Player - seulement si URL valide */}
         {video.videoUrl ? (
           <div className="pointer-events-none">
             <VideoPlayer
               src={video.videoUrl}
+              type={video.mimeType}
               poster={video.thumbnail}
               autoplay={false}
               className="rounded-xl overflow-hidden"
@@ -294,14 +259,8 @@ export default function VideoFeed() {
   }
 
   // Filtrer videyo yo selon rechèch - Use real search results when searching
-  const displayVideos = query && results 
-    ? results.videos.map(v => ({
-        ...v,
-        postedAt: v.createdAt,
-        videoUrl: v.videoUrl || v.url || v.src || '',
-        thumbnail: v.thumbnailUrl || v.thumbnail || '',
-        author: v.author || { id: v.author?.id, name: v.author?.fullName || 'Inconnu', profession: v.author?.profession || '', location: '', initials: '??', avatarColor: '#666', avatarUrl: v.author?.avatarUrl || '' }
-      }))
+  const displayVideos: Video[] = query && results
+    ? results.videos
     : videos.filter(video => {
         if (!query.trim()) return true;
         const searchLower = query.toLowerCase();
@@ -404,7 +363,7 @@ export default function VideoFeed() {
               {results.professionals.map((prof: any) => (
                 <div
                   key={prof.id}
-                  onClick={() => navigate(`/pro/profile/${prof.id}`)}
+                  onClick={() => handleProfileClick(String(prof.userId ?? prof.id))}
                   className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-xl p-4 cursor-pointer hover:opacity-80 transition-opacity`}
                 >
                   <div className="flex items-center gap-3">
@@ -451,19 +410,10 @@ export default function VideoFeed() {
               Vidéos ({results.videos.length})
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {results.videos.map((video: any) => (
+              {results.videos.map((video: Video) => (
                 <div
                   key={video.id}
-                  onClick={() => {
-                    const normalizedVideo = {
-                      ...video,
-                      postedAt: video.createdAt,
-                      videoUrl: video.videoUrl || video.url || video.src || '',
-                      thumbnail: video.thumbnailUrl || video.thumbnail || '',
-                      author: video.author || { id: video.author?.id, name: video.author?.fullName || 'Inconnu', profession: video.author?.profession || '', location: '', initials: '??', avatarColor: '#666', avatarUrl: video.author?.avatarUrl || '' }
-                    };
-                    handleOpen(normalizedVideo);
-                  }}
+                  onClick={() => handleOpen(video)}
                   className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity`}
                 >
                   {video.thumbnailUrl || video.thumbnail ? (
@@ -482,14 +432,11 @@ export default function VideoFeed() {
                       {video.title}
                     </h4>
                     <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mt-1`}>
-                      {video.author?.fullName || 'Inconnu'}
+                      {video.author?.name || 'Inconnu'}
                     </p>
                     <div className="flex gap-4 mt-2 text-xs">
                       <span className={resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}>
-                        {video.views} vues
-                      </span>
-                      <span className={resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}>
-                        {video.likesCount} likes
+                        {video.views ?? 0} vues
                       </span>
                     </div>
                   </div>

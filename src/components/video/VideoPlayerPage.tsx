@@ -12,7 +12,7 @@ import { useAccueilAlgo } from '../../algoPro/signals/useAccueilAlgo';
 import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { VideoPlayer } from './VideoPlayer';
+import { guessVideoMimeType, toPlayableMimeType } from './VideoPlayer';
 import { videoApi } from '../../services/videoApi';
 
 interface VideoPlayerPageProps {
@@ -25,7 +25,6 @@ interface VideoPlayerPageProps {
 const COMMENT_COLORS = ['#1d4ed8', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
 
 export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlayerPageProps) {
-  console.log('VideoPlayerPage rendering with video:', video.id, video.title);
   const { resolvedTheme } = useTheme();
   const isTabletOrBelow = useIsTabletOrBelow();
   const { msg, show } = useToast();
@@ -79,6 +78,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [reportModal, setReportModal] = useState<{ open: boolean; commentId: string | null }>({ open: false, commentId: null });
   const [reportReason, setReportReason] = useState('');
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   // Double-tap sou videyo pou like (TikTok/Instagram style)
   const handleVideoTap = (e: React.MouseEvent | React.TouchEvent) => {
@@ -119,8 +119,8 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
   };
 
 
-  // Komposan videyo a (itilize nan 2 kote pou mobil/desktop)
-  const VideoPlayer = () => (
+  // Komposan videyo prensipal la (itilize nan 2 kote pou mobil/desktop)
+  const MainPlayer = () => (
     <div
       ref={playerRef}
       onTouchStart={handleTouchStart}
@@ -128,33 +128,45 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       className={`relative w-full ${isTabletOrBelow ? 'aspect-video' : 'h-[450px]'} bg-gradient-to-br ${video.gradient || 'from-zinc-700 to-zinc-900'} overflow-hidden shadow-xl select-none`}
     >
       {video.videoUrl ? (
-        <video
-          ref={videoPlayerRef}
-          src={video.videoUrl}
-          poster={video.thumbnail}
-          controls
-          onClick={(e) => {
-            e.stopPropagation()
-            const videoEl = videoPlayerRef.current
-            if (videoEl) {
-              if (videoEl.paused) {
-                videoEl.play()
-              } else {
-                videoEl.pause()
+        <>
+          <video
+            ref={videoPlayerRef}
+            key={video.videoUrl}
+            poster={video.thumbnail}
+            controls
+            playsInline
+            preload="metadata"
+            onClick={(e) => {
+              e.stopPropagation()
+              const videoEl = videoPlayerRef.current
+              if (videoEl) {
+                if (videoEl.paused) {
+                  videoEl.play()
+                } else {
+                  videoEl.pause()
+                }
               }
-            }
-          }}
-          className="w-full h-full object-contain"
-          onError={(e) => console.error('Video error:', e)}
-        />
+            }}
+            className="w-full h-full object-contain"
+            onLoadStart={() => setPlaybackError(null)}
+            onError={() => setPlaybackError("Impossible de lire cette vidéo (format non supporté ou lien expiré).")}
+          >
+            <source src={video.videoUrl} type={video.mimeType ? toPlayableMimeType(video.mimeType) : guessVideoMimeType(video.videoUrl)} />
+          </video>
+          {playbackError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-4 text-center pointer-events-none">
+              <p className="text-white text-sm">{playbackError}</p>
+            </div>
+          )}
+        </>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center text-white/60 select-none">
+          <div className="text-center text-white/60 select-none px-4">
             <div className="w-16 h-16 rounded-full bg-white/15 border-2 border-white/40 flex items-center justify-center mx-auto mb-3">
               <span className="w-8 h-8 text-white/80"><PlayIcon /></span>
             </div>
             <p className="text-sm font-medium">{video.title || 'Vidéo'}</p>
-            <p className="text-xs mt-1 opacity-60">Lecture simulée — {video.duration || '0:00'}</p>
+            <p className="text-xs mt-1 opacity-60">Vidéo indisponible pour le moment</p>
           </div>
         </div>
       )}
@@ -947,7 +959,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       {/* MOBILE/TABLET: Videyo a FIXE an tèt, pa nan zòn ki defile */}
       {isTabletOrBelow && (
         <div className="flex-shrink-0">
-          <VideoPlayer />
+          <MainPlayer />
         </div>
       )}
 
@@ -961,7 +973,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
         <div className="flex-1 min-w-0 md:max-w-3xl">
 
           {/* DESKTOP SELMAN: Videyo nan koulè nòmal la */}
-          {!isTabletOrBelow && <VideoPlayer />}
+          {!isTabletOrBelow && <MainPlayer />}
 
           {/* Zone kontni - MOBILE/TABLET: defile anba videyo a, DESKTOP: nòmal */}
           <div className="p-4 md:p-0 md:mt-4">
@@ -1224,13 +1236,16 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                   aria-label={`Regarder : ${rv.title}`}
                   onClick={() => onSelect(rv)}
                 >
-                  {/* VideoPlayer pour thumbnails */}
-                  <VideoPlayer
-                    src={rv.file_url}
-                    poster={rv.cover_url}
-                    autoplay={false}
-                    className="aspect-video"
-                  />
+                  {/* Miniature */}
+                  <div className="relative w-full aspect-video bg-black overflow-hidden">
+                    {rv.thumbnail ? (
+                      <img src={rv.thumbnail} alt={rv.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="w-8 h-8 text-white/70"><PlayIcon /></span>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Info - Style SimpleVideoCard ultra-compact */}
                   <div className="p-2.5 sm:p-3">
@@ -1300,12 +1315,13 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                   {/* Miniature horizontale */}
                   <div className="flex gap-2 sm:gap-3 p-2 sm:p-3">
                     <div className="relative flex-shrink-0 w-36 sm:w-40 aspect-video rounded-lg overflow-hidden">
-                      <VideoPlayer
-                        src={rv.file_url}
-                        poster={rv.cover_url}
-                        autoplay={false}
-                        className="aspect-video"
-                      />
+                      {rv.thumbnail ? (
+                        <img src={rv.thumbnail} alt={rv.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-black flex items-center justify-center">
+                          <span className="w-6 h-6 text-white/70"><PlayIcon /></span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Info */}

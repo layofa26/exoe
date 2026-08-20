@@ -55,10 +55,10 @@ export const ImportantMessages = (): JSX.Element => {
         const userId = getCurrentUserId()
         
         // Load important messages from backend
-        const result = await api.get('/v1/conversations/messages/?is_important=true', MessageListSchema)
+        const result = await api.get('/conversations/messages/?is_important=true', MessageListSchema)
         
         if (result.success && result.data) {
-          const messagesData = (result.data.results || result.data).map((msg: any) => ({
+          const messagesData = result.data.results.map((msg: any) => ({
             id: String(msg.id),
             conversationId: String(msg.conversation),
             senderId: String(msg.sender),

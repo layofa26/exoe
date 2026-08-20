@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRecentSearches } from '../../hooks/useRecentSearches'
+import { unwrapList } from '../../services/videoApi'
 import type { NavLinkType } from '../../types'
 import {
   User,
@@ -192,47 +193,47 @@ export const Header = (): JSX.Element => {
     try {
       const token = localStorage.getItem('accessToken')
       
-      const profilsResponse = await fetch(`${API_BASE_URL}/profil/profils/?search=${query}`, {
+      const profilsResponse = await fetch(`${API_BASE_URL}/profil/profils/?search=${encodeURIComponent(query)}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
       
-      const videosResponse = await fetch(`${API_BASE_URL}/accueil/videos/?search=${query}`, {
+      const videosResponse = await fetch(`${API_BASE_URL}/accueil/videos/?search=${encodeURIComponent(query)}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
       
-      const profilsData = profilsResponse.ok ? await profilsResponse.json() : { results: [] }
-      const videosData = videosResponse.ok ? await videosResponse.json() : { results: [] }
-      
-      const professionals = profilsData.results ? profilsData.results.map((p: any) => ({
-        id: p.id,
-        username: p.username,
-        fullName: p.username,
-        profession: '',
+      const profilsData = profilsResponse.ok ? await profilsResponse.json() : []
+      const videosData = videosResponse.ok ? await videosResponse.json() : []
+
+      const professionals = unwrapList<any>(profilsData).map((p: any) => ({
+        id: p.user ?? p.id,
+        username: p.username || '',
+        fullName: p.full_name || p.username || 'Utilisateur',
+        profession: p.profession || p.user_profession || '',
         company: '',
         followersCount: 0,
         videosCount: 0
-      })) : []
-      
-      const videos = videosData.results ? videosData.results.map((v: any) => ({
+      }))
+
+      const videos = unwrapList<any>(videosData).map((v: any) => ({
         id: v.id,
         title: v.title,
         description: v.description,
-        thumbnail: v.cover,
-        videoUrl: v.file,
+        thumbnail: v.cover_url || '',
+        videoUrl: v.file_url || '',
         author: {
           id: v.owner,
-          fullName: 'Utilisateur',
+          fullName: v.owner_full_name || v.owner_username || 'Utilisateur',
           profession: ''
         },
-        views: 0,
+        views: v.views ?? 0,
         createdAt: v.created_at
-      })) : []
+      }))
       
       setSearchResults({ 
         professionals: filterType === 'video' ? [] : professionals, 
@@ -480,7 +481,7 @@ export const Header = (): JSX.Element => {
                                   <button
                                     key={pro.id}
                                     onClick={() => {
-                                      navigate(`/pro/profile/${pro.username}`)
+                                      navigate(`/pro/profile/${pro.id}`)
                                       setShowDropdown(false)
                                       setSearchQuery('')
                                     }}
@@ -669,7 +670,7 @@ export const Header = (): JSX.Element => {
                                   <button
                                     key={pro.id}
                                     onClick={() => {
-                                      navigate(`/pro/profile/${pro.username}`)
+                                      navigate(`/pro/profile/${pro.id}`)
                                       setShowDropdown(false)
                                       setSearchQuery('')
                                     }}
@@ -879,7 +880,7 @@ export const Header = (): JSX.Element => {
                         <button
                           key={pro.id}
                           onClick={() => {
-                            navigate(`/pro/profile/${pro.username}`)
+                            navigate(`/pro/profile/${pro.id}`)
                             setShowDropdown(false)
                             setSearchQuery('')
                             setIsMobileSearchOpen(false)

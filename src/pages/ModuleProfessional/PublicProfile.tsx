@@ -5,7 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useProfessionalProfile } from '../../hooks/useProfessionalProfile';
 import { useProfessionalVideos } from '../../hooks/useProfessionalVideos';
 import { useProfessionalEvents } from '../../hooks/useProfessionalEvents';
-import { MapPin, Calendar, Video, UserPlus, Share, Flag, Ban, MessageCircle, Star, Eye, Heart, Award, ExternalLink, CheckCircle2, Users, UserMinus } from 'lucide-react';
+import { MapPin, Calendar, Video, UserPlus, Share, Flag, Ban, MessageCircle, Star, Eye, Heart, Award, ExternalLink, CheckCircle2, Users, UserMinus, ArrowLeft } from 'lucide-react';
+import type { Video as FeedVideo } from '../../types/video';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -39,7 +40,7 @@ export const PublicProfile = () => {
       
       try {
         const token = localStorage.getItem('accessToken');
-        const response = await fetch(`${API_BASE_URL}/v1/abonnement/abonnements/`, {
+        const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -79,7 +80,7 @@ export const PublicProfile = () => {
       
       if (isSubscribed) {
         // Unsubscribe
-        const response = await fetch(`${API_BASE_URL}/v1/abonnement/abonnements/`, {
+        const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -94,7 +95,7 @@ export const PublicProfile = () => {
         }
       } else {
         // Subscribe
-        const response = await fetch(`${API_BASE_URL}/v1/abonnement/abonnements/`, {
+        const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -167,7 +168,7 @@ export const PublicProfile = () => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ blocked_user: userId })
+          body: JSON.stringify({ blocked_user: id })
         })
 
         if (response.ok) {
@@ -218,7 +219,7 @@ export const PublicProfile = () => {
               onClick={() => navigate(-1)}
               className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
             >
-              <Calendar className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+              <ArrowLeft className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
             </button>
             <h1 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Profil
@@ -522,15 +523,16 @@ export const PublicProfile = () => {
                 </div>
               ) : videos.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {videos.slice(0, 8).map((video: any) => (
+                  {videos.slice(0, 8).map((video: FeedVideo) => (
                     <div
                       key={video.id}
+                      onClick={() => navigate(`/pro/video/${video.id}`)}
                       className={`${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity group`}
                     >
                       <div className="relative">
-                        {video.thumbnailUrl ? (
+                        {video.thumbnail ? (
                           <img
-                            src={video.thumbnailUrl}
+                            src={video.thumbnail}
                             alt={video.title}
                             className="w-full h-32 object-cover"
                           />
@@ -539,11 +541,7 @@ export const PublicProfile = () => {
                             <Video className="w-8 h-8 text-gray-400" />
                           </div>
                         )}
-                        {video.duration && (
-                          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                            {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-                          </div>
-                        )}
+
                       </div>
                       <div className="p-3">
                         <h4 className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} line-clamp-2 mb-1`}>
@@ -554,13 +552,9 @@ export const PublicProfile = () => {
                             <Eye className="w-3 h-3" />
                             {video.views || 0}
                           </span>
-                          <span className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} flex items-center gap-1`}>
-                            <Heart className="w-3 h-3" />
-                            {video.likesCount || 0}
-                          </span>
                         </div>
                         <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} mt-1`}>
-                          {new Date(video.createdAt).toLocaleDateString('fr-FR')}
+                          {video.createdAt ? new Date(video.createdAt).toLocaleDateString('fr-FR') : ''}
                         </p>
                       </div>
                     </div>

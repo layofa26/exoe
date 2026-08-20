@@ -1,38 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
+import { videoApi, mapApiVideo } from '../services/videoApi';
+import type { Video } from '../types/video';
 
-interface Video {
-  id: string;
-  title: string;
-  description: string;
-  thumbnailUrl: string;
-  videoUrl: string;
-  views: number;
-  createdAt: string;
-  duration?: number;
-  likesCount: number;
-  commentsCount: number;
-  hashtags?: string[];
-}
-
-interface VideosResponse {
-  videos: Video[];
-  total: number;
-  page: number;
-  limit: number;
-  hasMore: boolean;
-}
-
-export const useProfessionalVideos = (professionalId: string, initialPage: number = 1, initialLimit: number = 20) => {
+/**
+ * Vidéos publiques d'un professionnel donné (par identifiant utilisateur).
+ * `mine` permet de charger aussi les vidéos privées de l'utilisateur connecté.
+ */
+export const useProfessionalVideos = (
+  professionalId: string,
+  initialPage: number = 1,
+  initialLimit: number = 20,
+  mine: boolean = false
+) => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(initialPage);
-  const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
   const limit = initialLimit;
 
-  const loadVideos = useCallback(async (pageNum: number = initialPage) => {
-    if (!professionalId) {
+  const loadVideos = useCallback(async () => {
+    if (!mine && !professionalId) {
       setError('ID de professionnel manquant');
       setLoading(false);
       return;
@@ -42,43 +29,40 @@ export const useProfessionalVideos = (professionalId: string, initialPage: numbe
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        setError('Token non trouvé')
-        return
-      }
+      const result = mine
+        ? await videoApi.getMyVideos()
+        : await videoApi.getVideos(undefined, { owner: professionalId });
 
-      const response = await fetch(`${API_BASE_URL}/accueil/videos/my_videos/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setVideos(data.results || data)
+      if (result.success && result.data) {
+        const mapped = result.data.map(mapApiVideo);
+        setVideos(mapped);
+        setTotal(mapped.length);
       } else {
-        setError('Impossible de charger les vidéos')
+        setVideos([]);
+        setError(result.error || 'Impossible de charger les vidéos');
       }
     } catch (err) {
       console.error('Error loading professional videos:', err);
+      setVideos([]);
       setError('Impossible de charger les vidéos');
     } finally {
       setLoading(false);
     }
-  }, [professionalId, initialPage, limit]);
+  }, [professionalId, mine]);
 
   useEffect(() => {
-    loadVideos(1);
+    loadVideos();
   }, [loadVideos]);
 
-  const loadMore = () => {
-    if (hasMore && !loading) {
-      loadVideos(page + 1);
-    }
+  return {
+    videos,
+    loading,
+    error,
+    loadMore: () => undefined,
+    hasMore: false,
+    total,
+    limit,
+    page: initialPage,
+    refresh: loadVideos,
   };
-
-  const refresh = () => {
-    loadVideos(1);
-  };
-
-  return { videos, loading, error, loadMore, hasMore, total, refresh };
 };

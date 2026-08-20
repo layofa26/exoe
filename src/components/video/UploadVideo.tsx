@@ -1,8 +1,6 @@
 ﻿import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Upload, X, Loader2, AlertCircle, CheckCircle, Edit3 } from 'lucide-react'
-import { getPublicVideoUrl } from '../../services/supabaseClient'
-import { api } from '../../services/apiClient'
+import { videoApi } from '../../services/videoApi'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { VideoEditor } from './VideoEditor'
 
@@ -24,8 +22,7 @@ interface UploadVideoProps {
 }
 
 export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSuccess }: UploadVideoProps): JSX.Element => {
-  const navigate = useNavigate()
-  const { addNotification } = useNotifications()
+  const { showSuccess, showError } = useNotifications()
   
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -49,7 +46,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
   const [error, setError] = useState<string | null>(null)
   
   const [showVideoEditor, setShowVideoEditor] = useState(false)
-  const [videoFilters, setVideoFilters] = useState<VideoFilters>({
+  const [, setVideoFilters] = useState<VideoFilters>({
     brightness: 100,
     contrast: 100,
     saturate: 100,
@@ -63,8 +60,17 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
   
   useEffect(() => {
-    if (initialVideoData) {
-      setVideoFile(initialVideoData.videoFile)
+    if (!initialVideoData) return
+
+    setVideoFile(initialVideoData.videoFile)
+    setVideoUrl(initialVideoData.videoUrl)
+
+    // La caméra fournit la miniature en data URL: la convertir en fichier envoyable
+    if (initialVideoData.thumbnail?.startsWith('data:image')) {
+      fetch(initialVideoData.thumbnail)
+        .then(res => res.blob())
+        .then(blob => setThumbnailFile(new File([blob], 'cover.jpg', { type: blob.type || 'image/jpeg' })))
+        .catch(() => undefined)
     }
   }, [initialVideoData])
   
@@ -147,33 +153,21 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
     setUploadProgress(0)
     
     try {
-      // Use backend upload endpoint
-      const formData = new FormData()
-      formData.append('file', videoFile)
-      formData.append('title', title.trim())
-      formData.append('description', description.trim())
-      formData.append('is_public', visibility === 'public' ? 'true' : 'false')
-      
-      if (thumbnailFile) {
-        formData.append('thumbnail', thumbnailFile)
-      }
-      
-      // Simulate upload progress for UX
-      let progress = 0
-      const progressInterval = setInterval(() => {
-        progress += 10
-        if (progress <= 90) {
-          setUploadProgress(progress)
-        }
-      }, 200)
-      
-      const result = await api.upload('/accueil/videos/', formData)
-      
-      clearInterval(progressInterval)
+      const result = await videoApi.uploadVideo(
+        {
+          file: videoFile,
+          title: title.trim(),
+          description: description.trim(),
+          isPublic: visibility === 'public',
+          cover: thumbnailFile,
+        },
+        setUploadProgress
+      )
+
       setUploadProgress(100)
-      
+
       if (result.success) {
-        addNotification('success', 'Vidéo uploadée avec succès!')
+        showSuccess('Vidéo publiée', 'Votre vidéo est disponible dans votre fil professionnel.')
         setTitle('')
         setDescription('')
         setVisibility('public')
@@ -197,7 +191,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
       console.error('Upload error:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'upload'
       setError(errorMessage)
-      addNotification('error', errorMessage)
+      showError('Upload échoué', errorMessage)
     } finally {
       setIsUploading(false)
     }

@@ -6,6 +6,8 @@ import {
   Mail, Smartphone, Briefcase, MapPin, Clock, Play, TrendingUp, Calendar
 } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+
 type PrivacyLevel = 'PUBLIC' | 'SUBSCRIBERS' | 'CONTACTS' | 'INSTITUTIONS' | 'PRIVATE';
 
 interface PrivacySettings {
@@ -70,12 +72,7 @@ const PrivacySettings = () => {
 
       if (response.ok) {
         const data = await response.json()
-        setPrivacySettings({
-          showEmail: data.show_email || false,
-          showPhone: data.show_phone || false,
-          allowMessages: data.allow_messages || true,
-          showLocation: data.show_location || false
-        })
+        setSettings(prev => ({ ...prev, ...(data.privacy_settings || {}) }))
       }
     } catch (error) {
       console.error('Error loading privacy settings:', error);
@@ -102,7 +99,7 @@ const PrivacySettings = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(privacySettings)
+        body: JSON.stringify({ privacy_settings: settings })
       })
 
       if (response.ok) {

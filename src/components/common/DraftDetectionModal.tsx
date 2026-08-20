@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Clock, X } from 'lucide-react'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+
 interface Draft {
   id: string
   title: string
@@ -18,6 +20,7 @@ interface DraftDetectionModalProps {
 export const DraftDetectionModal = ({ isOpen, onClose }: DraftDetectionModalProps) => {
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(false)
+  const [, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -74,7 +77,7 @@ export const DraftDetectionModal = ({ isOpen, onClose }: DraftDetectionModalProp
 
       if (response.ok) {
         alert('Brouillon supprimé avec succès')
-        loadDrafts()
+        checkDrafts()
       } else {
         throw new Error('Erreur lors de la suppression')
       }

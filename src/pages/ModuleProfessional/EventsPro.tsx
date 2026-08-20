@@ -199,7 +199,7 @@ export default function EventsPro() {
         }
 
         // Fetch events from backend
-        const response = await fetch('${API_BASE_URL}/v1/evenement/evenements/', {
+        const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

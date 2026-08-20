@@ -1,15 +1,53 @@
 import { useState, useEffect, useCallback } from 'react';
+import { videoApi, mapApiVideo, unwrapList } from '../services/videoApi';
+import { api } from '../services/apiClient';
+import type { Video } from '../types/video';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+export interface SearchProfessional {
+  id: string;
+  userId: string;
+  username: string;
+  fullName: string;
+  profession: string;
+  location: string;
+  avatarUrl: string;
+  initials: string;
+}
+
+interface ProfilApiResult {
+  id: number;
+  user?: number;
+  username?: string;
+  full_name?: string;
+  profession?: string;
+  user_profession?: string;
+  location?: string;
+  city?: string;
+  photo_url?: string | null;
+}
 
 interface SearchResults {
-  professionals: any[];
-  videos: any[];
+  professionals: SearchProfessional[];
+  videos: Video[];
   total: number;
   page: number;
   limit: number;
   hasMore: boolean;
 }
+
+const mapProfessional = (p: ProfilApiResult): SearchProfessional => {
+  const fullName = p.full_name || p.username || 'Utilisateur';
+  return {
+    id: String(p.id),
+    userId: p.user != null ? String(p.user) : String(p.id),
+    username: p.username || '',
+    fullName,
+    profession: p.profession || p.user_profession || '',
+    location: p.location || p.city || '',
+    avatarUrl: p.photo_url || '',
+    initials: fullName.charAt(0).toUpperCase(),
+  };
+};
 
 export const useSearch = () => {
   const [query, setQuery] = useState('');
@@ -19,103 +57,76 @@ export const useSearch = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
-  const debouncedSearch = useCallback(
-    (searchQuery: string, searchType: 'all' | 'videos' | 'professionals', searchPage: number = 1) => {
-      const timer = setTimeout(async () => {
-        if (!searchQuery.trim()) {
-          setResults(null);
-          setLoading(false);
-          return;
-        }
+  const runSearch = useCallback(
+    async (searchQuery: string, searchType: 'all' | 'videos' | 'professionals', searchPage: number) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-        try {
-          setLoading(true);
-          setError(null);
+        const needProfessionals = searchType !== 'videos';
+        const needVideos = searchType !== 'professionals';
 
-          const token = localStorage.getItem('accessToken');
-          
-          // Recherche parallèle professionnels et vidéos
-          const [profilsResponse, videosResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/profil/profils/?search=${searchQuery}`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            }),
-            fetch(`${API_BASE_URL}/accueil/videos/?search=${searchQuery}`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            })
-          ]);
+        const [profilsResult, videosResult] = await Promise.all([
+          needProfessionals
+            ? api.get<unknown>(`/profil/profils/?search=${encodeURIComponent(searchQuery)}`)
+            : Promise.resolve({ success: true, data: [] as unknown }),
+          needVideos
+            ? videoApi.getVideos(undefined, { search: searchQuery })
+            : Promise.resolve({ success: true, data: [] }),
+        ]);
 
-          const profilsData = profilsResponse.ok ? await profilsResponse.json() : { results: [] };
-          const videosData = videosResponse.ok ? await videosResponse.json() : { results: [] };
+        const professionals = profilsResult.success
+          ? unwrapList<ProfilApiResult>(profilsResult.data).map(mapProfessional)
+          : [];
+        const videos = videosResult.success && videosResult.data
+          ? videosResult.data.map(mapApiVideo)
+          : [];
 
-          const professionals = profilsData.results ? profilsData.results.map((p: any) => ({
-            id: p.id,
-            username: p.username,
-            fullName: p.full_name || p.username,
-            profession: p.profession || p.user_profession || '',
-            company: '',
-            followersCount: 0,
-            videosCount: 0,
-            avatarUrl: p.photo_url || p.photo
-          })) : [];
-
-          const videos = videosData.results ? videosData.results.map((v: any) => ({
-            id: v.id,
-            title: v.title,
-            description: v.description,
-            thumbnail: v.cover_url || v.cover,
-            videoUrl: v.file_url || v.file,
-            author: {
-              id: v.owner,
-              fullName: v.owner || 'Utilisateur',
-              profession: ''
-            },
-            views: 0,
-            createdAt: v.created_at
-          })) : [];
-
-          const filteredProfessionals = searchType === 'video' ? [] : professionals;
-          const filteredVideos = searchType === 'professional' ? [] : videos;
-
-          setResults({
-            professionals: filteredProfessionals,
-            videos: filteredVideos,
-            total: filteredProfessionals.length + filteredVideos.length,
-            page: searchPage,
-            limit: 20,
-            hasMore: false
-          });
-
-        } catch (err) {
-          console.error('Search error:', err);
+        if (!profilsResult.success && !videosResult.success) {
           setError('Erreur lors de la recherche');
-          setResults({
-            professionals: [],
-            videos: [],
-            total: 0,
-            page: 1,
-            limit: 20,
-            hasMore: false
-          });
-        } finally {
-          setLoading(false);
         }
-      }, 150);
 
-      return () => clearTimeout(timer);
+        setResults({
+          professionals,
+          videos,
+          total: professionals.length + videos.length,
+          page: searchPage,
+          limit: 20,
+          hasMore: false,
+        });
+      } catch (err) {
+        console.error('Search error:', err);
+        setError('Erreur lors de la recherche');
+        setResults({
+          professionals: [],
+          videos: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+          hasMore: false,
+        });
+      } finally {
+        setLoading(false);
+      }
     },
     []
   );
 
   useEffect(() => {
-    const cleanup = debouncedSearch(query, type, page);
-    return cleanup;
-  }, [query, type, page, debouncedSearch]);
+    if (!query.trim()) {
+      setResults(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    const timer = setTimeout(() => {
+      runSearch(query.trim(), type, page);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query, type, page, runSearch]);
 
   const loadMore = () => {
     if (results?.hasMore && !loading) {

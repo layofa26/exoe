@@ -72,16 +72,19 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     const token = localStorage.getItem('accessToken')
     if (token) {
       try {
-        const decoded = jwtDecode<JWTPayload>(token)
-        if (decoded.exp * 1000 > Date.now()) {
+        const decoded = jwtDecode<Partial<JWTPayload>>(token)
+        if (decoded.exp && decoded.exp * 1000 > Date.now()) {
+          const storedProfile = JSON.parse(
+            localStorage.getItem('exile_user_profile') || '{}'
+          )
           const userData: User = {
-            id: decoded.id,
-            email: decoded.email,
-            username: decoded.username,
-            fullName: decoded.full_name || '',
+            id: decoded.id || decoded.user_id || storedProfile.id || 0,
+            email: decoded.email || storedProfile.email || '',
+            username: decoded.username || storedProfile.username || '',
+            fullName: decoded.full_name || storedProfile.name || '',
             avatarUrl: undefined,
             roles: [],
-            type: decoded.type.toLowerCase() as 'professional' | 'institution',
+            type: (decoded.type || 'PROFESSIONAL').toLowerCase() as 'professional' | 'institution',
             legacyPro: false,
             institutionPlan: undefined
           }

@@ -64,10 +64,10 @@ export const ConversationsPage = (): JSX.Element => {
         setCurrentUserId(userId)
         
         // Load conversations from backend
-        const result = await api.get('/v1/conversations/conversations/', ConversationListSchema)
+        const result = await api.get('/conversations/conversations/', ConversationListSchema)
         
         if (result.success && result.data) {
-          const conversationsData = (result.data.results || result.data).map((conv: any) => ({
+          const conversationsData = result.data.results.map((conv: any) => ({
             id: String(conv.id),
             lastMessageAt: conv.updated_at || conv.created_at,
             participants: conv.participants || [],

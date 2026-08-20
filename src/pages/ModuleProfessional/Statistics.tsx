@@ -95,10 +95,8 @@ export const Statistics = (): JSX.Element => {
           return
         }
 
-        const userId = getCurrentUserId()
-        
         // Load statistics from backend
-        const result = await api.get(`/v1/stats/user-stats/summary/?period=${period}`)
+        const result = await api.get<any>(`/stats/user-stats/summary/?period=${period}`)
         
         if (result.success && result.data) {
           const statsData = result.data

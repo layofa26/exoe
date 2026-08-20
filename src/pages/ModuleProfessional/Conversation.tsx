@@ -19,11 +19,14 @@ import type { Attachment } from '../../types/requests'
 import { TYPING_TIMEOUT_MS } from '../../types/requests'
 import { useTheme } from '../../contexts/ThemeContext'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+
 export const ConversationPage = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [conversation, setConversation] = useState<any>(null)
   const [newMessage, setNewMessage] = useState('')
@@ -33,6 +36,7 @@ export const ConversationPage = (): JSX.Element => {
   
   // Nouvo state
   const [isTyping, setIsTyping] = useState(false)
+  const [otherUserTyping] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -187,19 +191,34 @@ export const ConversationPage = (): JSX.Element => {
     if (!newMessage.trim() || !conversation || !id) return
 
     try {
-      await api.sendMessage(id, {
-        content: newMessage.trim(),
-        isImportant: false
+      const token = localStorage.getItem('accessToken')
+      const sendResponse = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/messages/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: newMessage.trim(), is_important: false })
       })
-      
+
+      if (!sendResponse.ok) {
+        throw new Error('Envoi impossible')
+      }
+
       // Clear draft after sending
       clearDraft()
-      
+
       // Reload conversation to get updated messages
-      const convResponse = await api.getConversation(id) as { success: boolean; data: any }
-      setConversation(convResponse.data)
-      setMessages(convResponse.data.messages || [])
-      
+      const convResponse = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (convResponse.ok) {
+        const data = await convResponse.json()
+        setConversation(data)
+        setMessages(data.messages || [])
+      }
+
       setNewMessage('')
     } catch (err) {
       console.error('Error sending message:', err)
@@ -647,9 +666,9 @@ export const ConversationPage = (): JSX.Element => {
                         </span>
                         {isMe && (
                           message.read ? (
-                            <CheckCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" title="Lu" />
+                            <CheckCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                           ) : (
-                            <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" title="Envoyé" />
+                            <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                           )
                         )}
                       </div>
