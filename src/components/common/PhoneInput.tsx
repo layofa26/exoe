@@ -218,7 +218,7 @@ const COUNTRIES = [
   { code: 'MO', dialCode: '853', name: 'Macau' },
 ]
 
-export const PhoneInput = ({ value, onChange, placeholder = '+33 6 12 34 56 78', className = '', error, defaultCountryCode = '509', showHelpText = true }: PhoneInputProps) => {
+export const PhoneInput = ({ value, onChange, placeholder, className = '', error, defaultCountryCode = '509', showHelpText = true }: PhoneInputProps) => {
   const [isValid, setIsValid] = useState<boolean>(false)
   const [countryCode, setCountryCode] = useState<string>('')
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES.find(c => c.dialCode === defaultCountryCode) || COUNTRIES[0])
@@ -283,7 +283,7 @@ export const PhoneInput = ({ value, onChange, placeholder = '+33 6 12 34 56 78',
       if (inputValue.length >= 8 && inputValue.length <= 10 && !inputValue.startsWith('+')) {
         // Numéro court détecté (8-10 chiffres sans +)
         // Ajouter le code pays par défaut
-        const phoneNumberWithDefault = '+' + defaultCountryCode + inputValue
+        const phoneNumberWithDefault = '+' + selectedCountry.dialCode + inputValue
         const phoneNumber = parsePhoneNumber(phoneNumberWithDefault)
         
         if (phoneNumber) {
@@ -362,30 +362,22 @@ export const PhoneInput = ({ value, onChange, placeholder = '+33 6 12 34 56 78',
     onChange(inputValue, valid)
   }
 
-  const getFlag = () => {
-    // Afficher le drapeau et le code pays seulement si le numéro est valide
-    if (countryCode && isValid) {
-      const flagCode = countryCode.toLowerCase()
-      return (
-        <div className="flex items-center gap-2">
-          <span className={`fi fi-${flagCode} fis rounded`}></span>
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">+{countryCode}</span>
-        </div>
-      )
-    }
-    // Afficher le pays sélectionné manuellement ou par défaut
-    const flagCode = selectedCountry.code.toLowerCase()
-    return (
-      <button
-        type="button"
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-      >
-        <span className={`fi fi-${flagCode} fis rounded`}></span>
-        <ChevronDown className="w-4 h-4 text-gray-500" />
-      </button>
-    )
-  }
+  const displayedCountry = (countryCode && COUNTRIES.find(c => c.code === countryCode)) || selectedCountry
+
+  const getFlag = () => (
+    <button
+      type="button"
+      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+      aria-label="Choisir le pays"
+      className="flex items-center gap-2 pr-3 border-r border-gray-300 dark:border-zinc-700 hover:opacity-80 transition-opacity"
+    >
+      <span className={`fi fi-${displayedCountry.code.toLowerCase()} fis rounded`}></span>
+      <span className="text-sm font-medium text-gray-700 dark:text-zinc-200">+{displayedCountry.dialCode}</span>
+      <ChevronDown className="w-4 h-4 text-gray-500" />
+    </button>
+  )
+
+  const resolvedPlaceholder = placeholder ?? `+${displayedCountry.dialCode} 00 00 00 00`
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -396,7 +388,7 @@ export const PhoneInput = ({ value, onChange, placeholder = '+33 6 12 34 56 78',
         type="tel"
         value={value}
         onChange={handleChange}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         className={`w-full pl-24 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
           error ? 'border-red-500' : isValid ? 'border-green-500' : 'border-gray-300 dark:border-zinc-700'
         } ${className}`}
@@ -474,7 +466,7 @@ export const PhoneInput = ({ value, onChange, placeholder = '+33 6 12 34 56 78',
             <p className="text-gray-500 dark:text-zinc-400 text-xs">Continuez à saisir votre numéro...</p>
           ) : (
             <p className="text-gray-500 dark:text-zinc-400 text-xs">
-              Entrez votre numéro (ex: 42036784 ou +33 6 12 34 56 78)
+              Entrez votre numéro sans le code pays, ou au format international (+{displayedCountry.dialCode}…)
             </p>
           )}
         </div>
