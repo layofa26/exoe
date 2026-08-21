@@ -1,5 +1,11 @@
 import { z } from 'zod'
 
+// Un compte peut être créé avec un téléphone seul: l'API renvoie alors email: ""
+const optionalEmail = z
+  .union([z.string().email('Invalid email format'), z.literal('')])
+  .nullable()
+  .optional()
+
 // Login Response Schema
 export const LoginResponseSchema = z.object({
   access: z.string().min(1, 'Access token is required'),
@@ -13,7 +19,7 @@ export const RegisterResponseSchema = z.object({
   id: z.number().int().positive(),
   full_name: z.string().min(1, 'Full name is required'),
   username: z.string().min(1, 'Username is required'),
-  email: z.string().email('Invalid email format').nullable().optional(),
+  email: optionalEmail,
   phone_number: z.string().nullable().optional(),
   birth_date: z.string().nullable().optional(),
   profession: z.string().min(1, 'Profession is required'),
@@ -29,15 +35,15 @@ export const UserProfileSchema = z.object({
   id: z.number().int().positive(),
   full_name: z.string().min(1, 'Full name is required'),
   username: z.string().min(1, 'Username is required'),
-  email: z.string().email('Invalid email format'),
-  phone_number: z.string().optional(),
-  birth_date: z.string().datetime(),
+  email: optionalEmail,
+  phone_number: z.string().nullable().optional(),
+  birth_date: z.string().nullable().optional(),
   profession: z.string().min(1, 'Profession is required'),
-  speciality: z.string().optional(),
-  country: z.string().optional(),
-  city: z.string().optional(),
-  last_login_time: z.string().datetime().optional(),
-  last_login_ip: z.string().optional()
+  speciality: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  last_login_time: z.string().nullable().optional(),
+  last_login_ip: z.string().nullable().optional()
 })
 
 export type UserProfile = z.infer<typeof UserProfileSchema>

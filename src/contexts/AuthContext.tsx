@@ -281,8 +281,13 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
           return { success: true }
         }
       }
+
+      return {
+        success: false,
+        error: loginResult.error || 'Compte créé, mais la connexion automatique a échoué. Connectez-vous manuellement.'
+      }
     }
-    
+
     return { success: false, error: result.error }
   }
 

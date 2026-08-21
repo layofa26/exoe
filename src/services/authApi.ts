@@ -191,6 +191,9 @@ export const authApi = {
         if (errorData.email) {
           return { success: false, error: Array.isArray(errorData.email) ? errorData.email[0] : errorData.email }
         }
+        if (errorData.phone_number) {
+          return { success: false, error: Array.isArray(errorData.phone_number) ? errorData.phone_number[0] : errorData.phone_number }
+        }
         if (errorData.birth_date) {
           return { success: false, error: Array.isArray(errorData.birth_date) ? errorData.birth_date[0] : errorData.birth_date }
         }
