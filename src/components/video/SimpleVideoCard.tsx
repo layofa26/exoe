@@ -3,6 +3,7 @@ import type { Video } from '../../types/video';
 import { Play, MessageCircle, Trash2 } from 'lucide-react';
 import { ContactModal } from '../modals/ContactModal';
 import { useTheme } from '../../contexts/ThemeContext';
+import { VideoPoster } from './VideoPoster';
 
 interface SimpleVideoCardProps {
   video: Video;
@@ -107,18 +108,8 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
           />
         ) : (
           <>
-            {/* Thumbnail si li egziste */}
-            {video.thumbnail ? (
-              <img 
-                src={video.thumbnail}
-                alt={video.title}
-                className="absolute inset-0 w-full h-full object-cover"
-                onError={(e) => {
-                  // Si thumbnail pa chaje, kache l
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            ) : null}
+            {/* Cover du backend, sinon première image de la vidéo */}
+            <VideoPoster thumbnail={video.thumbnail} videoUrl={video.videoUrl} title={video.title} />
             
             {/* Grain texture overlay (sou thumbnail tou) */}
             <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIvPjwvc3ZnPg==')]" />

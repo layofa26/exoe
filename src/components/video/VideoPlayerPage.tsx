@@ -14,6 +14,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { guessVideoMimeType, toPlayableMimeType } from './VideoPlayer';
 import { videoApi } from '../../services/videoApi';
+import { VideoPoster } from './VideoPoster';
 
 interface VideoPlayerPageProps {
   video: Video;
@@ -125,7 +126,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       ref={playerRef}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className={`relative w-full ${isTabletOrBelow ? 'aspect-video' : 'h-[450px]'} bg-gradient-to-br ${video.gradient || 'from-zinc-700 to-zinc-900'} overflow-hidden shadow-xl select-none`}
+      className={`relative w-full ${isTabletOrBelow ? 'aspect-video max-h-[60vh] landscape:max-h-[75vh]' : 'h-[450px]'} bg-gradient-to-br ${video.gradient || 'from-zinc-700 to-zinc-900'} overflow-hidden shadow-xl select-none`}
     >
       {video.videoUrl ? (
         <>
@@ -457,12 +458,9 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       return;
     }
     
-    const isOwnProfile = userProfile?.id === authorId;
-    
-    if (isOwnProfile) {
-      onBack(); // Fèmen overlay a anvan
-      navigate('/pro/settings'); // Rediriger vers les paramètres ou une autre page de profil temporaire
-    }
+    const isOwnProfile = String(userProfile?.id) === String(authorId);
+
+    navigate(isOwnProfile ? '/pro/profile' : `/pro/profile/${authorId}`);
   };
 
   const MAX_COMMENT_LENGTH = 1000;
@@ -922,37 +920,31 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
         </span>
       </div>
 
-      {/* MOBILE/TABLET: Premier feed - Profil utilisateur connecté */}
+      {/* MOBILE/TABLET: Profil de l'auteur de la vidéo */}
       {isTabletOrBelow && (
-        <div className={`flex-shrink-0 p-4 border-b ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-200'}`}>
-          {/* Profil de l'utilisateur connecté */}
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden flex-shrink-0">
-              {(() => {
-                const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-                if (userProfile?.photo) {
-                  return <img src={userProfile.photo} alt={userProfile.name} className="w-full h-full object-cover" />
-                }
-                return userProfile?.name?.charAt(0).toUpperCase() || 'U'
-              })()}
+        <div className={`flex-shrink-0 p-3 sm:p-4 border-b ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-200'}`}>
+          <button onClick={handleProfileClick} className="flex items-center gap-3 w-full text-left">
+            <div
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden flex-shrink-0"
+              style={{ backgroundColor: video.author?.avatarColor || '#666' }}
+            >
+              {video.author?.avatarUrl ? (
+                <img src={video.author.avatarUrl} alt={video.author?.name || 'Auteur'} className="w-full h-full object-cover" />
+              ) : (
+                video.author?.initials || video.author?.name?.charAt(0).toUpperCase() || '?'
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <h2 className={`font-semibold text-base ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
-                {(() => {
-                  const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-                  return userProfile?.name || 'Utilisateur'
-                })()}
+                {video.author?.name || 'Auteur'}
               </h2>
               <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} truncate`}>
-                {(() => {
-                  const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-                  const profession = userProfile?.profession || 'Professionnel'
-                  const speciality = userProfile?.speciality
-                  return speciality ? `${profession} • ${speciality}` : profession
-                })()}
+                {video.author?.location
+                  ? `${video.author?.profession || 'Professionnel'} • ${video.author.location}`
+                  : (video.author?.profession || 'Professionnel')}
               </p>
             </div>
-          </div>
+          </button>
         </div>
       )}
 
@@ -966,17 +958,17 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       {/* Corps principal - MOBILE/TABLET: sèlman kontni ki defile, DESKTOP: tout bagay */}
       <div
         ref={scrollRef}
-        className={`w-full flex flex-col md:flex-row md:gap-6 md:p-6 md:pt-8 ${isTabletOrBelow ? 'flex-1 min-h-0 overflow-y-auto scrollbar-hide' : 'max-w-screen-xl mx-auto'}`}
+        className={`w-full flex flex-col lg:flex-row lg:gap-6 lg:p-6 lg:pt-8 ${isTabletOrBelow ? 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide' : 'max-w-screen-xl mx-auto'}`}
       >
 
         {/* Colonne gauche : player + infos */}
-        <div className="flex-1 min-w-0 md:max-w-3xl">
+        <div className="flex-1 min-w-0 lg:max-w-3xl">
 
           {/* DESKTOP SELMAN: Videyo nan koulè nòmal la */}
           {!isTabletOrBelow && <MainPlayer />}
 
           {/* Zone kontni - MOBILE/TABLET: defile anba videyo a, DESKTOP: nòmal */}
-          <div className="p-4 md:p-0 md:mt-4">
+          <div className="p-3 sm:p-4 lg:p-0 lg:mt-4">
             
             {/* Commentaires - Directement sous le player vidéo */}
             <div className="mb-4">
@@ -1228,7 +1220,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
             </p>
 
             {/* MOBILE: 1 kolòn, TABLET: 2 kolòn */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full px-3 sm:px-4 pb-4">
               {related.map((rv) => (
                 <div
                   key={rv.id}
@@ -1238,8 +1230,8 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                 >
                   {/* Miniature */}
                   <div className="relative w-full aspect-video bg-black overflow-hidden">
-                    {rv.thumbnail ? (
-                      <img src={rv.thumbnail} alt={rv.title} className="w-full h-full object-cover" />
+                    {rv.thumbnail || rv.videoUrl ? (
+                      <VideoPoster thumbnail={rv.thumbnail} videoUrl={rv.videoUrl} title={rv.title} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="w-8 h-8 text-white/70"><PlayIcon /></span>
@@ -1299,7 +1291,7 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
 
         {/* DESKTOP: Sidebar avec vidéos similaires */}
         {!isTabletOrBelow && (
-          <aside className="w-full md:w-80 lg:w-96 flex-shrink-0 overflow-y-auto scrollbar-hide">
+          <aside className="w-full lg:w-80 xl:w-96 flex-shrink-0 overflow-y-auto scrollbar-hide">
             <p className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Vidéos similaires
             </p>
@@ -1314,11 +1306,11 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
                 >
                   {/* Miniature horizontale */}
                   <div className="flex gap-2 sm:gap-3 p-2 sm:p-3">
-                    <div className="relative flex-shrink-0 w-36 sm:w-40 aspect-video rounded-lg overflow-hidden">
-                      {rv.thumbnail ? (
-                        <img src={rv.thumbnail} alt={rv.title} className="w-full h-full object-cover" />
+                    <div className="relative flex-shrink-0 w-36 sm:w-40 aspect-video rounded-lg overflow-hidden bg-black">
+                      {rv.thumbnail || rv.videoUrl ? (
+                        <VideoPoster thumbnail={rv.thumbnail} videoUrl={rv.videoUrl} title={rv.title} />
                       ) : (
-                        <div className="w-full h-full bg-black flex items-center justify-center">
+                        <div className="w-full h-full flex items-center justify-center">
                           <span className="w-6 h-6 text-white/70"><PlayIcon /></span>
                         </div>
                       )}
