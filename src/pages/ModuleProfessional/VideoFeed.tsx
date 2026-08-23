@@ -570,6 +570,7 @@ export default function VideoFeed() {
           receiver={{
             id: selectedVideoForContact.author?.id || 'unknown',
             name: selectedVideoForContact.author?.name || 'Inconnu',
+            username: selectedVideoForContact.author?.username,
             avatar: selectedVideoForContact.author?.avatarUrl || null,
             profession: selectedVideoForContact.author?.profession || 'Professionnel'
           }}

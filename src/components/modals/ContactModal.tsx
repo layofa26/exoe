@@ -15,6 +15,7 @@ interface ContactModalProps {
   receiver: {
     id: string
     name: string
+    username?: string
     avatar: string | null
     profession: string
   }
@@ -54,7 +55,7 @@ export const ContactModal = ({
     setIsSubmitting(true)
     
     const request: CreateDemandeRequest = {
-      receiver: receiver.name, // Backend utilise username
+      receiver: receiver.username || receiver.name, // Backend identifie le destinataire par username
       message: message.trim()
     }
 
@@ -93,10 +94,7 @@ export const ContactModal = ({
             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
               <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div>
-              <h3 className={`font-semibold text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Contacter</h3>
-              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{receiver.name}</p>
-            </div>
+            <h3 className={`font-semibold text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Contacter un professionnel</h3>
           </div>
           <button
             onClick={onClose}
@@ -110,9 +108,17 @@ export const ContactModal = ({
         <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
           {/* Info du destinataire */}
           <div className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700/50' : 'bg-gray-50'}`}>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg">
-              {receiver.name.charAt(0).toUpperCase()}
-            </div>
+            {receiver.avatar ? (
+              <img
+                src={receiver.avatar}
+                alt={receiver.name}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg">
+                {receiver.name.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="flex-1">
               <p className={`font-medium text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{receiver.name}</p>
               <p className={`text-[10px] sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{receiver.profession}</p>

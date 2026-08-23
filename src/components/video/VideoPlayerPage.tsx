@@ -64,6 +64,17 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
   // États pour les modals
   const [showContactModal, setShowContactModal] = useState(false);
   const [selectedAuthorForContact, setSelectedAuthorForContact] = useState<typeof video.author | null>(null);
+
+  // Un seul destinataire de contact affiché à la fois
+  const contactReceiver = selectedAuthorForContact || (showContactModal ? video.author : null);
+  const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
+  const contactSender = {
+    id: storedProfile?.id || 'current-user',
+    name: storedProfile?.name || 'Moi',
+    avatar: storedProfile?.photo || null,
+    profession: storedProfile?.profession || 'Utilisateur'
+  };
+
   
   const commentRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -1357,44 +1368,22 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
       )}
 
 
-      {/* Contact Modal - Klik sou Chat */}
-      {showContactModal && video.author && (
+      {/* Contact Modal - un seul à la fois (otè videyo aktyel oswa videyo similaire) */}
+      {contactReceiver && (
         <ContactModal
-          isOpen={showContactModal}
-          onClose={() => setShowContactModal(false)}
+          isOpen
+          onClose={() => {
+            setSelectedAuthorForContact(null)
+            setShowContactModal(false)
+          }}
           receiver={{
-            id: video.author.id,
-            name: video.author.name,
-            avatar: video.author.avatarUrl || null,
-            profession: video.author.profession
+            id: contactReceiver.id,
+            name: contactReceiver.name,
+            username: contactReceiver.username,
+            avatar: contactReceiver.avatarUrl || null,
+            profession: contactReceiver.profession
           }}
-          sender={{
-            id: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.id || 'current-user',
-            name: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.name || 'Moi',
-            avatar: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.photo || null,
-            profession: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.profession || 'Utilisateur'
-          }}
-        />
-      )}
-
-
-      {/* Contact Modal pou otè videyo similaire */}
-      {selectedAuthorForContact && (
-        <ContactModal
-          isOpen={!!selectedAuthorForContact}
-          onClose={() => setSelectedAuthorForContact(null)}
-          receiver={{
-            id: selectedAuthorForContact.id,
-            name: selectedAuthorForContact.name,
-            avatar: selectedAuthorForContact.avatarUrl || null,
-            profession: selectedAuthorForContact.profession
-          }}
-          sender={{
-            id: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.id || 'current-user',
-            name: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.name || 'Moi',
-            avatar: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.photo || null,
-            profession: JSON.parse(localStorage.getItem('exile_user_profile') || '{}')?.profession || 'Utilisateur'
-          }}
+          sender={contactSender}
         />
       )}
 

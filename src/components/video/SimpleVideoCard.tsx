@@ -65,12 +65,13 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
   const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
   const currentUserId = userProfile?.id || 'current-user-' + Date.now();
 
+  // Le profil affiche sur la carte est toujours l'auteur de la video
   const displayUser = {
-    id: userProfile?.id || currentUserId,
-    name: userProfile?.name || 'Utilisateur',
-    profession: userProfile?.profession || 'Professionnel',
-    photo: userProfile?.photo || null,
-    avatarColor: userProfile?.avatarColor || '#666'
+    id: author.id,
+    name: author.name,
+    profession: author.profession || 'Professionnel',
+    photo: author.avatarUrl || null,
+    avatarColor: author.avatarColor || '#666'
   };
 
   const handleContact = (e: React.MouseEvent) => {
@@ -184,6 +185,7 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
           receiver={{
             id: author.id,
             name: author.name,
+            username: author.username,
             avatar: author.avatarUrl || null,
             profession: author.profession
           }}

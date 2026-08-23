@@ -192,20 +192,14 @@ export const Header = (): JSX.Element => {
     setSearchLoading(true)
     try {
       const token = localStorage.getItem('accessToken')
-      
-      const profilsResponse = await fetch(`${API_BASE_URL}/profil/profils/?search=${encodeURIComponent(query)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      const videosResponse = await fetch(`${API_BASE_URL}/accueil/videos/?search=${encodeURIComponent(query)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      // La recherche est publique: n'envoyer le token que s'il existe (sinon "Bearer null" -> 401)
+      const headers: HeadersInit = token
+        ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        : { 'Content-Type': 'application/json' }
+
+      const profilsResponse = await fetch(`${API_BASE_URL}/profil/profils/?search=${encodeURIComponent(query)}`, { headers })
+
+      const videosResponse = await fetch(`${API_BASE_URL}/accueil/videos/?search=${encodeURIComponent(query)}`, { headers })
       
       const profilsData = profilsResponse.ok ? await profilsResponse.json() : []
       const videosData = videosResponse.ok ? await videosResponse.json() : []

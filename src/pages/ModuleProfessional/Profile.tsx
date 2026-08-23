@@ -184,18 +184,64 @@ const Profile = () => {
     const data = await listResponse.json()
     console.log('Profile list data received:', data)
     
-    // Chercher le profil de l'utilisateur connecté
-    const currentUserId = localStorage.getItem('userId')
-    
+    // Chercher le profil de l'utilisateur connecté (jamais un profil d'un autre utilisateur)
+    const storedUser = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+    const currentUserId = localStorage.getItem('userId') || (storedUser?.id != null ? String(storedUser.id) : null)
+    const currentUsername = storedUser?.username || localStorage.getItem('exile_username')
+    const isMine = (p: any) =>
+      (currentUserId && p.user?.toString() === currentUserId) ||
+      (currentUsername && p.username === currentUsername)
+
     if (data.results && data.results.length > 0) {
-      return data.results.find((p: any) => p.user?.toString() === currentUserId) || data.results[0]
+      return data.results.find(isMine) || null
     } else if (Array.isArray(data) && data.length > 0) {
-      return data.find((p: any) => p.user?.toString() === currentUserId) || data[0]
+      return data.find(isMine) || null
     } else if (data.id) {
       return data
     }
     
     return null
+  }
+
+  // Mapping unique backend -> UI (evite que des champs restent aux anciennes valeurs)
+  const mapBackendProfile = (data: any): UserProfile => ({
+    id: data.id,
+    username: data.username,
+    photo: data.photo_url || data.photo,
+    bio: data.bio,
+    location: data.location,
+    country: data.country,
+    city: data.city,
+    websites: data.website ? [data.website] : [],
+    fullName: data.full_name || data.username,
+    avatarUrl: data.photo_url || data.photo,
+    banner: data.banner_url || data.banner,
+    profession: data.profession || data.user_profession,
+    speciality: data.speciality || data.user_speciality,
+    lastProfessionUpdate: data.last_profession_update || data.lastProfessionUpdate,
+    skills: data.skills || [],
+    email: data.email || ''
+  })
+
+  // Recharge le profil depuis le backend et synchronise le profil local
+  const refreshProfile = async (token: string): Promise<UserProfile | null> => {
+    const backendProfile = await getProfileWithFallback(token)
+    if (!backendProfile) return null
+
+    const mapped = mapBackendProfile(backendProfile)
+    setProfile(mapped)
+
+    const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+    localStorage.setItem('exile_user_profile', JSON.stringify({
+      ...storedProfile,
+      id: backendProfile.user != null ? String(backendProfile.user) : storedProfile.id,
+      username: mapped.username,
+      name: mapped.fullName,
+      photo: mapped.avatarUrl || null,
+      profession: mapped.profession || ''
+    }))
+
+    return mapped
   }
 
   // Charger le profil depuis API
@@ -213,30 +259,9 @@ const Profile = () => {
         }
 
         // Charger le profil depuis le backend
-        console.log('Loading profile from backend...')
-        const backendProfile = await getProfileWithFallback(token)
-        console.log('Profile data received:', backendProfile)
-        
-        if (backendProfile) {
-          setProfile({
-            id: backendProfile.id,
-            username: backendProfile.username,
-            photo: backendProfile.photo,
-            bio: backendProfile.bio,
-            location: backendProfile.location,
-            country: backendProfile.country,
-            city: backendProfile.city,
-            websites: backendProfile.website ? [backendProfile.website] : [],
-            fullName: backendProfile.full_name || backendProfile.username,
-            avatarUrl: backendProfile.photo_url || backendProfile.photo,
-            banner: backendProfile.banner_url || backendProfile.banner,
-            profession: backendProfile.profession || backendProfile.user_profession,
-            speciality: backendProfile.speciality || backendProfile.user_speciality,
-            lastProfessionUpdate: backendProfile.lastProfessionUpdate,
-            skills: backendProfile.skills || [],
-            email: backendProfile.email || ''
-          })
-        } else {
+        const loadedProfile = await refreshProfile(token)
+
+        if (!loadedProfile) {
           console.log('No profile data found, creating empty profile')
           setProfile({
             username: localStorage.getItem('exile_username') || 'Utilisateur',
@@ -426,8 +451,7 @@ const Profile = () => {
         })
 
         if (response.ok) {
-          const updatedProfile = await response.json()
-          setProfile(updatedProfile)
+          await refreshProfile(token)
           setNewProfession('')
           setShowProfessionModal(false)
           showProfileUpdated()
@@ -668,26 +692,7 @@ const Profile = () => {
       showProfileUpdated()
 
       // Recharger le profil depuis le backend au lieu de recharger la page
-      const updatedProfile = await getProfileWithFallback(token)
-      if (updatedProfile) {
-        setProfile({
-          id: updatedProfile.id,
-          username: updatedProfile.username,
-          photo: updatedProfile.photo_url || updatedProfile.photo,
-          bio: updatedProfile.bio,
-          location: updatedProfile.location,
-          country: updatedProfile.country,
-          city: updatedProfile.city,
-          websites: updatedProfile.website ? [updatedProfile.website] : [],
-          fullName: updatedProfile.full_name || updatedProfile.username,
-          avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
-          banner: updatedProfile.banner_url || updatedProfile.banner,
-          profession: updatedProfile.profession || updatedProfile.user_profession,
-          speciality: updatedProfile.speciality || updatedProfile.user_speciality,
-          lastProfessionUpdate: updatedProfile.lastProfessionUpdate,
-          skills: updatedProfile.skills || []
-        })
-      }
+      await refreshProfile(token)
       
     } catch (error) {
       console.error('Error updating photo:', error)
@@ -845,28 +850,9 @@ const Profile = () => {
       setShowBannerModal(false)
       setUploadedBanner('')
       showProfileUpdated()
-      
+
       // Recharger le profil depuis le backend au lieu de recharger la page
-      const updatedProfile = await getProfileWithFallback(token)
-      if (updatedProfile) {
-        setProfile({
-          id: updatedProfile.id,
-          username: updatedProfile.username,
-          photo: updatedProfile.photo_url || updatedProfile.photo,
-          bio: updatedProfile.bio,
-          location: updatedProfile.location,
-          country: updatedProfile.country,
-          city: updatedProfile.city,
-          websites: updatedProfile.website ? [updatedProfile.website] : [],
-          fullName: updatedProfile.full_name || updatedProfile.username,
-          avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
-          banner: updatedProfile.banner_url || updatedProfile.banner,
-          profession: updatedProfile.profession || updatedProfile.user_profession,
-          speciality: updatedProfile.speciality || updatedProfile.user_speciality,
-          lastProfessionUpdate: updatedProfile.lastProfessionUpdate,
-          skills: updatedProfile.skills || []
-        })
-      }
+      await refreshProfile(token)
       
     } catch (error) {
       console.error('Error updating banner:', error)
@@ -932,27 +918,9 @@ const Profile = () => {
         setNewBio('')
         setShowBioModal(false)
         showProfileUpdated()
-        
+
         // Recharger le profil depuis le backend au lieu de recharger la page
-        const updatedProfile = await getProfileWithFallback(token)
-        if (updatedProfile) {
-          setProfile({
-            id: updatedProfile.id,
-            username: updatedProfile.username,
-            photo: updatedProfile.photo_url || updatedProfile.photo,
-            bio: updatedProfile.bio,
-            location: updatedProfile.location,
-            country: updatedProfile.country,
-            city: updatedProfile.city,
-            websites: updatedProfile.website ? [updatedProfile.website] : [],
-            fullName: updatedProfile.full_name || updatedProfile.username,
-            avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
-            banner: updatedProfile.banner,
-            profession: updatedProfile.profession,
-            speciality: updatedProfile.speciality,
-            lastProfessionUpdate: updatedProfile.lastProfessionUpdate
-          })
-        }
+        await refreshProfile(token)
         
       } catch (error) {
         console.error('Error updating bio:', error)
@@ -1019,27 +987,9 @@ const Profile = () => {
         setNewWebsite('')
         setShowWebsitesModal(false)
         showProfileUpdated()
-        
+
         // Recharger le profil depuis le backend au lieu de recharger la page
-        const updatedProfile = await getProfileWithFallback(token)
-        if (updatedProfile) {
-          setProfile({
-            id: updatedProfile.id,
-            username: updatedProfile.username,
-            photo: updatedProfile.photo_url || updatedProfile.photo,
-            bio: updatedProfile.bio,
-            location: updatedProfile.location,
-            country: updatedProfile.country,
-            city: updatedProfile.city,
-            websites: updatedProfile.website ? [updatedProfile.website] : [],
-            fullName: updatedProfile.full_name || updatedProfile.username,
-            avatarUrl: updatedProfile.photo_url || updatedProfile.photo,
-            banner: updatedProfile.banner,
-            profession: updatedProfile.profession,
-            speciality: updatedProfile.speciality,
-            lastProfessionUpdate: updatedProfile.lastProfessionUpdate
-          })
-        }
+        await refreshProfile(token)
         
       } catch (error) {
         console.error('Error adding website:', error)
