@@ -4,10 +4,32 @@ const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_UR
   ? API_BASE_URL.replace('/api', '/api/v1') 
   : API_BASE_URL
 
+// Le backend expose les demandes soit a la racine, soit sous le prefixe de l'app
+const DEMANDE_PATHS = ['/demandes', '/demande/demandes']
+
+const demandeFetch = async (suffix: string, init: RequestInit): Promise<Response> => {
+  const token = localStorage.getItem('accessToken')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init.headers as Record<string, string> | undefined)
+  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  let lastResponse: Response | null = null
+  for (const basePath of DEMANDE_PATHS) {
+    const response = await fetch(`${FINAL_API_BASE_URL}${basePath}${suffix}`, { ...init, headers })
+    if (response.status !== 404) return response
+    lastResponse = response
+  }
+  return lastResponse as Response
+}
+
 export interface Demande {
   id: number
   sender: string
+  sender_full_name?: string
   receiver: string
+  receiver_full_name?: string
   message: string
   status: 'envoye' | 'refuse' | 'accepte' | 'bloque'
   created_at: string
@@ -22,17 +44,11 @@ export const requestApi = {
   // Récupérer les demandes de l'utilisateur connecté
   getDemandes: async (status?: string, search?: string): Promise<{ success: boolean; data?: Demande[]; error?: string }> => {
     try {
-      const token = localStorage.getItem('accessToken')
       const params = new URLSearchParams()
       if (status) params.append('status', status)
       if (search) params.append('search', search)
 
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      const response = await demandeFetch(`/?${params.toString()}`, { method: 'GET' })
 
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`)
@@ -49,22 +65,12 @@ export const requestApi = {
   // Créer une nouvelle demande
   createDemande: async (request: CreateDemandeRequest): Promise<{ success: boolean; data?: Demande; error?: string }> => {
     try {
-      const token = localStorage.getItem('accessToken')
-
-      // Récupérer le profil utilisateur pour obtenir le username
-      const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-      const senderUsername = userProfile.username || userProfile.name
-
-      if (!senderUsername) {
-        return { success: false, error: 'Utilisateur non connecté' }
+      if (!localStorage.getItem('accessToken')) {
+        return { success: false, error: 'Vous devez être connecté pour contacter un professionnel.' }
       }
 
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
+      const response = await demandeFetch('/', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           receiver: request.receiver,
           message: request.message
@@ -72,8 +78,9 @@ export const requestApi = {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || errorData.message || `Erreur HTTP: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}))
+        const fieldError = Array.isArray(errorData.receiver) ? errorData.receiver[0] : errorData.receiver
+        throw new Error(fieldError || errorData.detail || errorData.message || `Erreur HTTP: ${response.status}`)
       }
 
       const data = await response.json()
@@ -87,14 +94,8 @@ export const requestApi = {
   // Mettre à jour le statut d'une demande
   updateDemande: async (id: number, status: string): Promise<{ success: boolean; data?: Demande; error?: string }> => {
     try {
-      const token = localStorage.getItem('accessToken')
-
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${id}/`, {
+      const response = await demandeFetch(`/${id}/`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ status })
       })
 
@@ -113,15 +114,7 @@ export const requestApi = {
   // Supprimer une demande
   deleteDemande: async (id: number): Promise<{ success: boolean; error?: string }> => {
     try {
-      const token = localStorage.getItem('accessToken')
-
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      const response = await demandeFetch(`/${id}/`, { method: 'DELETE' })
 
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`)

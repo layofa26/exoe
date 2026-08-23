@@ -135,6 +135,38 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
     setError(null)
   }
   
+  // Capture la première image de la vidéo pour servir de cover quand l'utilisateur n'en fournit pas
+  const captureCoverFromVideo = (file: File): Promise<File | null> =>
+    new Promise((resolve) => {
+      const objectUrl = URL.createObjectURL(file)
+      const videoEl = document.createElement('video')
+      videoEl.preload = 'metadata'
+      videoEl.muted = true
+      videoEl.playsInline = true
+
+      const cleanup = () => URL.revokeObjectURL(objectUrl)
+      const fail = () => { cleanup(); resolve(null) }
+
+      videoEl.onerror = fail
+      videoEl.onloadeddata = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = videoEl.videoWidth
+        canvas.height = videoEl.videoHeight
+        const ctx = canvas.getContext('2d')
+        if (!canvas.width || !canvas.height || !ctx) return fail()
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
+        canvas.toBlob((blob) => {
+          cleanup()
+          resolve(blob ? new File([blob], 'cover.jpg', { type: 'image/jpeg' }) : null)
+        }, 'image/jpeg', 0.85)
+      }
+      videoEl.onloadedmetadata = () => {
+        videoEl.currentTime = Math.min(0.1, (videoEl.duration || 1) / 2)
+      }
+
+      videoEl.src = objectUrl
+    })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -153,13 +185,15 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
     setUploadProgress(0)
     
     try {
+      const cover = thumbnailFile || (await captureCoverFromVideo(videoFile))
+
       const result = await videoApi.uploadVideo(
         {
           file: videoFile,
           title: title.trim(),
           description: description.trim(),
           isPublic: visibility === 'public',
-          cover: thumbnailFile,
+          cover,
         },
         setUploadProgress
       )

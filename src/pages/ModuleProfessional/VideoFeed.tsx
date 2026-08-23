@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { ContactModal } from '../../components/modals/ContactModal';
 import EntrepriseEnVedette from '../../pages/PUB/EntrepriseEnVedette';
+import { VideoPoster } from '../../components/video/VideoPoster';
 
 export default function VideoFeed() {
   const { resolvedTheme } = useTheme()
@@ -58,7 +59,10 @@ export default function VideoFeed() {
       const result = await videoApi.getVideos()
 
       if (result.success && result.data) {
-        setVideos(result.data.map(mapApiVideo))
+        console.log('Raw API videos:', result.data)
+        const mappedVideos = result.data.map(mapApiVideo)
+        console.log('Mapped videos:', mappedVideos)
+        setVideos(mappedVideos)
       } else {
         setVideos([])
         setError(result.error || 'Erreur lors du chargement des vidéos')
@@ -179,30 +183,43 @@ export default function VideoFeed() {
 
   // Wrapper component pour afficher vidéo avec infos utilisateur - Design selon image de référence
   const VideoCardWithInfo = ({ video, onClick }: { video: Video; onClick: () => void }) => {
+    // Helper pour obtenir l'URL de miniature avec fallbacks
+    const getThumbnailUrl = () => {
+      if (video.thumbnailUrl && video.thumbnailUrl.trim()) return video.thumbnailUrl
+      if (video.thumbnail && video.thumbnail.trim()) return video.thumbnail
+      return null
+    }
+
+    // Helper pour obtenir l'URL de vidéo avec fallbacks
+    const getVideoUrl = () => {
+      if (video.videoUrl && video.videoUrl.trim()) return video.videoUrl
+      return null
+    }
+
+    const thumbnailUrl = getThumbnailUrl()
+    const videoUrl = getVideoUrl()
+
     return (
       <div 
-        className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shadow-sm`}
+        className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shadow-sm flex flex-col`}
         onClick={onClick}
       >
-        {/* Video Player - seulement si URL valide */}
-        {video.videoUrl ? (
-          <div className="pointer-events-none">
-            <VideoPlayer
-              src={video.videoUrl}
-              type={video.mimeType}
-              poster={video.thumbnail}
-              autoplay={false}
-              className="rounded-xl overflow-hidden"
-            />
-          </div>
-        ) : (
-          <div className="aspect-video bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Vidéo en cours de traitement</p>
-          </div>
-        )}
+        {/* Video Thumbnail/Player - toujours en premier avec hauteur cohérente */}
+        <div className="relative w-full aspect-video bg-gray-200 dark:bg-gray-700 overflow-hidden">
+          {thumbnailUrl || videoUrl ? (
+            <VideoPoster thumbnail={thumbnailUrl || undefined} videoUrl={videoUrl || undefined} title={video.title} />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-2xl mb-1">📹</div>
+                <p className="text-gray-500 dark:text-gray-400 text-xs">Traitement en cours</p>
+              </div>
+            </div>
+          )}
+        </div>
         
-        {/* Info Section - Design compact selon image */}
-        <div className="p-3">
+        {/* Info Section - Avatar + nom + Contacter + titre + vues toujours sous la vidéo */}
+        <div className="p-3 flex-shrink-0">
           {/* User Info */}
           <div className="flex items-center gap-2 mb-2">
             <div 
@@ -236,7 +253,7 @@ export default function VideoFeed() {
                 e.stopPropagation()
                 handleContact(video)
               }}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-[10px] font-medium transition-colors flex items-center gap-1"
+              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-[10px] font-medium transition-colors flex items-center gap-1 flex-shrink-0"
             >
               <MessageCircle className="w-2.5 h-2.5" />
               <span className="hidden sm:inline">Contacter</span>
@@ -411,36 +428,7 @@ export default function VideoFeed() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {results.videos.map((video: Video) => (
-                <div
-                  key={video.id}
-                  onClick={() => handleOpen(video)}
-                  className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity`}
-                >
-                  {video.thumbnailUrl || video.thumbnail ? (
-                    <img
-                      src={video.thumbnailUrl || video.thumbnail}
-                      alt={video.title}
-                      className="w-full h-40 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-40 bg-gray-300 flex items-center justify-center">
-                      <div className={`w-8 h-8 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>📹</div>
-                    </div>
-                  )}
-                  <div className="p-3">
-                    <h4 className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} line-clamp-2`}>
-                      {video.title}
-                    </h4>
-                    <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mt-1`}>
-                      {video.author?.name || 'Inconnu'}
-                    </p>
-                    <div className="flex gap-4 mt-2 text-xs">
-                      <span className={resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}>
-                        {video.views ?? 0} vues
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <VideoCardWithInfo key={`search-video-${video.id}`} video={video} onClick={() => handleOpen(video)} />
               ))}
             </div>
             {results.hasMore && (
@@ -457,8 +445,8 @@ export default function VideoFeed() {
 
         {/* Mobile/Tablette: Videyo - Design selon l'image de référence */}
         <div className="lg:hidden">
-          <div className="px-0 py-4 mt-[120px] sm:mt-[128px]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-0 sm:gap-4">
+          <div className="px-4 py-4 mt-[120px] sm:mt-[128px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
               {loading ? (
                 <div className="col-span-full py-12 text-center">
                   <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
@@ -477,7 +465,7 @@ export default function VideoFeed() {
               ) : displayVideos.length > 0 ? (
                 <>
                   {displayVideos.map((video, index) => (
-                    <React.Fragment key={video.id}>
+                    <React.Fragment key={`video-${video.id}`}>
                       <VideoCardWithInfo video={video} onClick={() => handleOpen(video)} />
                       {/* Entreprise en vedette - Après la 2ème vidéo */}
                       {index === 1 && (
@@ -514,7 +502,7 @@ export default function VideoFeed() {
             {/* Kontenè videyo a - kole pi pre header la */}
             <div className="px-4 md:px-6 lg:px-8 pb-6 mt-0">
               {/* Grid videyo - Desktop: 3 cols */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 mt-32">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mt-32">
                 {loading ? (
                   <div className="col-span-full py-12 text-center">
                     <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
@@ -532,7 +520,7 @@ export default function VideoFeed() {
                   </div>
                 ) : displayVideos.length > 0 ? (
                   displayVideos.map((video) => (
-                    <VideoCardWithInfo key={video.id} video={video} onClick={() => handleOpen(video)} />
+                    <VideoCardWithInfo key={`video-${video.id}`} video={video} onClick={() => handleOpen(video)} />
                   ))
                 ) : (
                   <div className="col-span-full py-12 text-center">
@@ -582,6 +570,7 @@ export default function VideoFeed() {
           receiver={{
             id: selectedVideoForContact.author?.id || 'unknown',
             name: selectedVideoForContact.author?.name || 'Inconnu',
+            username: selectedVideoForContact.author?.username,
             avatar: selectedVideoForContact.author?.avatarUrl || null,
             profession: selectedVideoForContact.author?.profession || 'Professionnel'
           }}

@@ -1,6 +1,7 @@
 export interface Author {
   id: string;
   name: string;
+  username?: string;
   profession: string;
   location: string;
   initials: string;
