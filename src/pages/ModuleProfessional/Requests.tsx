@@ -35,7 +35,7 @@ interface Request {
   receiverAvatar: string | null
   receiverProfession: string
   message: string
-  status: 'pending' | 'accepted' | 'rejected' | 'expired'
+  status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled'
   createdAt: string
   respondedAt?: string
 }
@@ -128,7 +128,7 @@ export const Requests = (): JSX.Element => {
         const userId = tokenPayload.user_id
         setCurrentUserId(userId)
         
-        // Fetch requests from backend
+        // Fetch all requests from backend (no type filtering)
         const response = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -157,6 +157,7 @@ export const Requests = (): JSX.Element => {
           status: item.status === 'envoye' ? 'pending' : 
                  item.status === 'accepte' ? 'accepted' : 
                  item.status === 'refuse' ? 'rejected' : 
+                 item.status === 'annule' ? 'cancelled' :
                  item.status === 'bloque' ? 'expired' : 'pending',
           createdAt: item.created_at,
           respondedAt: undefined
@@ -273,19 +274,19 @@ export const Requests = (): JSX.Element => {
         return
       }
       
-      const newStatus = action === 'accept' ? 'accepte' : 'refuse'
+      const endpoint = action === 'accept' ? 'accept' : 'reject'
       
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/`, {
-        method: 'PATCH',
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/${endpoint}/`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
+        }
       })
       
       if (!response.ok) {
-        throw new Error('Failed to respond to request')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.detail || 'Failed to respond to request')
       }
       
       // Update local state
@@ -297,9 +298,40 @@ export const Requests = (): JSX.Element => {
       
       setToast(action === 'accept' ? 'Demande acceptée' : 'Demande refusée')
       setTimeout(() => setToast(''), 3000)
+      
+      // Reload requests to get updated data
+      const reloadResponse = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (reloadResponse.ok) {
+        const data = await reloadResponse.json()
+        const transformedRequests: Request[] = data.map((item: any) => ({
+          id: item.id,
+          senderId: item.sender_id || (item.sender?.id),
+          senderName: item.sender?.username || item.sender,
+          senderAvatar: null,
+          senderProfession: 'Professionnel',
+          receiverId: item.receiver_id || (item.receiver?.id),
+          receiverName: item.receiver?.username || item.receiver,
+          receiverAvatar: null,
+          receiverProfession: 'Professionnel',
+          message: item.message,
+          status: item.status === 'envoye' ? 'pending' : 
+                 item.status === 'accepte' ? 'accepted' : 
+                 item.status === 'refuse' ? 'rejected' : 
+                 item.status === 'bloque' ? 'expired' : 'pending',
+          createdAt: item.created_at,
+          respondedAt: undefined
+        }))
+        setRequests(transformedRequests)
+      }
     } catch (err) {
       console.error('Error responding to request:', err)
-      setToast('Erreur lors de la réponse')
+      setToast(err instanceof Error ? err.message : 'Erreur lors de la réponse')
       setTimeout(() => setToast(''), 3000)
     }
   }
@@ -312,8 +344,8 @@ export const Requests = (): JSX.Element => {
         return
       }
       
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/`, {
-        method: 'DELETE',
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/cancel/`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -321,17 +353,54 @@ export const Requests = (): JSX.Element => {
       })
       
       if (!response.ok) {
-        throw new Error('Failed to cancel request')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.detail || 'Failed to cancel request')
       }
       
-      // Update local state - remove the cancelled request
-      setRequests(requests.filter(req => req.id !== requestId))
+      // Update local state - change status to cancelled
+      setRequests(requests.map(req => 
+        req.id === requestId 
+          ? { ...req, status: 'cancelled' as any } 
+          : req
+      ))
       
       setToast('Demande annulée')
       setTimeout(() => setToast(''), 3000)
+      
+      // Reload requests to get updated data
+      const reloadResponse = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (reloadResponse.ok) {
+        const data = await reloadResponse.json()
+        const transformedRequests: Request[] = data.map((item: any) => ({
+          id: item.id,
+          senderId: item.sender_id || (item.sender?.id),
+          senderName: item.sender?.username || item.sender,
+          senderAvatar: null,
+          senderProfession: 'Professionnel',
+          receiverId: item.receiver_id || (item.receiver?.id),
+          receiverName: item.receiver?.username || item.receiver,
+          receiverAvatar: null,
+          receiverProfession: 'Professionnel',
+          message: item.message,
+          status: item.status === 'envoye' ? 'pending' : 
+                 item.status === 'accepte' ? 'accepted' : 
+                 item.status === 'refuse' ? 'rejected' : 
+                 item.status === 'annule' ? 'cancelled' :
+                 item.status === 'bloque' ? 'expired' : 'pending',
+          createdAt: item.created_at,
+          respondedAt: undefined
+        }))
+        setRequests(transformedRequests)
+      }
     } catch (err) {
       console.error('Error cancelling request:', err)
-      setToast('Erreur lors de l\'annulation')
+      setToast(err instanceof Error ? err.message : 'Erreur lors de l\'annulation')
       setTimeout(() => setToast(''), 3000)
     }
   }
@@ -370,13 +439,13 @@ export const Requests = (): JSX.Element => {
 
   const filteredRequests = requests.filter(request => {
     const matchesTab = activeTab === 'all'
-      ? true
+      ? request.status !== 'cancelled' // Hide cancelled from all
       : activeTab === 'received'
       ? request.receiverId === currentUserId && request.status === 'pending'
       : activeTab === 'accepted'
       ? request.status === 'accepted'
       : activeTab === 'sent'
-      ? request.senderId === currentUserId
+      ? request.senderId === currentUserId && request.status !== 'cancelled'
       : true
     
     const matchesSearch = searchQuery === '' || 
@@ -414,7 +483,8 @@ export const Requests = (): JSX.Element => {
       pending: { bg: resolvedTheme === 'dark' ? 'bg-amber-900/30' : 'bg-amber-100', text: resolvedTheme === 'dark' ? 'text-amber-300' : 'text-amber-700', icon: Clock, label: 'En attente' },
       accepted: { bg: resolvedTheme === 'dark' ? 'bg-green-900/30' : 'bg-green-100', text: resolvedTheme === 'dark' ? 'text-green-300' : 'text-green-700', icon: CheckCircle, label: 'Acceptée' },
       rejected: { bg: resolvedTheme === 'dark' ? 'bg-red-900/30' : 'bg-red-100', text: resolvedTheme === 'dark' ? 'text-red-300' : 'text-red-700', icon: XCircle, label: 'Refusée' },
-      expired: { bg: resolvedTheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100', text: resolvedTheme === 'dark' ? 'text-gray-300' : 'text-gray-700', icon: Clock, label: 'Expirée' }
+      expired: { bg: resolvedTheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100', text: resolvedTheme === 'dark' ? 'text-gray-300' : 'text-gray-700', icon: Clock, label: 'Expirée' },
+      cancelled: { bg: resolvedTheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100', text: resolvedTheme === 'dark' ? 'text-gray-300' : 'text-gray-700', icon: X, label: 'Annulée' }
     }
     const config = configs[status as keyof typeof configs] || configs.pending
     const Icon = config.icon
