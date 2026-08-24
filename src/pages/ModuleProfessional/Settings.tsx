@@ -53,6 +53,7 @@ const Settings = () => {
     skills: [] as string[]
   })
   const [newSkill, setNewSkill] = useState('')
+  const [lastProfessionUpdate, setLastProfessionUpdate] = useState<string | null>(null)
   const [uploadedPhoto, setUploadedPhoto] = useState<string>('')
   const [photoPreview, setPhotoPreview] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -144,6 +145,29 @@ const Settings = () => {
     setActiveSessions(activeSessions.filter(s => s.id !== sessionId))
   }
 
+  // Meme regle que 'Mon Profil': profession modifiable une fois tous les 30 jours
+  const daysUntilProfessionUpdate = () => {
+    if (!lastProfessionUpdate) return 0
+    const elapsed = Date.now() - new Date(lastProfessionUpdate).getTime()
+    const remaining = 30 - Math.floor(elapsed / (1000 * 60 * 60 * 24))
+    return remaining > 0 ? remaining : 0
+  }
+  const canModifyProfession = () => daysUntilProfessionUpdate() === 0
+
+  // Synchronise le profil stocke localement avec la reponse backend (meme source que Mon Profil)
+  const syncStoredProfile = (data: any) => {
+    if (!data) return
+    const stored = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+    localStorage.setItem('exile_user_profile', JSON.stringify({
+      ...stored,
+      id: data.user != null ? String(data.user) : stored.id,
+      username: data.username || stored.username,
+      name: data.full_name || stored.name,
+      photo: data.photo_url || data.photo || null,
+      profession: data.profession || data.user_profession || ''
+    }))
+  }
+
   // Charger les données du profil
   const loadProfile = useCallback(async () => {
     try {
@@ -169,6 +193,7 @@ const Settings = () => {
           website: data.website || '',
           skills: data.skills?.map((skill: any) => skill.name) || []
         })
+        setLastProfessionUpdate(data.last_profession_update || null)
       }
     } catch (error) {
       console.error('Error loading profile:', error)
@@ -184,7 +209,7 @@ const Settings = () => {
     try {
       const updateData = {
         full_name: `${profileData.firstName} ${profileData.lastName}`.trim(),
-        profession: profileData.profession,
+        ...(canModifyProfession() ? { profession: profileData.profession } : {}),
         bio: profileData.bio,
         city: profileData.city,
         country: profileData.country,
@@ -208,6 +233,8 @@ const Settings = () => {
       })
 
       if (response.ok) {
+        const updated = await response.json().catch(() => null)
+        syncStoredProfile(updated)
         alert('Profil mis à jour avec succès')
         window.location.reload()
       } else {
@@ -269,6 +296,8 @@ const Settings = () => {
       })
 
       if (response.ok) {
+        const updated = await response.json().catch(() => null)
+        syncStoredProfile(updated)
         alert('Photo de profil mise à jour avec succès')
         loadProfile()
       } else {
@@ -909,11 +938,17 @@ const Settings = () => {
               <div>
                 <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                   Titre professionnel
+                  {!canModifyProfession() && (
+                    <span className="ml-2 text-[10px] sm:text-xs font-normal text-gray-500">
+                      Modifiable dans {daysUntilProfessionUpdate()}j
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
                   value={profileData.profession}
                   onChange={(e) => setProfileData({ ...profileData, profession: e.target.value })}
+                  disabled={!canModifyProfession()}
                   placeholder="Titre professionnel"
                   className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border text-sm sm:text-base ${
                     resolvedTheme === 'dark'

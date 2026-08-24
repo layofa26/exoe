@@ -142,6 +142,9 @@ function App(): JSX.Element {
         const dismissed = localStorage.getItem('exile_drafts_dismissed')
         if (dismissed === 'true') return
 
+        // L'endpoint brouillons n'existe pas sur toutes les versions du backend
+        if (localStorage.getItem('exile_drafts_unsupported') === 'true') return
+
         const token = localStorage.getItem('accessToken')
         if (token) {
           const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
@@ -150,6 +153,10 @@ function App(): JSX.Element {
               'Authorization': `Bearer ${token}`
             }
           })
+          if (response.status === 404) {
+            localStorage.setItem('exile_drafts_unsupported', 'true')
+            return
+          }
           if (response.ok) {
             const data = await response.json()
             const pendingDrafts = (data.data || data || []).filter(

@@ -198,6 +198,9 @@ export default function VideoFeed() {
 
     const thumbnailUrl = getThumbnailUrl()
     const videoUrl = getVideoUrl()
+    const isOwnVideo =
+      (userProfile?.username && video.author?.username === userProfile.username) ||
+      (userProfile?.id != null && String(userProfile.id) === video.author?.id)
 
     return (
       <div 
@@ -248,6 +251,7 @@ export default function VideoFeed() {
                 {video.author.name || 'Utilisateur'}
               </p>
             </div>
+            {!isOwnVideo && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -259,6 +263,7 @@ export default function VideoFeed() {
               <span className="hidden sm:inline">Contacter</span>
               <span className="sm:hidden">Chat</span>
             </button>
+            )}
           </div>
           
           {/* Title */}
