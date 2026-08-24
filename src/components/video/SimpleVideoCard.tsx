@@ -64,6 +64,9 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
   // Profil de l'utilisateur connecté
   const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
   const currentUserId = userProfile?.id || 'current-user-' + Date.now();
+  const isOwnVideo =
+    (userProfile?.username && author.username === userProfile.username) ||
+    (userProfile?.id != null && String(userProfile.id) === author.id);
 
   // Le profil affiche sur la carte est toujours l'auteur de la video
   const displayUser = {
@@ -156,6 +159,7 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
           </div>
 
           {/* Bouton Contacter - Plus petit */}
+          {!isOwnVideo && (
           <button
             onClick={handleContact}
             className="px-2 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium transition-all hover:opacity-90 active:scale-95 flex items-center gap-1"
@@ -164,6 +168,7 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
             <span className="hidden sm:inline">Contacter</span>
             <span className="sm:hidden">Chat</span>
           </button>
+          )}
         </div>
 
         {/* Titre - 1 ligne seulement */}

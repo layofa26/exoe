@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { UploadVideo } from '../video/UploadVideo'
 import CameraRecord from '../video/CameraRecord'
 import { getCurrentUserId } from '../../services/apiClient'
+import { requestApi } from '../../services/requestApi'
 
 interface NavItem {
   to: string
@@ -68,32 +69,20 @@ export const ProSidebar = (): JSX.Element | null => {
         return
       }
 
-      try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) return
+      const token = localStorage.getItem('accessToken')
+      if (!token) return
 
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
-        const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
-          ? API_BASE_URL.replace('/api', '/api/v1') 
-          : API_BASE_URL
-        const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const pendingCount = data.filter((r: any) =>
-            r.receiver === currentUserId && r.status === 'pending'
-          ).length
-          setNewRequestsCount(pendingCount)
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement des demandes:', error)
+      const result = await requestApi.getDemandes()
+      if (!result.success || !result.data) {
         setNewRequestsCount(0)
+        return
       }
+
+      const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+      const myUsername = storedProfile.username
+      setNewRequestsCount(
+        result.data.filter(r => r.receiver === myUsername && r.status === 'envoye').length
+      )
     }
 
     loadUnreadRequests()

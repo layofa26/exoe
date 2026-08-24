@@ -22,6 +22,7 @@ interface Skill {
 
 interface UserProfile {
   id?: string
+  userId?: string
   name?: string
   email?: string
   photo?: string
@@ -162,7 +163,25 @@ const Profile = () => {
       console.log('Current userId from localStorage fallback:', currentUserId)
     }
     
-    // Utiliser directement la liste complète
+    // Endpoint dedie au profil connecte (meme source que Parametres du compte)
+    try {
+      const meResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (meResponse.ok) {
+        const meData = await meResponse.json()
+        if (meData && meData.id) {
+          return meData
+        }
+      }
+    } catch (error) {
+      console.log('Error fetching /profil/profils/me/, trying list endpoint:', error)
+    }
+
+    // Fallback: liste complète filtrée sur l'utilisateur connecté
     console.log('Loading from list endpoint')
     const listResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
       headers: {
@@ -210,6 +229,7 @@ const Profile = () => {
     country: data.country,
     city: data.city,
     websites: data.website ? [data.website] : [],
+    name: data.full_name || data.username,
     fullName: data.full_name || data.username,
     avatarUrl: data.photo_url || data.photo,
     banner: data.banner_url || data.banner,
@@ -217,6 +237,9 @@ const Profile = () => {
     speciality: data.speciality || data.user_speciality,
     lastProfessionUpdate: data.last_profession_update || data.lastProfessionUpdate,
     skills: data.skills || [],
+    createdAt: data.date_joined || data.created_at,
+    date_joined: data.date_joined || data.created_at,
+    status: 'online',
     email: data.email || ''
   })
 
@@ -226,6 +249,7 @@ const Profile = () => {
     if (!backendProfile) return null
 
     const mapped = mapBackendProfile(backendProfile)
+    mapped.userId = backendProfile.user != null ? String(backendProfile.user) : undefined
     setProfile(mapped)
 
     const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
@@ -257,6 +281,33 @@ const Profile = () => {
 
         // Charger le profil depuis le backend
         const loadedProfile = await refreshProfile(token)
+
+        // Charger les statistiques videos de l'utilisateur connecte
+        if (loadedProfile?.userId) {
+          try {
+            const videosResponse = await fetch(`${API_BASE_URL}/accueil/videos/?owner=${loadedProfile.userId}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            if (videosResponse.ok) {
+              const videosData = await videosResponse.json()
+              const videos: any[] = videosData.results || videosData || []
+              setStatistics(prev => ({
+                ...prev,
+                videos: {
+                  total: videos.length,
+                  totalViews: videos.reduce((sum, v) => sum + (v.views || 0), 0),
+                  totalLikes: videos.reduce((sum, v) => sum + (v.likes || v.likes_count || 0), 0),
+                  totalComments: videos.reduce((sum, v) => sum + (v.comments || v.comments_count || 0), 0)
+                }
+              }))
+            }
+          } catch (error) {
+            console.error('Error loading video statistics:', error)
+          }
+        }
 
         if (!loadedProfile) {
           console.log('No profile data found, creating empty profile')
@@ -1155,7 +1206,7 @@ const Profile = () => {
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-xl p-3 sm:p-4`}>
             {/* Banner Section - YouTube style */}
             <div className="relative group mb-3 sm:mb-4">
-              <div className="w-full h-24 sm:h-32 md:h-40 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg overflow-hidden">
+              <div className="w-full h-28 sm:h-36 md:h-44 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-zinc-600 shadow-md">
                 {profile?.banner ? (
                   <img 
                     src={profile.banner} 
@@ -1164,8 +1215,8 @@ const Profile = () => {
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center">
-                    <span className="text-white text-xs sm:text-sm opacity-50">Ajouter une bannière</span>
-                    <span className="text-white text-[9px] sm:text-[10px] opacity-30 mt-1">Recommandé: 2560x1440px (PC) / 1546x423px (Mobile)</span>
+                    <span className="text-white text-sm sm:text-base font-medium opacity-80">Ajouter une bannière</span>
+                    <span className="text-white text-[10px] sm:text-xs opacity-60 mt-1">Recommandé: 2560x1440px (PC) / 1546x423px (Mobile)</span>
                   </div>
                 )}
               </div>
@@ -1187,7 +1238,7 @@ const Profile = () => {
             <div className="flex flex-col items-center gap-2 sm:gap-3 -mt-8 sm:-mt-10 md:-mt-12">
               {/* Photo centrée avec upload - chevauchant la bannière */}
               <div className="relative group">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl sm:text-2xl md:text-3xl font-bold overflow-hidden border-4 border-white dark:border-zinc-800 shadow-lg">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-bold overflow-hidden border-4 border-white dark:border-zinc-800 ring-2 ring-blue-500/60 shadow-xl">
                   {profile?.avatarUrl || profile?.photo_url || profile?.photo ? (
                     <img src={profile?.avatarUrl || profile?.photo_url || profile?.photo} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -1217,7 +1268,7 @@ const Profile = () => {
                 />
                 <div className={`mt-1.5 flex items-center justify-center gap-1 ${profile?.status === 'online' ? 'text-green-500' : 'text-gray-500'}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${profile?.status === 'online' ? 'bg-green-500' : 'bg-gray-500'}`} />
-                  <span className="text-[10px]">{profile?.status === 'online' ? 'En ligne' : 'Hors ligne'}</span>
+                  <span className="text-xs font-medium">{profile?.status === 'online' ? 'En ligne' : 'Hors ligne'}</span>
                 </div>
               </div>
 
@@ -1225,15 +1276,20 @@ const Profile = () => {
               <div className="text-center space-y-1.5 sm:space-y-2 w-full">
                 {/* Name */}
                 <div>
-                  <h2 className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile?.name || ''}
+                  <h2 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {profile?.name || profile?.fullName || profile?.username || 'Utilisateur'}
                   </h2>
+                  {profile?.username && (
+                    <p className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      {profile.username}
+                    </p>
+                  )}
                 </div>
 
                 {/* Profession */}
                 <div className="flex items-center justify-center gap-1.5">
-                  <Briefcase className={`w-3 h-3 md:w-4 md:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                  <span className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  <Briefcase className={`w-4 h-4 md:w-5 md:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                  <span className={`text-sm md:text-base font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {profile?.profession && profile?.speciality 
                       ? `${profile.profession} - ${profile.speciality}`
                       : profile?.profession || profile?.speciality || 'Non renseigné'}
@@ -1248,7 +1304,7 @@ const Profile = () => {
                   ) : (
                     <div className={`flex items-center gap-1 px-2 py-0.5 bg-gray-500/80 text-white rounded-full shadow-lg`}>
                       <Lock className={`w-2 h-2`} />
-                      <span className={`text-[8px]`}>Modifiable dans {getDaysUntilModification()}j</span>
+                      <span className={`text-[10px]`}>Modifiable dans {getDaysUntilModification()}j</span>
                     </div>
                   )}
                 </div>
@@ -1256,8 +1312,8 @@ const Profile = () => {
                 {/* Bio */}
                 <div>
                   <div className="flex items-center justify-center gap-1">
-                    <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                      {profile?.bio || ''}
+                    <p className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                      {profile?.bio || 'Aucune bio'}
                     </p>
                     <button
                       onClick={() => {
@@ -1273,30 +1329,19 @@ const Profile = () => {
 
                 {/* Location */}
                 <div className="flex items-center justify-center gap-1.5">
-                  <MapPin className={`w-3 h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                  <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                  <MapPin className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                  <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                     {profile?.city && profile?.country 
                       ? `${profile.city}, ${profile.country}`
                       : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
                   </span>
                 </div>
 
-
-                {/* Member since */}
-                {profile?.createdAt && (
-                  <div className="flex items-center justify-center gap-1.5">
-                    <Calendar className={`w-3 h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                      Membre depuis {profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : 'Date inconnue'}
-                    </span>
-                  </div>
-                )}
-
                 {/* Websites */}
                 <div className="flex flex-col items-center gap-1.5">
                   <div className="flex items-center gap-1.5">
-                    <Globe className={`w-3 h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                    <Globe className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                    <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                       Sites web
                     </span>
                     <button
@@ -1314,7 +1359,7 @@ const Profile = () => {
                           href={website}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`text-[10px] ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+                          className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
                         >
                           {website}
                         </a>
@@ -1362,19 +1407,21 @@ const Profile = () => {
                 </div>
 
                 {/* Member since */}
-                <div className="flex items-center justify-center gap-1.5">
-                  <Calendar className={`w-3 h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                  <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                    Membre depuis {profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString('fr-FR') : 'Date inconnue'}
-                  </span>
-                </div>
+                {profile?.date_joined && (
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Calendar className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                    <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                      Membre depuis {new Date(profile.date_joined).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Skills Section */}
             <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 dark:border-zinc-700">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <h3 className={`text-sm md:text-base font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                <h3 className={`text-base md:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                   Compétences
                 </h3>
                 {(profile?.skills || []).length < 10 && (
@@ -1472,7 +1519,7 @@ const Profile = () => {
           <div className="md:col-span-2 space-y-3 sm:space-y-4">
             {/* Statistics */}
             <div>
-              <h3 className={`text-sm sm:text-base font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Statistiques Globales
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
@@ -1490,11 +1537,11 @@ const Profile = () => {
                         stat.color === 'orange' ? 'text-orange-500' :
                         'text-pink-500'
                       }`} />
-                      <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      <span className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                         {stat.label}
                       </span>
                     </div>
-                    <p className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    <p className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       {stat.value}
                     </p>
                   </div>
@@ -1504,7 +1551,7 @@ const Profile = () => {
 
             {/* Quick Access */}
             <div>
-              <h3 className={`text-sm sm:text-base font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Accès Rapide
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
@@ -1515,7 +1562,7 @@ const Profile = () => {
                     className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border rounded-lg p-2 sm:p-3 flex flex-col items-center gap-1 sm:gap-1.5 transition-colors`}
                   >
                     <item.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    <span className={`text-[10px] sm:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    <span className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       {item.label}
                     </span>
                   </button>
@@ -1525,7 +1572,7 @@ const Profile = () => {
 
             {/* Recent Activity */}
             <div>
-              <h3 className={`text-sm sm:text-base font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Activité Récente
               </h3>
               <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg p-2 sm:p-3 space-y-1.5 sm:space-y-2`}>
@@ -1557,7 +1604,7 @@ const Profile = () => {
 
             {/* Badges */}
             <div>
-              <h3 className={`text-sm sm:text-base font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Badges et Récompenses
               </h3>
               <div className="flex flex-wrap gap-1.5 sm:gap-2">
