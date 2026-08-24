@@ -90,17 +90,31 @@ function App(): JSX.Element {
                            location.pathname.startsWith('/pro/calendar') ||
                            location.pathname.startsWith('/pro/settings')
   
+  // Cacher header et sous-module sur mobile pour page détails vidéo uniquement
+  const isVideoDetailPage = location.pathname.startsWith('/pro/video')
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const shouldHideHeaderOnVideoDetail = isMobile && isVideoDetailPage
+  const shouldHideHeaderOnMobileUpload = isMobile && isUploadingVideo
+
   // Always show main header for module navigation
   const showMainHeader = !isLiveRoom && !isNoHeaderPage
-
-  // Cacher header et prosidebar sur mobile lors upload vidéo uniquement
-  const isMobile = window.innerWidth < 1024
-  const shouldHideHeaderOnMobileUpload = isMobile && isUploadingVideo
 
   // Detekte si nou nan paj ki pa dwe gen SubHeader (events, requests, subscriptions)
   const isNoSubHeaderPage = location.pathname.startsWith('/pro/events') ||
                                location.pathname.startsWith('/pro/requests') ||
                                location.pathname.startsWith('/pro/subscriptions')
+  
+  // Cacher SubHeader sur mobile pour page détails vidéo
+  const shouldHideSubHeaderOnVideoDetail = isMobile && isVideoDetailPage
   
   // Detekte si modal upload video la louvri pou kache ProSidebar
   useEffect(() => {
@@ -181,16 +195,16 @@ function App(): JSX.Element {
       <ScrollToTop />
       <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 overflow-x-hidden">
       {/* Always show main header for module navigation between Pro and Social */}
-      {showMainHeader && !shouldHideHeaderOnMobileUpload && <Header />}
+      {showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <Header />}
 
       {/* Sidebar parèt sèlman si se yon wout Pro epi li pa nan yon Live epi li pa nan upload video epi li pa nan paj san header epi li pa nan video player */}
-      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoHeaderPage && !isVideoPlayerActive && !shouldHideHeaderOnMobileUpload && <ProSidebar />}
+      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoHeaderPage && !isVideoPlayerActive && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <ProSidebar />}
 
       {/* SocialSidebar parèt sèlman si se yon wout Social epi li pa nan mobile search */}
       {isSocialRoute && !isLiveRoom && <SocialSidebar />}
 
-      {/* SubHeader parèt sèlman si se yon wout Pro epi li pa nan yon Live epi li pa nan upload video epi li pa nan paj san header epi li pa nan video player epi li pa nan paj san SubHeader */}
-      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoHeaderPage && !isVideoPlayerActive && !isNoSubHeaderPage && <ProSubHeader />}
+      {/* SubHeader parèt sèlman si se yon wout Pro epi li pa nan yon Live epi li pa nan upload video epi li pa nan paj san header epi li pa nan video player epi li pa nan paj san SubHeader epi li pa nan page détails vidéo sur mobile */}
+      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoHeaderPage && !isVideoPlayerActive && !isNoSubHeaderPage && !shouldHideSubHeaderOnVideoDetail && <ProSubHeader />}
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-y-auto">

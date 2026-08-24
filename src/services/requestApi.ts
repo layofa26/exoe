@@ -79,6 +79,7 @@ export const requestApi = {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        console.error('Backend error details:', errorData)
         const fieldError = Array.isArray(errorData.receiver) ? errorData.receiver[0] : errorData.receiver
         throw new Error(fieldError || errorData.detail || errorData.message || `Erreur HTTP: ${response.status}`)
       }

@@ -129,7 +129,7 @@ export const Requests = (): JSX.Element => {
         setCurrentUserId(userId)
         
         // Fetch requests from backend
-        const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/`, {
+        const response = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -145,12 +145,12 @@ export const Requests = (): JSX.Element => {
         // Transform backend data to frontend format
         const transformedRequests: Request[] = data.map((item: any) => ({
           id: item.id,
-          senderId: item.sender,
-          senderName: item.sender, // Backend returns username
+          senderId: item.sender_id || (item.sender?.id),
+          senderName: item.sender?.username || item.sender,
           senderAvatar: null,
           senderProfession: 'Professionnel',
-          receiverId: item.receiver,
-          receiverName: item.receiver, // Backend returns username
+          receiverId: item.receiver_id || (item.receiver?.id),
+          receiverName: item.receiver?.username || item.receiver,
           receiverAvatar: null,
           receiverProfession: 'Professionnel',
           message: item.message,
@@ -275,7 +275,7 @@ export const Requests = (): JSX.Element => {
       
       const newStatus = action === 'accept' ? 'accepte' : 'refuse'
       
-      const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/${requestId}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -312,7 +312,7 @@ export const Requests = (): JSX.Element => {
         return
       }
       
-      const response = await fetch(`${FINAL_API_BASE_URL}/demande/demandes/${requestId}/`, {
+      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

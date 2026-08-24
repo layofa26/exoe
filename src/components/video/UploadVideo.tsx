@@ -3,6 +3,7 @@ import { Upload, X, Loader2, AlertCircle, CheckCircle, Edit3 } from 'lucide-reac
 import { videoApi } from '../../services/videoApi'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { VideoEditor } from './VideoEditor'
+import { useNavigate } from 'react-router-dom'
 
 interface VideoFilters {
   brightness: number
@@ -23,6 +24,7 @@ interface UploadVideoProps {
 
 export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSuccess }: UploadVideoProps): JSX.Element => {
   const { showSuccess, showError } = useNotifications()
+  const navigate = useNavigate()
   
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -202,6 +204,12 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
 
       if (result.success) {
         showSuccess('Vidéo publiée', 'Votre vidéo est disponible dans votre fil professionnel.')
+        
+        // Naviguer vers la page de détails de la vidéo
+        if (result.data?.id) {
+          navigate(`/pro/video/${result.data.id}`)
+        }
+
         setTitle('')
         setDescription('')
         setVisibility('public')
@@ -237,7 +245,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-700 p-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Upload une vidéo</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Video details</h2>
               <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full transition-colors">
                 <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>

@@ -138,36 +138,32 @@ const Profile = () => {
   const bannerInputRef = useRef<HTMLInputElement>(null)
   const { showProfileUpdated } = useNotifications()
 
-  // Helper function pour récupérer le profil avec fallback
+  // Helper function pour récupérer le profil
   const getProfileWithFallback = async (token: string) => {
-    console.log('Getting profile with fallback...')
+    console.log('Getting profile...')
     
-    // Essayer d'abord l'endpoint /me/
+    // Récupérer l'utilisateur connecté depuis l'API
+    let currentUserId: string | null = null
     try {
-      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+      const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
-
-      console.log('/me/ response status:', response.status)
-      
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Profile received from /me/:', data)
-        return data
-      } else if (response.status === 404) {
-        console.log('/me/ endpoint not found (404), falling back to list endpoint')
-      } else {
-        throw new Error(`Erreur HTTP: ${response.status}`)
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        currentUserId = userData.id?.toString()
+        console.log('Current userId from API:', currentUserId)
       }
     } catch (error) {
-      console.log('Error with /me/ endpoint, falling back to list endpoint:', error)
+      console.log('Error fetching user from API, trying localStorage fallback:', error)
+      currentUserId = localStorage.getItem('userId')
+      console.log('Current userId from localStorage fallback:', currentUserId)
     }
-
-    // Fallback: utiliser la liste complète
-    console.log('Trying fallback: loading from list endpoint')
+    
+    // Utiliser directement la liste complète
+    console.log('Loading from list endpoint')
     const listResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -184,22 +180,23 @@ const Profile = () => {
     const data = await listResponse.json()
     console.log('Profile list data received:', data)
     
-    // Chercher le profil de l'utilisateur connecté (jamais un profil d'un autre utilisateur)
-    const storedUser = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-    const currentUserId = localStorage.getItem('userId') || (storedUser?.id != null ? String(storedUser.id) : null)
-    const currentUsername = storedUser?.username || localStorage.getItem('exile_username')
-    const isMine = (p: any) =>
-      (currentUserId && p.user?.toString() === currentUserId) ||
-      (currentUsername && p.username === currentUsername)
-
+    // Chercher le profil de l'utilisateur connecté
     if (data.results && data.results.length > 0) {
-      return data.results.find(isMine) || null
+      console.log('Data has results array with', data.results.length, 'items')
+      const foundProfile = data.results.find((p: any) => p.user?.toString() === currentUserId)
+      console.log('Found profile by userId:', foundProfile)
+      return foundProfile || data.results[0]
     } else if (Array.isArray(data) && data.length > 0) {
-      return data.find(isMine) || null
+      console.log('Data is array with', data.length, 'items')
+      const foundProfile = data.find((p: any) => p.user?.toString() === currentUserId)
+      console.log('Found profile by userId:', foundProfile)
+      return foundProfile || data[0]
     } else if (data.id) {
+      console.log('Data has id:', data.id)
       return data
     }
     
+    console.log('No profile found, returning null')
     return null
   }
 
@@ -441,7 +438,14 @@ const Profile = () => {
           }
         }
 
-        const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        // Récupérer le profil existant pour avoir son ID
+        const existingProfile = await getProfileWithFallback(token)
+        if (!existingProfile) {
+          alert('Impossible de récupérer votre profil')
+          return
+        }
+
+        const response = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -667,8 +671,8 @@ const Profile = () => {
 
         console.log('Updating profile with FormData...')
         
-        // Utiliser l'endpoint custom /me/ pour éviter les problèmes de permission
-        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        // Utiliser l'endpoint direct avec l'ID du profil
+        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -829,7 +833,7 @@ const Profile = () => {
 
       console.log('Updating profile with banner...')
       
-      const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+      const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -892,7 +896,7 @@ const Profile = () => {
         console.log('Updating existing profile with bio:', newBio)
         console.log('Existing profile data:', existingProfile)
         
-        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -961,7 +965,7 @@ const Profile = () => {
         console.log('Updating existing profile with website:', formattedWebsite)
         console.log('Existing profile data:', existingProfile)
         
-        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1013,7 +1017,7 @@ const Profile = () => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+      const response = await fetch(`${API_BASE_URL}/profil/profils/${profile.id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

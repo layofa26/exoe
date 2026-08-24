@@ -41,7 +41,7 @@ const ProSubHeader = (): JSX.Element | null => {
   }
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 fixed top-[56px] sm:top-[64px] left-0 right-0 z-[90] w-full">
+    <div className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">
       <div className="w-full px-3 sm:px-4 py-2 sm:py-3">
         <div className="flex flex-row items-center gap-2 sm:gap-3">
           {/* Gauche: Bouton Créer avec menu déroulant - Desktop uniquement (lg+) */}
