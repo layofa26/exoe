@@ -255,7 +255,7 @@ export default function VideoFeed() {
 
     return (
       <div 
-        className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shadow-sm flex flex-col`}
+        className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} lg:rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shadow-sm flex flex-col`}
         onClick={onClick}
       >
         {/* Video Thumbnail/Player - toujours en premier avec hauteur cohérente */}
@@ -514,8 +514,8 @@ export default function VideoFeed() {
 
         {/* Mobile/Tablette: Videyo - Design selon l'image de référence */}
         <div className="lg:hidden">
-          <div className="px-4 py-4 mt-[120px] sm:mt-[128px]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
+          <div className="py-4 mt-4">
+            <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 sm:gap-4 md:grid-cols-2 md:gap-4">
               {loading ? (
                 <div className="col-span-full py-12 text-center">
                   <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
@@ -569,9 +569,9 @@ export default function VideoFeed() {
           {/* Kolon GOUCH - Videyo yo (Desktop) */}
           <div className="flex-1 min-w-0 pr-80">
             {/* Kontenè videyo a - kole pi pre header la */}
-            <div className="px-4 md:px-6 lg:px-8 pb-6 mt-0">
+            <div className="px-4 md:px-6 lg:px-8 pb-6 mt-4">
               {/* Grid videyo - Desktop: 3 cols */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mt-32">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
                 {loading ? (
                   <div className="col-span-full py-12 text-center">
                     <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
