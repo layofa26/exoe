@@ -289,6 +289,8 @@ export const Requests = (): JSX.Element => {
         throw new Error(errorData.error || errorData.detail || 'Failed to respond to request')
       }
       
+      const responseData = await response.json()
+      
       // Update local state
       setRequests(requests.map(req => 
         req.id === requestId 
@@ -299,7 +301,13 @@ export const Requests = (): JSX.Element => {
       setToast(action === 'accept' ? 'Demande acceptée' : 'Demande refusée')
       setTimeout(() => setToast(''), 3000)
       
-      // Reload requests to get updated data
+      // If accepted and conversation was created, navigate to conversation
+      if (action === 'accept' && responseData.conversation_id) {
+        navigate(`/pro/conversation/${responseData.conversation_id}`)
+        return
+      }
+      
+      // Reload requests to get updated data (if not navigating away)
       const reloadResponse = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -323,6 +331,7 @@ export const Requests = (): JSX.Element => {
           status: item.status === 'envoye' ? 'pending' : 
                  item.status === 'accepte' ? 'accepted' : 
                  item.status === 'refuse' ? 'rejected' : 
+                 item.status === 'annule' ? 'cancelled' :
                  item.status === 'bloque' ? 'expired' : 'pending',
           createdAt: item.created_at,
           respondedAt: undefined
