@@ -36,7 +36,7 @@ export interface Demande {
 }
 
 export interface CreateDemandeRequest {
-  receiver: string
+  receiver_username: string
   message: string
 }
 
@@ -72,7 +72,7 @@ export const requestApi = {
       const response = await demandeFetch('/', {
         method: 'POST',
         body: JSON.stringify({
-          receiver: request.receiver,
+          receiver_username: request.receiver_username,
           message: request.message
         })
       })

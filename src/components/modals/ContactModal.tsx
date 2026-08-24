@@ -55,7 +55,7 @@ export const ContactModal = ({
     setIsSubmitting(true)
     
     const request: CreateDemandeRequest = {
-      receiver: receiver.username || receiver.name, // Backend identifie le destinataire par username
+      receiver_username: receiver.username || receiver.name, // Backend identifie le destinataire par username
       message: message.trim()
     }
 
