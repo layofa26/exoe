@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { ContactModal } from '../../components/modals/ContactModal';
 import EntrepriseEnVedette from '../../pages/PUB/EntrepriseEnVedette';
+import { VideoPoster } from '../../components/video/VideoPoster';
 
 export default function VideoFeed() {
   const { resolvedTheme } = useTheme()
@@ -197,61 +198,6 @@ export default function VideoFeed() {
 
     const thumbnailUrl = getThumbnailUrl()
     const videoUrl = getVideoUrl()
-    const playerRef = useRef<any>(null)
-    const videoElRef = useRef<HTMLVideoElement | null>(null)
-    const containerRef = useRef<HTMLDivElement>(null)
-    const [isPlayerReady, setIsPlayerReady] = useState(false)
-
-    // Initialiser Video.js uniquement quand l'élément est dans le DOM
-    useEffect(() => {
-      console.log('VideoCardWithInfo useEffect:', { videoId: video.id, videoUrl, thumbnailUrl, hasRef: !!videoElRef.current, hasPlayer: !!playerRef.current })
-      
-      if (videoElRef.current && videoUrl && !playerRef.current) {
-        console.log('Initializing Video.js for video:', video.id)
-        import('video.js').then((videojs) => {
-          if (videoElRef.current && !playerRef.current) {
-            console.log('Creating Video.js player')
-            playerRef.current = videojs.default(videoElRef.current, {
-              src: videoUrl,
-              type: video.mimeType,
-              poster: thumbnailUrl || undefined,
-              controls: false,
-              autoplay: false,
-              preload: 'metadata',
-              fluid: false,
-              responsive: false,
-              fill: true,
-              muted: true,
-              bigPlayButton: false,
-            })
-
-            // Capture une frame pour thumbnail
-            if (playerRef.current) {
-              playerRef.current.ready(() => {
-                console.log('Video.js player ready for video:', video.id)
-                setIsPlayerReady(true)
-                playerRef.current.currentTime(0.1)
-              })
-            }
-          }
-        }).catch(err => {
-          console.error('Error loading video.js:', err)
-        })
-      }
-
-      return () => {
-        console.log('Cleaning up Video.js player for video:', video.id)
-        if (playerRef.current) {
-          try {
-            playerRef.current.dispose()
-          } catch (e) {
-            console.error('Error disposing player:', e)
-          }
-          playerRef.current = null
-        }
-        setIsPlayerReady(false)
-      }
-    }, [videoUrl, thumbnailUrl, video.mimeType, video.id])
 
     return (
       <div 
@@ -259,24 +205,9 @@ export default function VideoFeed() {
         onClick={onClick}
       >
         {/* Video Thumbnail/Player - toujours en premier avec hauteur cohérente */}
-        <div ref={containerRef} className="relative w-full aspect-video bg-gray-200 dark:bg-gray-700 overflow-hidden">
-          {videoUrl ? (
-            <div className="absolute inset-0">
-              <video
-                ref={videoElRef}
-                className="video-js vjs-big-play-centered w-full h-full object-cover"
-                playsInline
-              />
-            </div>
-          ) : thumbnailUrl ? (
-            <img
-              src={thumbnailUrl}
-              alt={video.title}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
+        <div className="relative w-full aspect-video bg-gray-200 dark:bg-gray-700 overflow-hidden">
+          {thumbnailUrl || videoUrl ? (
+            <VideoPoster thumbnail={thumbnailUrl || undefined} videoUrl={videoUrl || undefined} title={video.title} />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
@@ -639,6 +570,7 @@ export default function VideoFeed() {
           receiver={{
             id: selectedVideoForContact.author?.id || 'unknown',
             name: selectedVideoForContact.author?.name || 'Inconnu',
+            username: selectedVideoForContact.author?.username,
             avatar: selectedVideoForContact.author?.avatarUrl || null,
             profession: selectedVideoForContact.author?.profession || 'Professionnel'
           }}

@@ -71,6 +71,7 @@ export const mapApiVideo = (apiVideo: Video): FeedVideo => {
     author: {
       id: authorId,
       name: authorName,
+      username: apiVideo.owner_username,
       profession: 'Professionnel',
       location: '',
       initials: authorName.charAt(0).toUpperCase(),
