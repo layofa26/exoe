@@ -125,7 +125,7 @@ export const Requests = (): JSX.Element => {
         
         // Decode token to get user ID
         const tokenPayload = JSON.parse(atob(token.split('.')[1]))
-        const userId = tokenPayload.user_id
+        const userId = String(tokenPayload.user_id)
         setCurrentUserId(userId)
         
         // Fetch all requests from backend (no type filtering)
@@ -145,11 +145,11 @@ export const Requests = (): JSX.Element => {
         // Transform backend data to frontend format
         const transformedRequests: Request[] = data.map((item: any) => ({
           id: item.id,
-          senderId: item.sender_id || (item.sender?.id),
+          senderId: String(item.sender_id || (item.sender?.id)),
           senderName: item.sender?.username || item.sender,
           senderAvatar: null,
           senderProfession: 'Professionnel',
-          receiverId: item.receiver_id || (item.receiver?.id),
+          receiverId: String(item.receiver_id || (item.receiver?.id)),
           receiverName: item.receiver?.username || item.receiver,
           receiverAvatar: null,
           receiverProfession: 'Professionnel',
@@ -319,11 +319,11 @@ export const Requests = (): JSX.Element => {
         const data = await reloadResponse.json()
         const transformedRequests: Request[] = data.map((item: any) => ({
           id: item.id,
-          senderId: item.sender_id || (item.sender?.id),
+          senderId: String(item.sender_id || (item.sender?.id)),
           senderName: item.sender?.username || item.sender,
           senderAvatar: null,
           senderProfession: 'Professionnel',
-          receiverId: item.receiver_id || (item.receiver?.id),
+          receiverId: String(item.receiver_id || (item.receiver?.id)),
           receiverName: item.receiver?.username || item.receiver,
           receiverAvatar: null,
           receiverProfession: 'Professionnel',
@@ -388,11 +388,11 @@ export const Requests = (): JSX.Element => {
         const data = await reloadResponse.json()
         const transformedRequests: Request[] = data.map((item: any) => ({
           id: item.id,
-          senderId: item.sender_id || (item.sender?.id),
+          senderId: String(item.sender_id || (item.sender?.id)),
           senderName: item.sender?.username || item.sender,
           senderAvatar: null,
           senderProfession: 'Professionnel',
-          receiverId: item.receiver_id || (item.receiver?.id),
+          receiverId: String(item.receiver_id || (item.receiver?.id)),
           receiverName: item.receiver?.username || item.receiver,
           receiverAvatar: null,
           receiverProfession: 'Professionnel',
@@ -461,6 +461,15 @@ export const Requests = (): JSX.Element => {
       (activeTab === 'all' || activeTab === 'received' || activeTab === 'accepted'
         ? request.senderName.toLowerCase().includes(searchQuery.toLowerCase()) || request.receiverName.toLowerCase().includes(searchQuery.toLowerCase())
         : request.receiverName.toLowerCase().includes(searchQuery.toLowerCase()))
+    
+    // Debug logging
+    if (activeTab === 'received' && request.status === 'pending') {
+      console.log('Received request check:', {
+        requestReceiverId: request.receiverId,
+        currentUserId: currentUserId,
+        match: request.receiverId === currentUserId
+      })
+    }
     
     return matchesTab && matchesSearch
   })
