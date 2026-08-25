@@ -161,26 +161,41 @@ const Settings = () => {
       const token = localStorage.getItem('accessToken')
       if (!token) return
 
-      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+      // Récupérer d'abord l'ID utilisateur
+      const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      let currentUserId = null
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        currentUserId = userData.id?.toString()
+      }
+
+      // Utiliser l'endpoint standard avec filtre user
+      const response = await fetch(`${API_BASE_URL}/profil/profils/?user=${currentUserId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
       if (response.ok) {
         const data = await response.json()
-        const fullName: string = data.full_name || ''
-        const [firstName, ...rest] = fullName.split(' ')
-        setProfileData({
-          firstName: firstName || '',
-          lastName: rest.join(' '),
-          username: data.username || '',
-          profession: data.profession || data.user_profession || '',
-          bio: data.bio || '',
-          city: data.city || data.location || '',
-          country: data.country || '',
-          website: data.website || '',
-          skills: data.skills?.map((skill: any) => skill.name) || []
-        })
-        setLastProfessionUpdate(data.last_profession_update || null)
+        const profileData = data.results && data.results.length > 0 ? data.results[0] : (Array.isArray(data) && data.length > 0 ? data[0] : null)
+        
+        if (profileData) {
+          const fullName: string = profileData.full_name || ''
+          const [firstName, ...rest] = fullName.split(' ')
+          setProfileData({
+            firstName: firstName || '',
+            lastName: rest.join(' '),
+            username: profileData.username || '',
+            profession: profileData.profession || profileData.user_profession || '',
+            bio: profileData.bio || '',
+            city: profileData.city || profileData.location || '',
+            country: profileData.country || '',
+            website: profileData.website || '',
+            skills: profileData.skills?.map((skill: any) => skill.name) || []
+          })
+          setLastProfessionUpdate(profileData.last_profession_update || null)
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error)
@@ -194,6 +209,36 @@ const Settings = () => {
   // Handler pour l'édition du profil
   const handleProfileEdit = async () => {
     try {
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        alert('Token non trouvé. Veuillez vous reconnecter.')
+        return
+      }
+
+      // Récupérer l'ID du profil
+      const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      let currentUserId = null
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        currentUserId = userData.id?.toString()
+      }
+
+      const profileResponse = await fetch(`${API_BASE_URL}/profil/profils/?user=${currentUserId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!profileResponse.ok) {
+        throw new Error('Erreur lors de la récupération du profil')
+      }
+      const profileData = await profileResponse.json()
+      const profile = profileData.results && profileData.results.length > 0 ? profileData.results[0] : (Array.isArray(profileData) && profileData.length > 0 ? profileData[0] : null)
+      
+      if (!profile) {
+        alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
+        return
+      }
+
       const updateData = {
         full_name: `${profileData.firstName} ${profileData.lastName}`.trim(),
         ...(canModifyProfession(lastProfessionUpdate) ? { profession: profileData.profession } : {}),
@@ -204,13 +249,7 @@ const Settings = () => {
         website: profileData.website
       }
 
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+      const response = await fetch(`${API_BASE_URL}/profil/profils/${profile.id}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -223,7 +262,7 @@ const Settings = () => {
         const updated = await response.json().catch(() => null)
         syncStoredProfile(updated)
         alert('Profil mis à jour avec succès')
-        window.location.reload()
+        loadProfile()
       } else {
         throw new Error('Erreur lors de la mise à jour')
       }
@@ -264,35 +303,77 @@ const Settings = () => {
     if (!uploadedPhoto) return
 
     try {
-      // Convertir base64 en blob
-      const photoResponse = await fetch(uploadedPhoto)
-      const blob = await photoResponse.blob()
-      const formData = new FormData()
-      formData.append('photo', blob, 'photo.jpg')
-
       const token = localStorage.getItem('accessToken')
       if (!token) {
         alert('Token non trouvé. Veuillez vous reconnecter.')
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
+      // Récupérer l'ID du profil
+      const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      let currentUserId = null
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        currentUserId = userData.id?.toString()
+      }
+
+      const profileResponse = await fetch(`${API_BASE_URL}/profil/profils/?user=${currentUserId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!profileResponse.ok) {
+        throw new Error('Erreur lors de la récupération du profil')
+      }
+      const profileData = await profileResponse.json()
+      const profile = profileData.results && profileData.results.length > 0 ? profileData.results[0] : (Array.isArray(profileData) && profileData.length > 0 ? profileData[0] : null)
+      
+      if (!profile) {
+        alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
+        return
+      }
+
+      // Convertir base64 en blob
+      const photoResponse = await fetch(uploadedPhoto)
+      const blob = await photoResponse.blob()
+      const formData = new FormData()
+      formData.append('photo', blob, 'photo.jpg')
+
+      console.log('Uploading photo to profile ID:', profile.id)
+
+      const response = await fetch(`${API_BASE_URL}/profil/profils/${profile.id}/`, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       })
 
+      console.log('Photo upload response status:', response.status)
+
       if (response.ok) {
         const updated = await response.json().catch(() => null)
+        console.log('Photo upload response:', updated)
+        
+        // Vérifier que le backend retourne photo_url
+        if (!updated.photo && !updated.photo_url) {
+          console.error('Backend did not return photo or photo_url after upload')
+          alert('Erreur: Le backend n\'a pas retourné l\'URL de la photo après l\'upload')
+          return
+        }
+
         syncStoredProfile(updated)
         alert('Photo de profil mise à jour avec succès')
         loadProfile()
+        setShowPhotoUploadModal(false)
+        setUploadedPhoto('')
+        setPhotoPreview('')
       } else {
-        throw new Error('Erreur lors de l\'upload')
+        const errorText = await response.text()
+        console.error('Photo upload error:', errorText)
+        throw new Error(`Erreur lors de l'upload: ${response.status} - ${errorText}`)
       }
     } catch (error) {
       console.error('Error uploading photo:', error)
-      alert('Erreur lors de l\'upload de la photo')
+      alert(`Erreur lors de l'upload de la photo: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
   }
 
