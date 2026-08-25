@@ -735,7 +735,11 @@ const Profile = () => {
       // Mettre à jour immédiatement l'état du profil avec les données retournées par l'API
       const bannerUrl = updatedData.banner_url || updatedData.banner
       if (bannerUrl) {
-        setProfile(prev => prev ? { ...prev, banner: bannerUrl } : null)
+        setProfile(prev => prev ? { 
+          ...prev, 
+          banner: bannerUrl,
+          banner_url: updatedData.banner_url || bannerUrl
+        } : null)
         console.log('Profile state updated with banner URL:', bannerUrl)
       }
 
@@ -1051,13 +1055,14 @@ const Profile = () => {
                     bannerUrlValue: profile?.banner_url,
                     imageCacheBuster
                   })
-                  return profile?.banner ? (
+                  const bannerUrl = profile?.banner_url || profile?.banner
+                  return bannerUrl ? (
                     <img 
-                      src={`${profile.banner}?t=${imageCacheBuster}`} 
+                      src={bannerUrl} 
                       alt="Banner" 
                       className="w-full h-full object-cover"
                       onLoad={() => console.log('Banner image loaded successfully')}
-                      onError={(e) => console.error('Banner image failed to load:', e)}
+                      onError={(e) => console.error('Banner image failed to load:', e.currentTarget.src)}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center">
