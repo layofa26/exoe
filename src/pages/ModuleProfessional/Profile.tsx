@@ -678,6 +678,13 @@ const Profile = () => {
       }
 
       console.log('Updating profile banner...')
+      console.log('Current profile:', profile)
+      console.log('Profile ID:', profile?.id)
+      
+      if (!profile?.id) {
+        alert('Profil non trouvé. Veuillez recharger la page.')
+        return
+      }
       
       // Convertir base64 en blob
       const response = await fetch(uploadedBanner)
