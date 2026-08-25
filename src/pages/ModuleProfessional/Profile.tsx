@@ -9,6 +9,15 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { getCurrentUserId } from '../../services/apiClient'
+import { 
+  getProfileWithFallback, 
+  mapBackendProfile, 
+  syncStoredProfile,
+  canModifyProfession,
+  getDaysUntilProfessionModification,
+  canModifyPhoto,
+  getDaysUntilPhotoModification
+} from '../../hooks/useProfileUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -117,6 +126,7 @@ const Profile = () => {
   const [error, setError] = useState<string | null>(null)
   const [statistics, setStatistics] = useState<UserStatistics | null>(null)
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
+  const [imageCacheBuster, setImageCacheBuster] = useState(Date.now())
 
   const [showProfessionModal, setShowProfessionModal] = useState(false)
   const [showSkillModal, setShowSkillModal] = useState(false)
@@ -139,110 +149,6 @@ const Profile = () => {
   const bannerInputRef = useRef<HTMLInputElement>(null)
   const { showProfileUpdated } = useNotifications()
 
-  // Helper function pour récupérer le profil
-  const getProfileWithFallback = async (token: string) => {
-    console.log('Getting profile...')
-    
-    // Récupérer l'utilisateur connecté depuis l'API
-    let currentUserId: string | null = null
-    try {
-      const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        currentUserId = userData.id?.toString()
-        console.log('Current userId from API:', currentUserId)
-      }
-    } catch (error) {
-      console.log('Error fetching user from API, trying localStorage fallback:', error)
-      currentUserId = localStorage.getItem('userId')
-      console.log('Current userId from localStorage fallback:', currentUserId)
-    }
-    
-    // Endpoint dedie au profil connecte (meme source que Parametres du compte)
-    try {
-      const meResponse = await fetch(`${API_BASE_URL}/profil/profils/me/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      if (meResponse.ok) {
-        const meData = await meResponse.json()
-        if (meData && meData.id) {
-          return meData
-        }
-      }
-    } catch (error) {
-      console.log('Error fetching /profil/profils/me/, trying list endpoint:', error)
-    }
-
-    // Fallback: liste complète filtrée sur l'utilisateur connecté
-    console.log('Loading from list endpoint')
-    const listResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    console.log('List response status:', listResponse.status)
-    
-    if (!listResponse.ok) {
-      throw new Error(`Erreur HTTP: ${listResponse.status}`)
-    }
-
-    const data = await listResponse.json()
-    console.log('Profile list data received:', data)
-    
-    // Chercher le profil de l'utilisateur connecté
-    if (data.results && data.results.length > 0) {
-      console.log('Data has results array with', data.results.length, 'items')
-      const foundProfile = data.results.find((p: any) => p.user?.toString() === currentUserId)
-      console.log('Found profile by userId:', foundProfile)
-      return foundProfile || data.results[0]
-    } else if (Array.isArray(data) && data.length > 0) {
-      console.log('Data is array with', data.length, 'items')
-      const foundProfile = data.find((p: any) => p.user?.toString() === currentUserId)
-      console.log('Found profile by userId:', foundProfile)
-      return foundProfile || data[0]
-    } else if (data.id) {
-      console.log('Data has id:', data.id)
-      return data
-    }
-    
-    console.log('No profile found, returning null')
-    return null
-  }
-
-  // Mapping unique backend -> UI (evite que des champs restent aux anciennes valeurs)
-  const mapBackendProfile = (data: any): UserProfile => ({
-    id: data.id,
-    username: data.username,
-    photo: data.photo_url || data.photo,
-    bio: data.bio,
-    location: data.location,
-    country: data.country,
-    city: data.city,
-    websites: data.website ? [data.website] : [],
-    name: data.full_name || data.username,
-    fullName: data.full_name || data.username,
-    avatarUrl: data.photo_url || data.photo,
-    banner: data.banner_url || data.banner,
-    profession: data.profession || data.user_profession,
-    speciality: data.speciality || data.user_speciality,
-    lastProfessionUpdate: data.last_profession_update || data.lastProfessionUpdate,
-    skills: data.skills || [],
-    createdAt: data.date_joined || data.created_at,
-    date_joined: data.date_joined || data.created_at,
-    status: 'online',
-    email: data.email || ''
-  })
-
   // Recharge le profil depuis le backend et synchronise le profil local
   const refreshProfile = async (token: string): Promise<UserProfile | null> => {
     const backendProfile = await getProfileWithFallback(token)
@@ -252,15 +158,7 @@ const Profile = () => {
     mapped.userId = backendProfile.user != null ? String(backendProfile.user) : undefined
     setProfile(mapped)
 
-    const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-    localStorage.setItem('exile_user_profile', JSON.stringify({
-      ...storedProfile,
-      id: backendProfile.user != null ? String(backendProfile.user) : storedProfile.id,
-      username: mapped.username,
-      name: mapped.fullName,
-      photo: mapped.avatarUrl || null,
-      profession: mapped.profession || ''
-    }))
+    syncStoredProfile(backendProfile)
 
     return mapped
   }
@@ -413,50 +311,9 @@ const Profile = () => {
     loadProfile();
   }, [navigate])
 
-  // Vérifier si la profession est modifiable (après 30 jours)
-  const canModifyProfession = () => {
-    // Si pas de date de dernière modification, considérer comme modifiable (nouveau compte)
-    if (!profile?.lastProfessionUpdate) return true
-    
-    const lastUpdate = new Date(profile.lastProfessionUpdate)
-    const now = new Date()
-    const daysSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24)
-    return daysSinceUpdate >= 30
-  }
-
-  // Vérifier si la photo est modifiable (après 30 jours)
-  const canModifyPhoto = () => {
-    // Si pas de date de dernière modification, considérer comme modifiable (nouveau compte)
-    if (!profile?.photoLastModified) return true
-    
-    const lastUpdate = new Date(profile.photoLastModified)
-    const now = new Date()
-    const daysSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24)
-    return daysSinceUpdate >= 30
-  }
-
-  // Calculer les jours restants avant modification de la photo
-  const getDaysUntilPhotoModification = () => {
-    // Si pas de date de dernière modification, retourner 0 (modifiable immédiatement)
-    if (!profile?.photoLastModified) return 0
-    
-    const lastUpdate = new Date(profile.photoLastModified)
-    const now = new Date()
-    const daysSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24)
-    const daysRemaining = 30 - daysSinceUpdate
-    return Math.max(0, Math.ceil(daysRemaining))
-  }
-
   // Calculer les jours restants avant modification
   const getDaysUntilModification = () => {
-    // Si pas de date de dernière modification, retourner 0 (modifiable immédiatement)
-    if (!profile?.lastProfessionUpdate) return 0
-    
-    const lastUpdate = new Date(profile.lastProfessionUpdate)
-    const now = new Date()
-    const daysSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24)
-    const daysRemaining = 30 - daysSinceUpdate
-    return Math.max(0, Math.ceil(daysRemaining))
+    return getDaysUntilProfessionModification(profile?.lastProfessionUpdate)
   }
 
   const getDaysSinceLastProfessionUpdate = (lastUpdate?: string): number => {
@@ -650,14 +507,14 @@ const Profile = () => {
       console.log('Updating profile photo...')
       console.log('Uploaded image type:', typeof uploadedImage)
       console.log('Uploaded image length:', uploadedImage?.length)
-      
+
       // Convertir base64 en blob
       const response = await fetch(uploadedImage)
       const blob = await response.blob()
       const file = new File([blob], 'profile.jpg', { type: 'image/jpeg' })
-      
+
       console.log('File created:', file.name, file.size, file.type)
-      
+
       // Récupérer d'abord le profil existant
       const existingProfile = await getProfileWithFallback(token)
       console.log('Get profile data:', existingProfile)
@@ -670,30 +527,10 @@ const Profile = () => {
         formData.append('bio', profile.bio || '')
         formData.append('location', profile.location || '')
         formData.append('website', profile.websites?.[0] || '')
-        
+
         // Récupérer l'ID de l'utilisateur
         const userId = localStorage.getItem('exile_user_id')
-        if (!userId) {
-          // Si pas d'ID en localStorage, essayer de le récupérer depuis l'API users
-          const userResponse = await fetch(`${API_BASE_URL}/users/profile/`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          if (userResponse.ok) {
-            const userData = await userResponse.json()
-            formData.append('user', userData.id)
-          } else {
-            throw new Error('Impossible de récupérer l\'ID utilisateur')
-          }
-        } else {
-          formData.append('user', userId)
-        }
 
-        console.log('Creating profile with FormData...')
-        console.log('User ID:', userId)
-        
         const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
           method: 'POST',
           headers: {
@@ -745,6 +582,9 @@ const Profile = () => {
       setShowCropModal(false)
       setUploadedImage('')
       showProfileUpdated()
+
+      // Update cache buster to force image refresh
+      setImageCacheBuster(Date.now())
 
       // Recharger le profil depuis le backend au lieu de recharger la page
       await refreshProfile(token)
@@ -846,46 +686,14 @@ const Profile = () => {
       
       console.log('Banner file created:', file.name, file.size, file.type)
       
-      // Récupérer d'abord le profil existant ou le créer
-      let existingProfile = await getProfileWithFallback(token)
-      console.log('Get profile data:', existingProfile)
-
-      if (!existingProfile) {
-        // Créer le profil s'il n'existe pas
-        console.log('Creating new profile...')
-        const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            bio: '',
-            location: '',
-            website: ''
-          })
-        })
-
-        if (createResponse.ok) {
-          existingProfile = await createResponse.json()
-          console.log('Profile created:', existingProfile)
-        } else {
-          alert('Erreur lors de la création du profil.')
-          return
-        }
-      }
-
-      // Mettre à jour le profil existant avec bannière
+      // Utiliser l'endpoint standard avec l'ID du profil
       const formData = new FormData()
       formData.append('banner', file)
-      formData.append('bio', existingProfile.bio || '')
-      formData.append('location', existingProfile.location || '')
-      formData.append('website', existingProfile.website || '')
 
-      console.log('Updating profile with banner...')
+      console.log('Updating profile with banner using PATCH on /profil/profils/{id}/ endpoint...')
       
-      const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
-        method: 'PUT',
+      const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${profile.id}/`, {
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -900,14 +708,36 @@ const Profile = () => {
         throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
       }
       
-      console.log('Profile updated successfully')
+      const updatedData = await updateResponse.json()
+      console.log('Profile updated successfully, response:', updatedData)
+      console.log('Banner URL in response:', updatedData.banner_url || updatedData.banner)
+      console.log('All banner-related fields:', {
+        banner: updatedData.banner,
+        banner_url: updatedData.banner_url,
+        photo: updatedData.photo,
+        photo_url: updatedData.photo_url
+      })
+      
+      // Vérifier si le backend retourne les bonnes données
+      if (!updatedData.banner && !updatedData.banner_url) {
+        console.error('Backend did not return banner or banner_url after upload')
+        alert('Erreur: Le backend n\'a pas retourné l\'URL de la bannière après l\'upload')
+        return
+      }
+
+      // Mettre à jour immédiatement l'état du profil avec les données retournées par l'API
+      const bannerUrl = updatedData.banner_url || updatedData.banner
+      if (bannerUrl) {
+        setProfile(prev => prev ? { ...prev, banner: bannerUrl } : null)
+        console.log('Profile state updated with banner URL:', bannerUrl)
+      }
 
       setShowBannerModal(false)
       setUploadedBanner('')
       showProfileUpdated()
 
-      // Recharger le profil depuis le backend au lieu de recharger la page
-      await refreshProfile(token)
+      // Update cache buster to force image refresh
+      setImageCacheBuster(Date.now())
       
     } catch (error) {
       console.error('Error updating banner:', error)
@@ -1207,18 +1037,28 @@ const Profile = () => {
             {/* Banner Section - YouTube style */}
             <div className="relative group mb-3 sm:mb-4">
               <div className="w-full h-28 sm:h-36 md:h-44 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-zinc-600 shadow-md">
-                {profile?.banner ? (
-                  <img 
-                    src={profile.banner} 
-                    alt="Banner" 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center">
-                    <span className="text-white text-sm sm:text-base font-medium opacity-80">Ajouter une bannière</span>
-                    <span className="text-white text-[10px] sm:text-xs opacity-60 mt-1">Recommandé: 2560x1440px (PC) / 1546x423px (Mobile)</span>
-                  </div>
-                )}
+                {(() => {
+                  console.log('Rendering banner check:', {
+                    hasProfile: !!profile,
+                    bannerValue: profile?.banner,
+                    bannerUrlValue: profile?.banner_url,
+                    imageCacheBuster
+                  })
+                  return profile?.banner ? (
+                    <img 
+                      src={`${profile.banner}?t=${imageCacheBuster}`} 
+                      alt="Banner" 
+                      className="w-full h-full object-cover"
+                      onLoad={() => console.log('Banner image loaded successfully')}
+                      onError={(e) => console.error('Banner image failed to load:', e)}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center">
+                      <span className="text-white text-sm sm:text-base font-medium opacity-80">Ajouter une bannière</span>
+                      <span className="text-white text-[10px] sm:text-xs opacity-60 mt-1">Recommandé: 2560x1440px (PC) / 1546x423px (Mobile)</span>
+                    </div>
+                  )
+                })()}
               </div>
               <button
                 onClick={() => bannerInputRef.current?.click()}
@@ -1240,12 +1080,12 @@ const Profile = () => {
               <div className="relative group">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-bold overflow-hidden border-4 border-white dark:border-zinc-800 ring-2 ring-blue-500/60 shadow-xl">
                   {profile?.avatarUrl || profile?.photo_url || profile?.photo ? (
-                    <img src={profile?.avatarUrl || profile?.photo_url || profile?.photo} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={`${profile?.avatarUrl || profile?.photo_url || profile?.photo}?t=${imageCacheBuster}`} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     profile?.name?.charAt(0) || profile?.fullName?.charAt(0) || '?'
                   )}
                 </div>
-                {canModifyPhoto() ? (
+                {canModifyPhoto(profile?.photoLastModified) ? (
                   <button
                     onClick={triggerFileInput}
                     className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors opacity-0 group-hover:opacity-100"
@@ -1255,7 +1095,7 @@ const Profile = () => {
                 ) : (
                   <div className="absolute bottom-0 right-0 flex items-center gap-1 px-2 py-1 bg-gray-500/80 text-white rounded-full shadow-lg">
                     <Lock className="w-2 h-2" />
-                    <span className="text-[8px]">{getDaysUntilPhotoModification()}j</span>
+                    <span className="text-[8px]">{getDaysUntilPhotoModification(profile?.photoLastModified)}j</span>
                   </div>
                 )}
                 <input
@@ -1264,7 +1104,7 @@ const Profile = () => {
                   accept="image/*"
                   onChange={handlePhotoUpload}
                   className="hidden"
-                  disabled={!canModifyPhoto()}
+                  disabled={!canModifyPhoto(profile?.photoLastModified)}
                 />
                 <div className={`mt-1.5 flex items-center justify-center gap-1 ${profile?.status === 'online' ? 'text-green-500' : 'text-gray-500'}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${profile?.status === 'online' ? 'bg-green-500' : 'bg-gray-500'}`} />
@@ -1294,7 +1134,7 @@ const Profile = () => {
                       ? `${profile.profession} - ${profile.speciality}`
                       : profile?.profession || profile?.speciality || 'Non renseigné'}
                   </span>
-                  {canModifyProfession() ? (
+                  {canModifyProfession(profile?.lastProfessionUpdate) ? (
                     <button
                       onClick={() => setShowProfessionModal(true)}
                       className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}

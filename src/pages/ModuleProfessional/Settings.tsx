@@ -7,6 +7,11 @@ import {
   User, Camera, MapPin, Briefcase, Plus, X
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { 
+  syncStoredProfile,
+  canModifyProfession,
+  getDaysUntilProfessionModification
+} from '../../hooks/useProfileUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -147,25 +152,7 @@ const Settings = () => {
 
   // Meme regle que 'Mon Profil': profession modifiable une fois tous les 30 jours
   const daysUntilProfessionUpdate = () => {
-    if (!lastProfessionUpdate) return 0
-    const elapsed = Date.now() - new Date(lastProfessionUpdate).getTime()
-    const remaining = 30 - Math.floor(elapsed / (1000 * 60 * 60 * 24))
-    return remaining > 0 ? remaining : 0
-  }
-  const canModifyProfession = () => daysUntilProfessionUpdate() === 0
-
-  // Synchronise le profil stocke localement avec la reponse backend (meme source que Mon Profil)
-  const syncStoredProfile = (data: any) => {
-    if (!data) return
-    const stored = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-    localStorage.setItem('exile_user_profile', JSON.stringify({
-      ...stored,
-      id: data.user != null ? String(data.user) : stored.id,
-      username: data.username || stored.username,
-      name: data.full_name || stored.name,
-      photo: data.photo_url || data.photo || null,
-      profession: data.profession || data.user_profession || ''
-    }))
+    return getDaysUntilProfessionModification(lastProfessionUpdate)
   }
 
   // Charger les données du profil
@@ -209,7 +196,7 @@ const Settings = () => {
     try {
       const updateData = {
         full_name: `${profileData.firstName} ${profileData.lastName}`.trim(),
-        ...(canModifyProfession() ? { profession: profileData.profession } : {}),
+        ...(canModifyProfession(lastProfessionUpdate) ? { profession: profileData.profession } : {}),
         bio: profileData.bio,
         city: profileData.city,
         country: profileData.country,
@@ -938,7 +925,7 @@ const Settings = () => {
               <div>
                 <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                   Titre professionnel
-                  {!canModifyProfession() && (
+                  {!canModifyProfession(lastProfessionUpdate) && (
                     <span className="ml-2 text-[10px] sm:text-xs font-normal text-gray-500">
                       Modifiable dans {daysUntilProfessionUpdate()}j
                     </span>
@@ -948,7 +935,7 @@ const Settings = () => {
                   type="text"
                   value={profileData.profession}
                   onChange={(e) => setProfileData({ ...profileData, profession: e.target.value })}
-                  disabled={!canModifyProfession()}
+                  disabled={!canModifyProfession(lastProfessionUpdate)}
                   placeholder="Titre professionnel"
                   className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border text-sm sm:text-base ${
                     resolvedTheme === 'dark'
