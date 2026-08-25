@@ -4,7 +4,8 @@ import {
   MapPin, Globe, Calendar,
   Briefcase, Plus, Edit2, Lock, X,
   Users, Video, MessageSquare,
-  TrendingUp, Settings, Camera, Heart, ArrowLeft
+  TrendingUp, Settings, Camera, Heart, ArrowLeft,
+  ChevronDown, Award
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useNotifications } from '../../contexts/NotificationContext'
@@ -135,6 +136,7 @@ const Profile = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ type: 'website' | 'skill', item: string } | null>(null)
   const [showSkillsDropdown, setShowSkillsDropdown] = useState(false)
   const [showWebsitesDropdown, setShowWebsitesDropdown] = useState(false)
+  const [showMobileInfoDropdown, setShowMobileInfoDropdown] = useState(false)
   const [newProfession, setNewProfession] = useState('')
   const [newSkill, setNewSkill] = useState({ name: '', category: 'Technique', level: 'Intermédiaire' })
   const [newBio, setNewBio] = useState('')
@@ -1126,16 +1128,14 @@ const Profile = () => {
 
               {/* Info centrée */}
               <div className="text-center space-y-1.5 sm:space-y-2 w-full">
-                {/* Name */}
+                {/* Name - Mobile: only username, Desktop: full name */}
                 <div>
                   <h2 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile?.name || profile?.fullName || profile?.username || 'Utilisateur'}
+                    {profile?.username || 'Utilisateur'}
                   </h2>
-                  {profile?.username && (
-                    <p className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                      {profile.username}
-                    </p>
-                  )}
+                  <p className={`hidden sm:block text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                    {profile?.name || profile?.fullName || ''}
+                  </p>
                 </div>
 
                 {/* Profession */}
@@ -1161,100 +1161,220 @@ const Profile = () => {
                   )}
                 </div>
 
-                {/* Bio */}
-                <div>
-                  <div className="flex items-center justify-center gap-1">
-                    <p className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                      {profile?.bio || 'Aucune bio'}
-                    </p>
-                    <button
-                      onClick={() => {
-                        setNewBio(profile?.bio || '')
-                        setShowBioModal(true)
-                      }}
-                      className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
-                    >
-                      <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Location */}
-                <div className="flex items-center justify-center gap-1.5">
-                  <MapPin className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                  <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                    {profile?.city && profile?.country 
-                      ? `${profile.city}, ${profile.country}`
-                      : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
-                  </span>
-                </div>
-
-                {/* Websites */}
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Globe className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                      Sites web
+                {/* Mobile: Compact info with dropdown */}
+                <div className="sm:hidden">
+                  <button
+                    onClick={() => setShowMobileInfoDropdown(!showMobileInfoDropdown)}
+                    className={`flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-700 hover:bg-zinc-600' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}
+                  >
+                    <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      Informations personnelles
                     </span>
-                    <button
-                      onClick={() => setShowWebsitesModal(true)}
-                      className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
-                      disabled={(profile?.websites || []).length >= 6}
-                    >
-                      <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    </button>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showMobileInfoDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showMobileInfoDropdown && (
+                    <div className={`mt-2 p-3 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'}`}>
+                      {/* Bio */}
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                            {profile?.bio || 'Aucune bio'}
+                          </p>
+                          <button
+                            onClick={() => {
+                              setNewBio(profile?.bio || '')
+                              setShowBioModal(true)
+                            }}
+                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
+                          >
+                            <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Location */}
+                      <div className="mb-3 flex items-center gap-1.5">
+                        <MapPin className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                        <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                          {profile?.city && profile?.country 
+                            ? `${profile.city}, ${profile.country}`
+                            : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
+                        </span>
+                      </div>
+
+                      {/* Websites */}
+                      <div className="mb-3">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Globe className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                          <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                            Sites web
+                          </span>
+                          <button
+                            onClick={() => setShowWebsitesModal(true)}
+                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
+                            disabled={(profile?.websites || []).length >= 6}
+                          >
+                            <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(profile?.websites || []).map((website, index) => (
+                            <div key={index} className="flex items-center gap-1">
+                              <a
+                                href={website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+                              >
+                                {website}
+                              </a>
+                              <button
+                                onClick={() => handleDeleteWebsite(website)}
+                                className="hover:opacity-70"
+                              >
+                                <X className="w-2.5 h-2.5 text-red-500" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Skills */}
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Award className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                          <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                            Compétences
+                          </span>
+                          <button
+                            onClick={() => setShowSkillsModal(true)}
+                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
+                          >
+                            <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(profile?.skills || []).slice(0, 5).map((skill, index) => (
+                            <div key={index} className="flex items-center gap-1">
+                              <span className={`text-xs px-2 py-1 rounded-full ${resolvedTheme === 'dark' ? 'bg-zinc-600 text-white' : 'bg-gray-200 text-gray-900'}`}>
+                                {skill}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteSkill(skill)}
+                                className="hover:opacity-70"
+                              >
+                                <X className="w-2.5 h-2.5 text-red-500" />
+                              </button>
+                            </div>
+                          ))}
+                          {(profile?.skills || []).length > 5 && (
+                            <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                              +{(profile?.skills || []).length - 5}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop: Full info display */}
+                <div className="hidden sm:block">
+                  {/* Bio */}
+                  <div>
+                    <div className="flex items-center justify-center gap-1">
+                      <p className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                        {profile?.bio || 'Aucune bio'}
+                      </p>
+                      <button
+                        onClick={() => {
+                          setNewBio(profile?.bio || '')
+                          setShowBioModal(true)
+                        }}
+                        className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                      >
+                        <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap justify-center gap-1.5">
-                    {(profile?.websites || []).slice(0, 3).map((website, index) => (
-                      <div key={index} className="flex items-center gap-1">
-                        <a
-                          href={website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
-                        >
-                          {website}
-                        </a>
-                        <button
-                          onClick={() => handleDeleteWebsite(website)}
-                          className="hover:opacity-70"
-                        >
-                          <X className="w-2.5 h-2.5 text-red-500" />
-                        </button>
-                      </div>
-                    ))}
-                    {(profile?.websites || []).length > 3 && (
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowWebsitesDropdown(!showWebsitesDropdown)}
-                          className={`text-[10px] px-1.5 py-0.5 rounded ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'}`}
-                        >
-                          +{(profile?.websites || []).length - 3}
-                        </button>
-                        {showWebsitesDropdown && (
-                          <div className={`absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
-                            {(profile?.websites || []).slice(3).map((website, index) => (
-                              <div key={index} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-700">
-                                <a
-                                  href={website}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}
-                                >
-                                  {website}
-                                </a>
-                                <button
-                                  onClick={() => handleDeleteWebsite(website)}
-                                  className="hover:opacity-70"
-                                >
-                                  <X className="w-3 h-3 text-red-500" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+
+                  {/* Location */}
+                  <div className="flex items-center justify-center gap-1.5">
+                    <MapPin className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                    <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                      {profile?.city && profile?.country 
+                        ? `${profile.city}, ${profile.country}`
+                        : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
+                    </span>
+                  </div>
+
+                  {/* Websites */}
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Globe className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                      <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                        Sites web
+                      </span>
+                      <button
+                        onClick={() => setShowWebsitesModal(true)}
+                        className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                        disabled={(profile?.websites || []).length >= 6}
+                      >
+                        <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                      {(profile?.websites || []).slice(0, 3).map((website, index) => (
+                        <div key={index} className="flex items-center gap-1">
+                          <a
+                            href={website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+                          >
+                            {website}
+                          </a>
+                          <button
+                            onClick={() => handleDeleteWebsite(website)}
+                            className="hover:opacity-70"
+                          >
+                            <X className="w-2.5 h-2.5 text-red-500" />
+                          </button>
+                        </div>
+                      ))}
+                      {(profile?.websites || []).length > 3 && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowWebsitesDropdown(!showWebsitesDropdown)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'}`}
+                          >
+                            +{(profile?.websites || []).length - 3}
+                          </button>
+                          {showWebsitesDropdown && (
+                            <div className={`absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
+                              {(profile?.websites || []).slice(3).map((website, index) => (
+                                <div key={index} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-700">
+                                  <a
+                                    href={website}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}
+                                  >
+                                    {website}
+                                  </a>
+                                  <button
+                                    onClick={() => handleDeleteWebsite(website)}
+                                    className="hover:opacity-70"
+                                  >
+                                    <X className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
