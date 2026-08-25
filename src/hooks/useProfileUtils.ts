@@ -74,10 +74,15 @@ export const getProfileWithFallback = async (token: string) => {
     });
     if (meResponse.ok) {
       const meData = await meResponse.json();
+      console.log('Profile by user ID response:', meData);
       if (meData.results && meData.results.length > 0) {
+        console.log('Found profile by user ID:', meData.results[0]);
         return meData.results[0];
       } else if (Array.isArray(meData) && meData.length > 0) {
+        console.log('Found profile by user ID (array):', meData[0]);
         return meData[0];
+      } else {
+        console.log('No profile found for user ID, will create one');
       }
     }
   } catch (error) {
@@ -160,6 +165,7 @@ export const mapBackendProfile = (data: any): UserProfile => {
   
   const mapped: UserProfile = {
     id: data.id,
+    userId: data.user?.toString(),
     username: data.username,
     photo: getPublicImageUrl(data.photo || data.photo_url),
     bio: data.bio,
@@ -182,6 +188,7 @@ export const mapBackendProfile = (data: any): UserProfile => {
     status: 'online' as const,
     email: data.email || ''
   }
+  console.log('mapBackendProfile output ID:', mapped.id)
   console.log('mapBackendProfile output banner:', mapped.banner)
   console.log('mapBackendProfile output banner_url:', mapped.banner_url)
   console.log('mapBackendProfile output FULL:', JSON.stringify(mapped, null, 2))
