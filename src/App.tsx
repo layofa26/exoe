@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Outlet } from 'react-router-dom'
 import { Suspense, useEffect, useState } from 'react'
 
 // Layout
@@ -58,6 +58,11 @@ const PageLoading = () => (
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
   </div>
 )
+
+// Professional module layout with caching
+const ProLayout = () => {
+  return <Outlet />
+}
 
 // Scroll to top on route change
 const ScrollToTop = () => {
@@ -228,28 +233,30 @@ function App(): JSX.Element {
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/forgot-email" element={<ForgotEmailPage />} />
                 
-                {/* Module Professional */}
-                <Route path="/pro/profile" element={<Profile />} />
-                <Route path="/pro/profile/:id" element={<PublicProfile />} />
-                <Route path="/pro/settings" element={<Settings />} />
-                <Route path="/pro/settings/privacy" element={<PrivacySettings />} />
-                <Route path="/pro/requests" element={<Requests />} />
-                <Route path="/pro/conversations" element={<Conversations />} />
-                <Route path="/pro/blocked-users" element={<BlockedUsers />} />
-                <Route path="/pro/important-messages" element={<ImportantMessages />} />
-                <Route path="/pro/my-videos" element={<MyVideos />} />
-                <Route path="/pro/drafts" element={<MyDrafts />} />
-                <Route path="/pro/subscribers" element={<Subscribers />} />
-                <Route path="/pro/statistics" element={<Statistics />} />
-                <Route path="/pro/calendar" element={<Calendar />} />
-                <Route path="/pro/subscriptions" element={<Subscriptions />} />
-                <Route path="/pro/events" element={<EventsPro />} />
-                <Route path="/pro/events/:eventId/preview" element={<EventPreview />} />
-                <Route path="/pro/events/:eventId/live" element={<LiveRoom />} />
-                <Route path="/pro/conversations/:id" element={<ConversationPage />} />
-                <Route path="/pro/ads" element={<AdDashboard />} />
-                <Route path="/pro/video/:videoId" element={<VideoPage />} />
-                <Route path="/pro" element={<VideoFeed />} />
+                {/* Module Professional - with caching */}
+                <Route path="/pro" element={<ProLayout />}>
+                  <Route index element={<VideoFeed />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="profile/:id" element={<PublicProfile />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="settings/privacy" element={<PrivacySettings />} />
+                  <Route path="requests" element={<Requests />} />
+                  <Route path="conversations" element={<Conversations />} />
+                  <Route path="conversations/:id" element={<ConversationPage />} />
+                  <Route path="blocked-users" element={<BlockedUsers />} />
+                  <Route path="important-messages" element={<ImportantMessages />} />
+                  <Route path="my-videos" element={<MyVideos />} />
+                  <Route path="drafts" element={<MyDrafts />} />
+                  <Route path="subscribers" element={<Subscribers />} />
+                  <Route path="statistics" element={<Statistics />} />
+                  <Route path="calendar" element={<Calendar />} />
+                  <Route path="subscriptions" element={<Subscriptions />} />
+                  <Route path="events" element={<EventsPro />} />
+                  <Route path="events/:eventId/preview" element={<EventPreview />} />
+                  <Route path="events/:eventId/live" element={<LiveRoom />} />
+                  <Route path="ads" element={<AdDashboard />} />
+                  <Route path="video/:videoId" element={<VideoPage />} />
+                </Route>
                 
                 {/* Module Social */}
                 <Route path="/social" element={<SocialFeed />} />
