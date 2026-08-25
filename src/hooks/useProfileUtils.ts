@@ -82,7 +82,25 @@ export const getProfileWithFallback = async (token: string) => {
         console.log('Found profile by user ID (array):', meData[0]);
         return meData[0];
       } else {
-        console.log('No profile found for user ID, will create one');
+        console.log('No profile found for user ID, creating one...');
+        // Créer le profil s'il n'existe pas
+        const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            bio: '',
+            location: '',
+            website: ''
+          })
+        });
+        if (createResponse.ok) {
+          const createdProfile = await createResponse.json();
+          console.log('Profile created:', createdProfile);
+          return createdProfile;
+        }
       }
     }
   } catch (error) {
