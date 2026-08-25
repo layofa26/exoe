@@ -389,7 +389,18 @@ export default function VideoFeed() {
                   className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-xl p-4 cursor-pointer hover:opacity-80 transition-opacity`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
+                    {prof.photo || prof.avatarUrl ? (
+                      <img
+                        src={prof.photo_url || prof.avatarUrl || prof.photo}
+                        alt={prof.fullName || prof.username}
+                        className="w-12 h-12 rounded-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold ${prof.photo || prof.avatarUrl ? 'hidden' : ''}`}>
                       {prof.fullName?.charAt(0) || prof.username?.charAt(0) || '?'}
                     </div>
                     <div className="flex-1 min-w-0">
