@@ -77,6 +77,7 @@ export const mapApiVideo = (apiVideo: Video): FeedVideo => {
       initials: authorName.charAt(0).toUpperCase(),
       avatarColor: AVATAR_COLORS[colorIndex],
       avatarUrl: apiVideo.owner_avatar || undefined,
+      photo_url: apiVideo.owner_avatar || undefined,
     },
     views: apiVideo.views ?? 0,
     viewsCount: apiVideo.views ?? 0,

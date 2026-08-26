@@ -76,6 +76,11 @@ export default function VideoFeed() {
     }
   };
 
+  // Charger les vidéos immédiatement sans attendre useCallback
+  useEffect(() => {
+    loadVideos();
+  }, []);
+
   // Écouter l'événement de vidéo uploadée
   useEffect(() => {
     const handleVideoUploaded = () => {
@@ -86,13 +91,6 @@ export default function VideoFeed() {
     window.addEventListener('video-uploaded', handleVideoUploaded)
     return () => window.removeEventListener('video-uploaded', handleVideoUploaded)
   }, [])
-
-  // Wrapper useCallback pour loadVideos
-  const loadVideosCallback = useCallback(loadVideos, []);
-
-  useEffect(() => {
-    loadVideosCallback();
-  }, [loadVideosCallback]);
 
   const handleOpen = useCallback((video: Video) => {
     // Comptabiliser la vue côté backend, sans bloquer l'ouverture
@@ -348,7 +346,7 @@ export default function VideoFeed() {
         ref={feedRef}
         className={`flex-1 flex flex-col ${activeVideo ? 'hidden' : 'flex'}`}
         style={{ 
-          scrollPaddingTop: isMobile ? '160px' : '64px'
+          scrollPaddingTop: '0px'
         }}
       >
         {/* Loading State */}

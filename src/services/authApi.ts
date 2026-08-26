@@ -6,7 +6,7 @@ const PROD_API_BASE_URL = 'https://exile-backend-9q6o.onrender.com/api/v1'
 const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
   ? API_BASE_URL.replace('/api', '/api/v1') 
   : API_BASE_URL
-const API_TIMEOUT = 30000 // 30 seconds timeout for better connectivity
+const API_TIMEOUT = 10000 // 10 seconds timeout for faster connection
 
 // Helper functions for cookie management (for reading httpOnly cookies set by backend)
 const getCookie = (name: string): string | null => {

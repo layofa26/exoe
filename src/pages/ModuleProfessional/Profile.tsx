@@ -1045,11 +1045,11 @@ const Profile = () => {
           <>
             {/* Profile Header - YouTube-style layout */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-          {/* Left column - Profile info */}
-          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-xl p-3 sm:p-4`}>
-            {/* Banner Section - YouTube style */}
+          {/* Left column - Profile info - Mobile: full width banner/photo section */}
+          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-xl p-0 sm:p-3 sm:p-4`}>
+            {/* Banner Section - YouTube style - Mobile: full width */}
             <div className="relative group mb-3 sm:mb-4">
-              <div className="w-full h-28 sm:h-36 md:h-44 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-zinc-600 shadow-md">
+              <div className="w-full h-32 sm:h-36 md:h-44 bg-gradient-to-r from-blue-500 to-purple-600 rounded-b-xl sm:rounded-xl overflow-hidden border-2 border-gray-200 dark:border-zinc-600 shadow-md">
                 {(() => {
                   console.log('Rendering banner check:', {
                     hasProfile: !!profile,
@@ -1089,10 +1089,10 @@ const Profile = () => {
               />
             </div>
 
-            <div className="flex flex-col items-center gap-2 sm:gap-3 -mt-8 sm:-mt-10 md:-mt-12">
-              {/* Photo centrée avec upload - chevauchant la bannière */}
+            <div className="flex flex-col items-center gap-2 sm:gap-3 -mt-10 sm:-mt-10 md:-mt-12 px-3 sm:px-0">
+              {/* Photo centrée avec upload - chevauchant la bannière - Mobile: plus grand avec cadre plus épais */}
               <div className="relative group">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-bold overflow-hidden border-4 border-white dark:border-zinc-800 ring-2 ring-blue-500/60 shadow-xl">
+                <div className="w-24 h-24 sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-bold overflow-hidden border-6 sm:border-4 border-white dark:border-zinc-800 ring-2 ring-blue-500/60 shadow-xl">
                   {profile?.avatarUrl || profile?.photo_url || profile?.photo ? (
                     <img src={`${profile?.avatarUrl || profile?.photo_url || profile?.photo}?t=${imageCacheBuster}`} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -1239,41 +1239,7 @@ const Profile = () => {
                         </div>
                       </div>
 
-                      {/* Skills */}
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Award className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                          <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                            Compétences
-                          </span>
-                          <button
-                            onClick={() => setShowSkillsModal(true)}
-                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
-                          >
-                            <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(profile?.skills || []).slice(0, 5).map((skill, index) => (
-                            <div key={index} className="flex items-center gap-1">
-                              <span className={`text-xs px-2 py-1 rounded-full ${resolvedTheme === 'dark' ? 'bg-zinc-600 text-white' : 'bg-gray-200 text-gray-900'}`}>
-                                {skill}
-                              </span>
-                              <button
-                                onClick={() => handleDeleteSkill(skill)}
-                                className="hover:opacity-70"
-                              >
-                                <X className="w-2.5 h-2.5 text-red-500" />
-                              </button>
-                            </div>
-                          ))}
-                          {(profile?.skills || []).length > 5 && (
-                            <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                              +{(profile?.skills || []).length - 5}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      {/* Skills - Supprimé du dropdown mobile pour éviter le doublon */}
                     </div>
                   )}
                 </div>

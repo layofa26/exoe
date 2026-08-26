@@ -1,5 +1,5 @@
-import { Routes, Route, useLocation, Outlet } from 'react-router-dom'
-import { Suspense, useEffect, useState } from 'react'
+import { Routes, Route, useLocation, Outlet, useOutlet } from 'react-router-dom'
+import { Suspense, useEffect, useState, useMemo } from 'react'
 
 // Layout
 import Header from './components/common/Header'
@@ -61,7 +61,8 @@ const PageLoading = () => (
 
 // Professional module layout with caching
 const ProLayout = () => {
-  return <Outlet />
+  const outlet = useOutlet()
+  return outlet
 }
 
 // Scroll to top on route change

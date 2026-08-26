@@ -59,11 +59,11 @@ export const Header = (): JSX.Element => {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [lastScrollY])
 
-  // Afficher le username tel quel (déjà au format @prenom_nom du backend)
+  // Afficher le username sans le @ pour l'affichage
   const getDisplayName = () => {
-    // Priorité: username (format @prenom_nom du backend) > full_name > email
-    if (user?.username) return user.username
+    // Priorité: full_name > username sans @ > email
     if (user?.fullName) return user.fullName
+    if (user?.username) return user.username.replace('@', '')
     if (user?.email) return user.email
     return 'Utilisateur'
   }
@@ -309,13 +309,13 @@ export const Header = (): JSX.Element => {
           </div>
 
           {/* Navigation - Desktop & Mobile - Centrés */}
-          <nav className="flex items-center justify-center space-x-2 sm:space-x-4 md:space-x-8 mt-8 sm:mt-0">
+          <nav className="flex items-center justify-center space-x-2 sm:space-x-4 md:space-x-8">
             {navLinks.map((link) => (
               link.show && (
                 <div key={link.to} className="relative group">
                   <Link
                     to={link.disabled ? '#' : link.to}
-                    className={`relative py-2 text-sm sm:text-sm md:text-base font-bold transition-colors ${
+                    className={`relative text-sm sm:text-sm md:text-base font-bold transition-colors ${
                       isActive(link.to)
                         ? 'text-orange-500'
                         : link.disabled
@@ -327,7 +327,7 @@ export const Header = (): JSX.Element => {
                     <span className="hidden sm:inline">{link.label}</span>
                     <span className="sm:hidden text-sm font-bold">{link.label}</span>
                     {isActive(link.to) && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500 rounded-full" />
+                      <span className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-orange-500 rounded-full" />
                     )}
                     {link.disabled && (
                       <span className="ml-1 text-xs text-orange-500 hidden sm:inline">(soon)</span>
@@ -781,7 +781,7 @@ export const Header = (): JSX.Element => {
         </div>
       </div>
 
-      {/* Mobile Full Screen Search */}
+      {/* Mobile Full Screen Search - Simplified */}
       {isMobileSearchOpen && createPortal(
         <div className={`fixed inset-0 z-[999999] ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-white'} flex flex-col`}>
           <div className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-zinc-800">
@@ -801,8 +801,8 @@ export const Header = (): JSX.Element => {
                 autoFocus
                 className={`w-full pl-12 pr-12 py-3 rounded-xl text-base ${
                   resolvedTheme === 'dark'
-                    ? 'bg-zinc-900 border-zinc-800 text-white placeholder-zinc-500 focus:border-pro'
-                    : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500 focus:border-pro'
+                    ? 'bg-zinc-900 border-zinc-800 text-white placeholder-zinc-500'
+                    : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
                 } border focus:outline-none focus:ring-2 focus:ring-pro/20`}
               />
               {searchQuery && (
@@ -823,8 +823,8 @@ export const Header = (): JSX.Element => {
               </div>
             ) : !searchQuery ? (
               recentSearches.length > 0 && (
-                <div className="border-t border-gray-200 dark:border-zinc-800 mt-4">
-                  <div className="px-3 py-2 bg-gray-50 dark:bg-zinc-800 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase flex items-center justify-between">
+                <div>
+                  <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <History className="w-3 h-3" />
                       Recherches récentes
@@ -855,8 +855,8 @@ export const Header = (): JSX.Element => {
               searchResults.professionals.length > 0 || searchResults.videos.length > 0 ? (
                 <>
                   {searchResults.professionals.length > 0 && (
-                    <div className="border-t border-gray-200 dark:border-zinc-800 mt-4">
-                      <div className="px-3 py-2 bg-gray-50 dark:bg-zinc-800 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
+                    <div className="mt-4">
+                      <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
                         Professionnels
                       </div>
                       {searchResults.professionals.map((pro: any) => (
@@ -883,8 +883,8 @@ export const Header = (): JSX.Element => {
                   )}
 
                   {searchResults.videos.length > 0 && (
-                    <div className="border-t border-gray-200 dark:border-zinc-800 mt-4">
-                      <div className="px-3 py-2 bg-gray-50 dark:bg-zinc-800 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
+                    <div className="mt-4">
+                      <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
                         Vidéos
                       </div>
                       {searchResults.videos.map((video: any) => (
