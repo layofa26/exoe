@@ -329,8 +329,8 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
       setUser(null)
       setIsAuthenticated(false)
 
-      // Navigate to ProSidebar home
-      window.location.href = '/pro'
+      // Navigate to login page
+      navigate('/login')
     } catch (error) {
       console.error('Error during logout:', error)
       // Even if there's an error, force logout
@@ -338,7 +338,7 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
       sessionStorage.clear()
       setUser(null)
       setIsAuthenticated(false)
-      window.location.href = '/pro'
+      navigate('/login')
     }
   }
 

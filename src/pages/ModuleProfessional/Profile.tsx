@@ -432,17 +432,15 @@ const Profile = () => {
           
           console.log('Sending to backend:', { name: newSkill.name, category: englishCategory, level: englishLevel, profile: existingProfile.id })
           
-          // Créer la compétence via le backend avec l'ID du profil
-          const response = await fetch(`${API_BASE_URL}/profil/skills/`, {
-            method: 'POST',
+          // Ajouter la compétence via l'endpoint du profil
+          const response = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
+            method: 'PATCH',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              name: newSkill.name,
-              category: englishCategory,
-              level: englishLevel
+              skills: [...(profile.skills || []), newSkill.name]
             })
           })
 
@@ -455,14 +453,10 @@ const Profile = () => {
           }
 
           const data = await response.json()
-          console.log('Skill created:', data)
+          console.log('Profile updated with skill:', data)
           
-          // Mettre à jour l'état local avec la compétence créée
-          const updatedSkills = [...(profile.skills || []), {
-            ...skill,
-            id: data.id
-          }]
-          setProfile({ ...profile, skills: updatedSkills })
+          // Mettre à jour l'état local avec les compétences du profil mis à jour
+          setProfile({ ...profile, skills: data.skills || [...(profile.skills || []), newSkill.name] })
           setNewSkill({ name: '', category: '', level: 'intermediate' })
           showProfileUpdated()
           

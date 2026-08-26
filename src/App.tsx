@@ -61,8 +61,11 @@ const PageLoading = () => (
 
 // Professional module layout with caching
 const ProLayout = () => {
-  const outlet = useOutlet()
-  return outlet
+  return (
+    <div className="w-full h-full">
+      <Outlet />
+    </div>
+  )
 }
 
 // Scroll to top on route change
