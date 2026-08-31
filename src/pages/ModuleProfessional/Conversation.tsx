@@ -327,6 +327,22 @@ export const ConversationView = ({
               return Array.from(map.values()).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
             })
           }
+        } else if (res.status === 404) {
+          clearInterval(pollInterval)
+          if (partnerId) {
+            try {
+              const startRes = await apiFetch('/conversations/start/', {
+                method: 'POST',
+                body: JSON.stringify({ participant_id: Number(partnerId) })
+              })
+              if (startRes.ok) {
+                const startData = await startRes.json()
+                if (startData.id) {
+                  setActiveConvId(String(startData.id))
+                }
+              }
+            } catch {}
+          }
         }
       } catch {}
     }, 2000)
@@ -703,11 +719,11 @@ export const ConversationView = ({
   }, [conversation, currentUserId])
 
   const isOtherOnline = useMemo(() => {
-    if (!otherParticipant) return true
-    if (onlineUserId === String(otherParticipant.id)) return true
+    if (!otherParticipant) return false
+    if (onlineUserId && onlineUserId === String(otherParticipant.id)) return true
     if (otherParticipant.is_online !== undefined) return Boolean(otherParticipant.is_online)
     if (otherParticipant.isOnline !== undefined) return Boolean(otherParticipant.isOnline)
-    return true
+    return Boolean(otherParticipant.is_active || otherParticipant.isActive)
   }, [onlineUserId, otherParticipant])
 
   const filteredMessages = useMemo(() => {
