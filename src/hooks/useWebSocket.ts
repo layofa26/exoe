@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 
-const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+const WS_BASE = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? 'wss://exile-backend-9q6o.onrender.com' : 'ws://localhost:8000')
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error'
 
@@ -26,7 +26,7 @@ const BASE_DELAY_MS = 1000
 const MAX_DELAY_MS = 30000
 
 function getJWT(): string | null {
-  return localStorage.getItem('accessToken')
+  return localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
 }
 
 export function useWebSocket({
@@ -48,7 +48,8 @@ export function useWebSocket({
   }, [onMessage])
 
   const connect = useCallback(() => {
-    if (!enabled || !conversationId) return
+    const isNumericId = /^\d+$/.test(String(conversationId))
+    if (!enabled || !conversationId || !isNumericId) return
     if (!navigator.onLine) {
       setConnectionState('disconnected')
       return
