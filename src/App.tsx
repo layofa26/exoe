@@ -108,8 +108,16 @@ function App(): JSX.Element {
                            location.pathname.startsWith('/pro/subscriptions') ||
                            isPubRoute
 
-  // Pages où le ProSidebar doit être masqué (ProSidebar doit TOUJOURS apparaître sur Demandes !)
-  const isNoSidebarPage = location.pathname.startsWith('/pro/conversations')
+  // Pages où le ProSidebar doit être masqué (demande, evenement, abonnement)
+  const isNoSidebarPage = 
+    location.pathname.startsWith('/pro/conversations') ||
+    location.pathname.startsWith('/pro/requests') ||
+    location.pathname.startsWith('/pro/demandes') ||
+    location.pathname.startsWith('/pro/events') ||
+    location.pathname.startsWith('/pro/evenements') ||
+    location.pathname.startsWith('/pro/subscriptions') ||
+    location.pathname.startsWith('/pro/subscribers') ||
+    location.pathname.startsWith('/pro/abonnement')
 
   // Cacher header et sous-module sur mobile pour page détails vidéo uniquement
   const isVideoDetailPage = location.pathname.startsWith('/pro/video')

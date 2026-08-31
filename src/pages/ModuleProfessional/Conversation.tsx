@@ -138,6 +138,12 @@ export const ConversationView = ({
     return null
   })
   const [messages, setMessages] = useState<MessageBubbleData[]>(() => {
+    try {
+      const convKey = conversationId || partnerId || 'temp'
+      const stored = localStorage.getItem(`exile_chat_messages_${convKey}`)
+      if (stored) return JSON.parse(stored)
+    } catch {}
+
     if (initialMessage) {
       return [{
         id: 'init-msg',
@@ -292,6 +298,52 @@ export const ConversationView = ({
     load()
     return () => { isMounted = false }
   }, [id, partnerId, partnerUsername, partnerAvatar, initialMessage])
+
+  // ─── Real-time LocalStorage Backup & 2s Polling ─────────────────────────────
+  useEffect(() => {
+    const targetKey = activeConvId || conversationId || partnerId || id
+    if (!targetKey) return
+    try {
+      localStorage.setItem(`exile_chat_messages_${targetKey}`, JSON.stringify(messages))
+    } catch {}
+  }, [messages, activeConvId, conversationId, partnerId, id])
+
+  useEffect(() => {
+    const targetConvId = activeConvId || (conversationId && /^\d+$/.test(String(conversationId)) ? String(conversationId) : (id && /^\d+$/.test(String(id)) ? String(id) : null))
+    if (!targetConvId || targetConvId === 'temp') return
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await apiFetch(`/conversations/${targetConvId}/`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.messages && Array.isArray(data.messages)) {
+            const normalized: MessageBubbleData[] = data.messages.map((m: any) => ({
+              id: String(m.id),
+              content: m.content || '',
+              senderId: String(m.sender?.id || m.sender_id || ''),
+              senderName: m.sender?.full_name || m.sender?.username || m.sender_name || 'Utilisateur',
+              senderAvatar: m.sender?.avatar_url || m.sender_avatar || undefined,
+              senderUsername: m.sender?.username || m.sender_username || '',
+              createdAt: m.created_at || new Date().toISOString(),
+              read: m.read || false,
+              isImportant: m.is_important || false,
+              isEdited: false,
+            }))
+
+            setMessages(prev => {
+              const map = new Map<string, MessageBubbleData>()
+              prev.forEach(m => map.set(String(m.id), m))
+              normalized.forEach(m => map.set(String(m.id), m))
+              return Array.from(map.values()).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+            })
+          }
+        }
+      } catch {}
+    }, 2000)
+
+    return () => clearInterval(pollInterval)
+  }, [activeConvId, conversationId, id])
 
   // ─── Scroll to bottom ────────────────────────────────────────────────────────
   useEffect(() => {

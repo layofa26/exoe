@@ -320,6 +320,40 @@ export const Requests = (): JSX.Element => {
     )
   }, [cachedDemandes, currentUserId])
 
+  // ─── Real-time Auto-mount & 3s Polling for Demandes ────────────────────────
+  const refetchDemandes = useCallback(async () => {
+    try {
+      const res = await apiFetch('/demandes/')
+      if (res.ok) {
+        const data = await res.json()
+        const raw = Array.isArray(data) ? data : (data.results || [])
+        const normalized = raw.map(normalizeDemande)
+        setDemandes(normalized)
+      }
+    } catch {}
+  }, [setDemandes])
+
+  useEffect(() => {
+    const handleDemandeChange = () => {
+      refetchDemandes()
+    }
+
+    window.addEventListener('exile_demande_created', handleDemandeChange)
+    window.addEventListener('exile_demande_updated', handleDemandeChange)
+    window.addEventListener('storage', handleDemandeChange)
+
+    const interval = setInterval(() => {
+      refetchDemandes()
+    }, 3000)
+
+    return () => {
+      window.removeEventListener('exile_demande_created', handleDemandeChange)
+      window.removeEventListener('exile_demande_updated', handleDemandeChange)
+      window.removeEventListener('storage', handleDemandeChange)
+      clearInterval(interval)
+    }
+  }, [refetchDemandes])
+
   // ─── Actions ────────────────────────────────────────────────────────────────
   const updateStatus = useCallback((id: string, status: DemandeStatus, conversationId?: string | number) => {
     setDemandes((prev: Demande[]) => prev.map(d => d.id === id ? { ...d, status, conversationId: conversationId || d.conversationId } : d))
@@ -364,8 +398,15 @@ export const Requests = (): JSX.Element => {
       const convId = data.conversation_id || data.conversation?.id
 
       updateStatus(d.id, 'accepted', convId)
+
+      // Notify User A
       notificationService.notifyRequestAccepted(d.senderUsername || d.senderName, convId)
-      showToast('🎉 Demande acceptée ! Ouverture...')
+
+      // Dispatch real-time events
+      window.dispatchEvent(new CustomEvent('exile_demande_updated', { detail: { id: d.id, status: 'accepted', convId } }))
+      window.dispatchEvent(new Event('storage'))
+
+      showToast('🎉 Demande acceptée ! Ouverture de la discussion...')
 
       const updatedD = { ...d, status: 'accepted' as DemandeStatus, conversationId: convId || d.conversationId }
       setSelectedDemande(updatedD)
