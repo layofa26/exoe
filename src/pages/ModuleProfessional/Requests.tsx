@@ -11,7 +11,7 @@ import { notificationService } from '../../services/notificationService'
 import { ConversationView } from './Conversation'
 
 // ─── API Base ─────────────────────────────────────────────────────────────────
-const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const API = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 async function apiFetch(path: string, options?: RequestInit) {
   let token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
@@ -43,19 +43,8 @@ async function apiFetch(path: string, options?: RequestInit) {
         } catch {}
       }
     }
-    if (!res.ok && API.includes('onrender.com')) {
-      try {
-        const localRes = await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
-        if (localRes.ok) return localRes
-      } catch {}
-    }
     return res
   } catch (err) {
-    if (API.includes('onrender.com')) {
-      try {
-        return await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
-      } catch {}
-    }
     throw err
   }
 }

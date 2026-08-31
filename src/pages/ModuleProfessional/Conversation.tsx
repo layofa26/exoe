@@ -10,7 +10,7 @@ import { useWebSocket, WSMessage } from '../../hooks/useWebSocket'
 import { TypingIndicator } from '../../components/TypingIndicator'
 import { MessageBubble, MessageBubbleData } from '../../components/MessageBubble'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 interface ReplyContext {
   id: string
@@ -20,12 +20,12 @@ interface ReplyContext {
 
 function getCurrentUserId(): string | null {
   try {
-    const token = localStorage.getItem('accessToken')
-    if (!token) return null
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+    if (!token) return localStorage.getItem('user_id')
     const payload = JSON.parse(atob(token.split('.')[1]))
-    return String(payload.user_id)
+    return String(payload.user_id || payload.id || payload.uuid || localStorage.getItem('user_id') || '')
   } catch {
-    return null
+    return localStorage.getItem('user_id')
   }
 }
 
@@ -59,19 +59,8 @@ async function apiFetch(path: string, options?: RequestInit) {
         } catch {}
       }
     }
-    if (!res.ok && API_BASE_URL.includes('onrender.com')) {
-      try {
-        const localRes = await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
-        if (localRes.ok) return localRes
-      } catch {}
-    }
     return res
   } catch (err) {
-    if (API_BASE_URL.includes('onrender.com')) {
-      try {
-        return await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
-      } catch {}
-    }
     throw err
   }
 }
