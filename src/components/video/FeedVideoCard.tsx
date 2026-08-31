@@ -597,7 +597,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         <button
           type="button"
           onClick={handleToggleSound}
-          className={`absolute bottom-2.5 right-2.5 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur transition-all active:scale-95 cursor-pointer ${
+          className={`sound-toggle-btn absolute bottom-2.5 right-2.5 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur transition-all active:scale-95 cursor-pointer ${
             isMuted
               ? 'bg-black/85 hover:bg-black text-white border border-white/20 shadow-md'
               : 'bg-black/60 hover:bg-black/80 text-white'
@@ -614,7 +614,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         </button>
 
         {/* Barre de progression discrète */}
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/20 z-20 overflow-hidden">
+        <div className="feed-progress-bar absolute bottom-0 left-0 right-0 h-[2px] bg-white/20 z-20 overflow-hidden">
           <div
             className="h-full bg-[#FF6B00] transition-all duration-100 ease-linear"
             style={{ width: `${progress}%` }}

@@ -552,15 +552,18 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
   })
   const [submitted, setSubmitted] = useState(false)
 
-  // Bloquer le scroll d'arrière-plan quand la modale est ouverte
+  // Bloquer le scroll d'arrière-plan et masquer les contrôles vidéo quand la modale est ouverte
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
+      document.body.classList.add('pub-inquiry-modal-open')
     } else {
       document.body.style.overflow = ''
+      document.body.classList.remove('pub-inquiry-modal-open')
     }
     return () => {
       document.body.style.overflow = ''
+      document.body.classList.remove('pub-inquiry-modal-open')
     }
   }, [isOpen])
 
@@ -636,6 +639,21 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
       className="fixed inset-0 z-[999999] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-150"
       style={{ isolation: 'isolate', transform: 'translateZ(0)' }}
     >
+      <style>{`
+        body.pub-inquiry-modal-open .sound-toggle-btn,
+        body.pub-inquiry-modal-open .feed-progress-bar,
+        body.pub-inquiry-modal-open .video-controls-overlay {
+          display: none !important;
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+        }
+        body.pub-inquiry-modal-open .feed-video-card,
+        body.pub-inquiry-modal-open .video-player-container {
+          filter: blur(10px) brightness(0.5) !important;
+          transition: filter 0.2s ease-in-out !important;
+        }
+      `}</style>
       <div className={`w-full max-w-lg rounded-3xl border ${isDark ? 'bg-zinc-900 text-white border-zinc-800' : 'bg-white text-zinc-900 border-zinc-200'} p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative z-10 shadow-black/90`}>
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
