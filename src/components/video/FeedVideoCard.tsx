@@ -342,11 +342,23 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
     return () => window.removeEventListener('exile_feed_play_video', handleGlobalPlay)
   }, [video.id])
 
-  // URLs médias propres
-  const rawThumbnail = video.thumbnailUrl || video.thumbnail || ''
+  // URLs médias propres avec support complet pour les couvertures (Django cover, cover_url, etc.)
+  const rawThumbnail =
+    video.thumbnailUrl ||
+    video.thumbnail ||
+    (video as any).cover_url ||
+    (video as any).cover ||
+    (video as any).poster ||
+    (video as any).image ||
+    ''
   const thumbnailUrl: string | undefined = rawThumbnail.trim() ? resolveMediaUrl(rawThumbnail) : undefined
 
-  const rawVideo = video.videoUrl || ''
+  const rawVideo =
+    video.videoUrl ||
+    (video as any).url ||
+    (video as any).file_url ||
+    (video as any).file ||
+    ''
   const videoUrl: string | undefined = rawVideo.trim() ? resolveMediaUrl(rawVideo) : undefined
 
   // Nettoyage strict username & initiale
@@ -455,8 +467,11 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
     if (!next && v.volume === 0) v.volume = 1
   }, [])
 
+  const [isPlaying, setIsPlaying] = useState(false)
+
   // Événements du lecteur vidéo HTML5
   const handlePlaying = () => {
+    setIsPlaying(true)
     setIsBuffering(false)
     window.dispatchEvent(new CustomEvent('exile_feed_play_video', { detail: { videoId: String(video.id) } }))
 
@@ -468,6 +483,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
   }
 
   const handlePause = () => {
+    setIsPlaying(false)
     const v = videoRef.current
     if (v && v.currentTime > 0) {
       playbackPositionStore.set(video.id, v.currentTime)
@@ -562,6 +578,18 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden select-none flex items-center justify-center"
         onClick={handleVideoClick}
       >
+        {/* Vraie Image / Miniature de la vidéo (Superposée si présente et vidéo non en lecture) */}
+        {thumbnailUrl && !isPlaying && (
+          <img
+            src={thumbnailUrl}
+            alt={video.title}
+            className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none transition-opacity duration-200"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        )}
+
         {videoUrl ? (
           <video
             ref={videoRef}
@@ -579,6 +607,12 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
             onTimeUpdate={handleTimeUpdate}
             onError={() => setIsBuffering(false)}
             className="w-full h-full object-contain bg-black"
+          />
+        ) : thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={video.title}
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-600">
