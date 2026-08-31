@@ -55,9 +55,18 @@ export interface Video {
   postedAt?: string;
   createdAt?: string;
   videoUrl?: string; // URL videyo a (optional)
+  hlsUrl?: string; // URL HLS .m3u8 (optional)
   mimeType?: string; // Type MIME reyèl videyo a (optional)
   thumbnail?: string; // URL thumbnail la (optional)
   thumbnailUrl?: string; // URL thumbnail la (backend field)
+  aspectRatio?: string; // '16:9' | '9:16' (optional)
+  qualities?: string[]; // Qualités disponibles (ex: ['240p', '360p', '720p'])
+  captions?: {
+    src: string;
+    srclang: string;
+    label: string;
+    default?: boolean;
+  }[]; // Sous-titres WebVTT (optional)
   videoAvailable?: boolean; // Indique si la vidéo est disponible
   visibility?: 'PUBLIC' | 'PRIVATE' | 'SUBSCRIBERS_ONLY';
   status?: 'PUBLISHED' | 'DRAFT' | 'UPLOADING' | 'FAILED' | 'READY';

@@ -789,18 +789,18 @@ export const SocialEvents = (): JSX.Element => {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={`block text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1.5`}>
-                        Salle Jitsi
+                        Salon Live (WebRTC)
                       </label>
                       <input
                         type="text"
-                        value={newEvent.jitsiRoom}
-                        onChange={(e) => setNewEvent({ ...newEvent, jitsiRoom: e.target.value })}
+                        value={newEvent.liveRoomName || ''}
+                        onChange={(e) => setNewEvent({ ...newEvent, liveRoomName: e.target.value })}
                         className={`w-full px-3 py-2 rounded-lg text-sm ${
                           resolvedTheme === 'dark'
                             ? 'bg-zinc-700 border-zinc-600 text-white'
                             : 'bg-gray-50 border-gray-300 text-gray-900'
                         } border focus:ring-2 focus:ring-social focus:border-transparent transition-all`}
-                        placeholder="Nom de la salle"
+                        placeholder="Nom du salon"
                       />
                     </div>
                     <div>

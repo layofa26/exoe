@@ -7,7 +7,8 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { requestApi, CreateDemandeRequest } from '../../services/requestApi'
+
+const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 interface ContactModalProps {
   isOpen: boolean
@@ -45,33 +46,43 @@ export const ContactModal = ({
 
     // Vérifier si l'utilisateur essaie de s'envoyer à lui-même
     if (sender.id === receiver.id) {
-      setResult({
-        success: false,
-        message: 'Vous ne pouvez pas envoyer de demande à vous-même.'
-      })
+      setResult({ success: false, message: 'Vous ne pouvez pas envoyer de demande à vous-même.' })
       return
     }
 
     setIsSubmitting(true)
-    
-    const request: CreateDemandeRequest = {
-      receiver_username: receiver.username || receiver.name, // Backend identifie le destinataire par username
-      message: message.trim()
-    }
 
-    const response = await requestApi.createDemande(request)
-    
-    if (response.success) {
-      setResult({ success: true, message: 'Demande envoyée avec succès!' })
-      setTimeout(() => {
-        onClose()
-        setResult(null)
-        setMessage('')
-      }, 2000)
-    } else {
-      setResult({ success: false, message: response.error || 'Une erreur est survenue' })
+    try {
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setResult({ success: false, message: 'Vous devez être connecté pour envoyer une demande.' })
+        setIsSubmitting(false)
+        return
+      }
+      const res = await fetch(`${API}/demandes/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          receiver_username: receiver.username || receiver.name,
+          message: message.trim(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setResult({ success: true, message: 'Demande envoyée avec succès !' })
+        setTimeout(() => { onClose(); setResult(null); setMessage('') }, 2000)
+      } else {
+        const errMsg = Array.isArray(data.receiver) ? data.receiver[0] : (data.detail || data.message || 'Erreur lors de l\'envoi')
+        setResult({ success: false, message: errMsg })
+      }
+    } catch {
+      setResult({ success: false, message: 'Erreur réseau. Vérifiez votre connexion.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    setIsSubmitting(false)
   }
 
   // Fonction pour empêcher la propagation du clic
@@ -137,6 +148,44 @@ export const ContactModal = ({
             </div>
           )}
 
+          {/* Options de type de demande */}
+          <div className="space-y-1.5">
+            <label className={`block text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
+              Objet de votre demande
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'collaboration', label: '🤝 Collaboration', hint: 'Projet commun, partenariat' },
+                { id: 'service', label: '💼 Prestation', hint: 'Mission, service pro' },
+                { id: 'contact', label: '💬 Prise de contact', hint: 'Échange, réseau pro' },
+                { id: 'quote', label: '🎯 Demande de devis', hint: 'Tarifs et faisabilité' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    const prefix = `[${opt.label.split(' ')[1]}] `
+                    if (!message.startsWith('[')) {
+                      setMessage(prefix + message)
+                    } else {
+                      setMessage(prefix + message.replace(/^\[.*?\]\s*/, ''))
+                    }
+                  }}
+                  className={`p-2 rounded-xl text-left border text-xs transition-all ${
+                    message.includes(opt.label.split(' ')[1])
+                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold'
+                      : resolvedTheme === 'dark'
+                        ? 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-600 text-zinc-300'
+                        : 'border-gray-200 bg-gray-50 hover:border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <p className="font-semibold">{opt.label}</p>
+                  <p className={`text-[10px] mt-0.5 truncate ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{opt.hint}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {!result?.success && (
             <>
               {/* Message */}
@@ -147,10 +196,10 @@ export const ContactModal = ({
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Écrivez votre message..."
+                  placeholder="Décrivez brièvement votre projet ou votre demande..."
                   rows={4}
                   disabled={isSubmitting}
-                  className={`w-full px-2.5 sm:px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none ${
+                  className={`w-full px-2.5 sm:px-3 py-2 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none text-xs sm:text-sm ${
                     resolvedTheme === 'dark' 
                       ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500' 
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'

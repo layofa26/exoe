@@ -1,946 +1,850 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { 
-  Users, 
-  Inbox, 
-  Check, 
-  Search,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Handshake,
-  ArrowLeft,
-  Loader2,
-  Star,
-  UserX,
-  X,
-  Shield
+import {
+  Users, Inbox, Search, Clock, XCircle,
+  ArrowLeft, Loader2, X, Shield, MessageSquare,
+  Send, Check, Ban, CheckCheck, MessageCircle
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useQuery } from '../../hooks/useQuery'
+import { notificationService } from '../../services/notificationService'
+import { ConversationView } from './Conversation'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
-// Ensure API_BASE_URL always ends with /api/v1 for production URLs
-const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
-  ? API_BASE_URL.replace('/api', '/api/v1') 
-  : API_BASE_URL
+// ─── API Base ─────────────────────────────────────────────────────────────────
+const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
-interface Request {
-  id: string
-  senderId: string
-  senderName: string
-  senderAvatar: string | null
-  senderProfession: string
-  receiverId: string
-  receiverName: string
-  receiverAvatar: string | null
-  receiverProfession: string
-  message: string
-  status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled'
-  createdAt: string
-  respondedAt?: string
+async function apiFetch(path: string, options?: RequestInit) {
+  let token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options?.headers as Record<string, string> || {}),
+  }
+
+  try {
+    let res = await fetch(`${API}${path}`, { ...options, headers })
+    if (res.status === 401) {
+      const refresh = localStorage.getItem('refreshToken') || localStorage.getItem('refresh_token')
+      if (refresh) {
+        try {
+          const refreshRes = await fetch(`${API}/token/refresh/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh }),
+          })
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json()
+            if (refreshData.access) {
+              localStorage.setItem('accessToken', refreshData.access)
+              headers['Authorization'] = `Bearer ${refreshData.access}`
+              res = await fetch(`${API}${path}`, { ...options, headers })
+            }
+          }
+        } catch {}
+      }
+    }
+    if (!res.ok && API.includes('onrender.com')) {
+      try {
+        const localRes = await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
+        if (localRes.ok) return localRes
+      } catch {}
+    }
+    return res
+  } catch (err) {
+    if (API.includes('onrender.com')) {
+      try {
+        return await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
+      } catch {}
+    }
+    throw err
+  }
 }
 
-interface ImportantMessage {
-  id: string
-  conversationId: string
-  senderId: string
-  content: string
-  isImportant: boolean
-  read: boolean
-  createdAt: string
-  sender: {
-    id: string
-    fullName: string
-    username: string
-    avatarUrl?: string
+function getCurrentUserId(): string | null {
+  try {
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
+    if (!token) return null
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return String(payload.user_id || payload.id || '')
+  } catch {
+    return null
   }
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+export type DemandeStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'blocked'
+
+interface LastMessageInfo {
+  id?: string | number
+  content?: string
+  created_at?: string
+  sender?: { id: number | string; username: string }
+  read?: boolean
+}
+
+interface Demande {
+  id: string
+  conversationId?: string | number | null
+  senderId: string
+  senderName: string
+  senderUsername: string
+  senderAvatar: string | null
+  receiverId: string
+  receiverName: string
+  receiverUsername: string
+  receiverAvatar: string | null
+  message: string
+  status: DemandeStatus
+  createdAt: string
+  lastMessage?: LastMessageInfo | null
 }
 
 interface BlockedUser {
   id: string
-  blockerId: string
-  blockedId: string
   blocked: {
     id: string
     username: string
-    fullName: string
-    avatarUrl?: string
-    professionalProfile?: {
-      profession: string
-    }
+    full_name: string
+    avatar_url?: string
   }
   createdAt: string
 }
 
-export const Requests = (): JSX.Element => {
-  const { resolvedTheme } = useTheme()
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState<'all' | 'received' | 'sent' | 'accepted' | 'important' | 'blocked'>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [requests, setRequests] = useState<Request[]>([])
-  const [importantMessages, setImportantMessages] = useState<ImportantMessage[]>([])
-  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([])
-  const [toast, setToast] = useState('')
+// ─── Helper Functions ─────────────────────────────────────────────────────────
+function normalizeStatus(s: string): DemandeStatus {
+  switch (s) {
+    case 'accepte':
+    case 'accepted': return 'accepted'
+    case 'refuse':
+    case 'rejected': return 'rejected'
+    case 'annule':
+    case 'cancelled': return 'cancelled'
+    case 'bloque':
+    case 'blocked': return 'blocked'
+    default: return 'pending'
+  }
+}
 
-  // Fonction de navigation conditionnelle
-  const handleBack = () => {
-    const previousPage = localStorage.getItem('exile_previous_page')
-    if (previousPage === '/pro/profile') {
-      // On vient de Mon compte → retour vers Mon compte
-      navigate('/pro/profile')
-    } else {
-      // On vient du prosidebar → retour vers accueil
-      navigate('/pro')
-    }
+function normalizeDemande(item: any): Demande {
+  return {
+    id: String(item.id),
+    conversationId: item.conversation_id || item.conversation?.id || null,
+    senderId: String(item.sender?.id || item.sender_id || ''),
+    senderName: item.sender?.full_name || item.sender?.username || 'Utilisateur',
+    senderUsername: (item.sender?.username || '').replace(/^@/, ''),
+    senderAvatar: item.sender?.avatar_url || item.sender?.photo || null,
+    receiverId: String(item.receiver?.id || item.receiver_id || ''),
+    receiverName: item.receiver?.full_name || item.receiver?.username || 'Utilisateur',
+    receiverUsername: (item.receiver?.username || '').replace(/^@/, ''),
+    receiverAvatar: item.receiver?.avatar_url || item.receiver?.photo || null,
+    message: item.message || '',
+    status: normalizeStatus(item.status),
+    createdAt: item.created_at || new Date().toISOString(),
+    lastMessage: item.last_message || null,
+  }
+}
+
+function timeAgo(iso?: string): string {
+  if (!iso) return ''
+  try {
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000
+    if (diff < 60) return 'À l\'instant'
+    if (diff < 3600) return `${Math.floor(diff / 60)} min`
+    if (diff < 86400) return `${Math.floor(diff / 3600)} h`
+    if (diff < 604800) return `${Math.floor(diff / 86400)} j`
+    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  } catch { return '' }
+}
+
+// ─── Avatar Dynamic Colors & Real Photo Resolution ────────────────────────────
+const AVATAR_GRADIENTS = [
+  'from-blue-600 via-indigo-600 to-violet-700',
+  'from-emerald-600 via-teal-600 to-cyan-700',
+  'from-violet-600 via-purple-600 to-fuchsia-700',
+  'from-amber-600 via-orange-600 to-rose-700',
+  'from-rose-600 via-pink-600 to-purple-700',
+  'from-teal-600 via-emerald-600 to-green-700',
+  'from-cyan-600 via-blue-600 to-indigo-700',
+  'from-fuchsia-600 via-pink-600 to-rose-700',
+  'from-orange-600 via-amber-600 to-yellow-600',
+  'from-indigo-600 via-blue-700 to-violet-800',
+]
+
+function getAvatarGradient(name: string): string {
+  let hash = 0
+  const str = name || 'User'
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const index = Math.abs(hash) % AVATAR_GRADIENTS.length
+  return AVATAR_GRADIENTS[index]
+}
+
+function formatAvatarUrl(url: string | null | undefined): string | null {
+  if (!url || typeof url !== 'string') return null
+  const trimmed = url.trim()
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+    return trimmed
   }
 
-  // Set active tab from URL parameter
+  if (trimmed.startsWith('/media/') || trimmed.startsWith('media/')) {
+    const clean = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+    const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace('/api/v1', '')
+    return `${base}${clean}`
+  }
+
+  const supabaseBase = import.meta.env.VITE_SUPABASE_URL || 'https://phjpbbcymhtppfkyoegk.supabase.co'
+  return `${supabaseBase}/storage/v1/object/public/Exile_images/${trimmed.replace(/^\/+/, '')}`
+}
+
+function Avatar({ src, name, size = 44 }: { src: string | null; name: string; size?: number }) {
+  const [imgError, setImgError] = useState(false)
+  const formatted = useMemo(() => formatAvatarUrl(src), [src])
+  const letter = (name || 'U').replace(/^@/, '').charAt(0).toUpperCase()
+  const gradient = useMemo(() => getAvatarGradient(name || 'U'), [name])
+
+  if (formatted && !imgError) {
+    return (
+      <img
+        src={formatted}
+        alt={name}
+        onError={() => setImgError(true)}
+        className="rounded-full object-cover ring-2 ring-white/10 flex-shrink-0"
+        style={{ width: size, height: size }}
+      />
+    )
+  }
+  return (
+    <div
+      className={`rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold flex-shrink-0 shadow-md ring-2 ring-white/10`}
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
+      {letter}
+    </div>
+  )
+}
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+const STATUS_CONFIG: Record<DemandeStatus, { icon: any; label: string; cls: string }> = {
+  pending: { icon: Clock, label: 'En attente', cls: 'text-amber-400 bg-amber-400/10 border border-amber-400/20' },
+  accepted: { icon: MessageCircle, label: 'Discussion', cls: 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' },
+  rejected: { icon: XCircle, label: 'Refusée', cls: 'text-red-400 bg-red-400/10 border border-red-400/20' },
+  cancelled: { icon: X, label: 'Annulée', cls: 'text-slate-400 bg-slate-400/10 border border-slate-400/20' },
+  blocked: { icon: Shield, label: 'Bloquée', cls: 'text-orange-400 bg-orange-400/10 border border-orange-400/20' },
+}
+
+function StatusBadge({ status }: { status: DemandeStatus }) {
+  const cfg = STATUS_CONFIG[status]
+  const Icon = cfg.icon
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium ${cfg.cls}`}>
+      <Icon size={12} /> {cfg.label}
+    </span>
+  )
+}
+
+// ─── Main Unified Requests & WhatsApp Split Component ──────────────────────────
+export const Requests = (): JSX.Element => {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const currentUserId = useMemo(() => getCurrentUserId(), [])
+
+  type Tab = 'all' | 'accepted' | 'received' | 'sent'
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab')
+    if (t === 'sent' || t === 'received' || t === 'accepted' || t === 'all') return t as Tab
+    return 'all'
+  })
+
+  // Selected conversation ID and Demande for the Right Side Pane
+  const [selectedConversationId, setSelectedConversationId] = useState<string | number | null>(() => {
+    const convParam = searchParams.get('conv')
+    return convParam || null
+  })
+  const [selectedDemande, setSelectedDemande] = useState<Demande | null>(null)
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [toast, setToast] = useState<{ msg: string; type?: 'success' | 'error' } | null>(null)
+  const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([])
+  const [loadingBlocked, setLoadingBlocked] = useState(false)
+  const [showBlockedPanel, setShowBlockedPanel] = useState(false)
+
   useEffect(() => {
-    const tabParam = searchParams.get('tab')
-    if (tabParam === 'sent') {
-      setActiveTab('sent')
+    const t = searchParams.get('tab')
+    if (t === 'sent' || t === 'received' || t === 'accepted' || t === 'all') {
+      setActiveTab(t as Tab)
     }
   }, [searchParams])
 
-  const [loading, setLoading] = useState(true)
-  const [loadingImportant, setLoadingImportant] = useState(false)
-  const [loadingBlocked, setLoadingBlocked] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const handleTabChange = (t: Tab) => {
+    setActiveTab(t)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (t === 'all') next.delete('tab')
+      else next.set('tab', t)
+      return next
+    })
+  }
 
-  // Load requests from backend API
-  useEffect(() => {
-    const loadRequests = async () => {
+  const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }, [])
+
+  // ─── Load demandes & conversations ──────────────────────────────────────────
+  const {
+    data: cachedDemandes,
+    isLoading,
+    setData: setDemandes,
+  } = useQuery<Demande[]>(
+    async () => {
+      const res = await apiFetch('/demandes/')
+      if (!res.ok) throw new Error('Erreur chargement demandes')
+      const data = await res.json()
+      const raw = Array.isArray(data) ? data : (data.results || [])
+      return raw.map(normalizeDemande)
+    },
+    { cacheKey: `pro:demandes:user:${currentUserId || 'guest'}:v4`, cacheTime: 10_000, initialData: [] }
+  )
+
+  const demandes = useMemo(() => {
+    if (!currentUserId) return []
+    return (cachedDemandes || []).filter(
+      d => String(d.senderId) === String(currentUserId) || String(d.receiverId) === String(currentUserId)
+    )
+  }, [cachedDemandes, currentUserId])
+
+  // ─── Actions ────────────────────────────────────────────────────────────────
+  const updateStatus = useCallback((id: string, status: DemandeStatus, conversationId?: string | number) => {
+    setDemandes((prev: Demande[]) => prev.map(d => d.id === id ? { ...d, status, conversationId: conversationId || d.conversationId } : d))
+  }, [setDemandes])
+
+  // Open Conversation on the Right Pane instantly
+  const handleOpenConversation = useCallback(async (d: Demande) => {
+    setSelectedDemande(d)
+    setSelectedConversationId(d.conversationId || `demande-${d.id}`)
+
+    const partnerId = d.senderId === currentUserId ? d.receiverId : d.senderId
+    if (!partnerId) return
+
+    if (!d.conversationId) {
       try {
-        setLoading(true)
-        setError(null)
-        
-        // Get current user ID from token
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          navigate('/login')
-          return
-        }
-        
-        // Decode token to get user ID
-        const tokenPayload = JSON.parse(atob(token.split('.')[1]))
-        const userId = String(tokenPayload.user_id)
-        setCurrentUserId(userId)
-        
-        // Fetch all requests from backend (no type filtering)
-        const response = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+        const startRes = await apiFetch('/conversations/start/', {
+          method: 'POST',
+          body: JSON.stringify({ participant_id: Number(partnerId) })
         })
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch requests')
-        }
-        
-        const data = await response.json()
-        
-        // Transform backend data to frontend format
-        const transformedRequests: Request[] = data.map((item: any) => ({
-          id: item.id,
-          senderId: String(item.sender_id || (item.sender?.id)),
-          senderName: item.sender?.username || item.sender,
-          senderAvatar: null,
-          senderProfession: 'Professionnel',
-          receiverId: String(item.receiver_id || (item.receiver?.id)),
-          receiverName: item.receiver?.username || item.receiver,
-          receiverAvatar: null,
-          receiverProfession: 'Professionnel',
-          message: item.message,
-          status: item.status === 'envoye' ? 'pending' : 
-                 item.status === 'accepte' ? 'accepted' : 
-                 item.status === 'refuse' ? 'rejected' : 
-                 item.status === 'annule' ? 'cancelled' :
-                 item.status === 'bloque' ? 'expired' : 'pending',
-          createdAt: item.created_at,
-          respondedAt: undefined
-        }))
-        
-        setRequests(transformedRequests)
-      } catch (err) {
-        console.error('Error loading requests:', err)
-        setError('Erreur lors du chargement des demandes')
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    loadRequests()
-  }, [navigate])
-
-  // Load important messages when tab changes
-  useEffect(() => {
-    if (activeTab === 'important') {
-      const loadImportantMessages = async () => {
-        try {
-          setLoadingImportant(true)
-          const token = localStorage.getItem('accessToken')
-          if (!token) return
-
-          const response = await fetch(`${FINAL_API_BASE_URL}/conversations/messages/important/`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            setImportantMessages(data.results || data)
+        if (startRes.ok) {
+          const startData = await startRes.json()
+          if (startData.id) {
+            updateStatus(d.id, 'accepted', startData.id)
+            setSelectedConversationId(startData.id)
+            setSelectedDemande(prev => prev ? { ...prev, conversationId: startData.id } : null)
           }
-        } catch (err) {
-          console.error('Error loading important messages:', err)
-        } finally {
-          setLoadingImportant(false)
         }
-      }
-      loadImportantMessages()
+      } catch {}
     }
-  }, [activeTab])
+  }, [currentUserId, updateStatus])
 
-  const loadBlockedUsers = useCallback(async () => {
+  // Accept Demande -> Opens discussion on the right immediately
+  const handleAccept = useCallback(async (d: Demande) => {
+    setLoadingAction(d.id + ':accept')
     try {
-      setLoadingBlocked(true)
-      const token = localStorage.getItem('accessToken')
-      if (!token) return
+      const res = await apiFetch(`/demandes/${d.id}/accept/`, { method: 'POST' })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || errData.error || 'Erreur lors de l\'acceptation')
+      }
+      const data = await res.json()
+      const convId = data.conversation_id || data.conversation?.id
 
-      const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      updateStatus(d.id, 'accepted', convId)
+      notificationService.notifyRequestAccepted(d.senderUsername || d.senderName, convId)
+      showToast('🎉 Demande acceptée ! Ouverture...')
 
-      if (response.ok) {
-        const data = await response.json()
-        setBlockedUsers(data.results || data)
+      const updatedD = { ...d, status: 'accepted' as DemandeStatus, conversationId: convId || d.conversationId }
+      setSelectedDemande(updatedD)
+      setSelectedConversationId(convId || `demande-${d.id}`)
+
+      if (!convId) {
+        handleOpenConversation(updatedD)
       }
     } catch (err) {
-      console.error('Error loading blocked users:', err)
+      showToast(err instanceof Error ? err.message : 'Erreur lors de l\'acceptation', 'error')
     } finally {
+      setLoadingAction(null)
+    }
+  }, [handleOpenConversation, showToast, updateStatus])
+
+  // Reject Demande
+  const handleReject = useCallback(async (d: Demande) => {
+    setLoadingAction(d.id + ':reject')
+    try {
+      const res = await apiFetch(`/demandes/${d.id}/reject/`, { method: 'POST' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Erreur')
+      updateStatus(d.id, 'rejected')
+      showToast('Demande refusée')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erreur', 'error')
+    } finally {
+      setLoadingAction(null)
+    }
+  }, [showToast, updateStatus])
+
+  // Cancel Demande
+  const handleCancel = useCallback(async (d: Demande) => {
+    setLoadingAction(d.id + ':cancel')
+    try {
+      const res = await apiFetch(`/demandes/${d.id}/cancel/`, { method: 'POST' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Erreur')
+      updateStatus(d.id, 'cancelled')
+      showToast('Demande annulée')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erreur', 'error')
+    } finally {
+      setLoadingAction(null)
+    }
+  }, [showToast, updateStatus])
+
+  // Block User
+  const handleBlock = useCallback(async (d: Demande) => {
+    setLoadingAction(d.id + ':block')
+    try {
+      const targetUser = d.senderId === currentUserId ? d.receiverId : d.senderId
+      const res = await apiFetch('/blocked/blocked-users/', {
+        method: 'POST',
+        body: JSON.stringify({ blocked_user: targetUser }),
+      })
+      if (!res.ok) throw new Error('Erreur lors du blocage')
+      updateStatus(d.id, 'blocked')
+      showToast('🚫 Utilisateur bloqué')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erreur', 'error')
+    } finally {
+      setLoadingAction(null)
+    }
+  }, [currentUserId, showToast, updateStatus])
+
+  // Load Blocked Users
+  const loadBlockedUsers = useCallback(async () => {
+    setLoadingBlocked(true)
+    try {
+      const res = await apiFetch('/blocked/blocked-users/')
+      if (res.ok) {
+        const data = await res.json()
+        setBlockedUsers(data.results || data)
+      }
+    } catch {} finally {
       setLoadingBlocked(false)
     }
   }, [])
 
-  // Load blocked users when tab changes
-  useEffect(() => {
-    if (activeTab === 'blocked') {
-      loadBlockedUsers()
-    }
-  }, [activeTab, loadBlockedUsers])
-
-  const handleUnblock = async (userId: string) => {
+  const handleUnblock = useCallback(async (userId: string) => {
     try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        setToast('Token non trouvé')
-        setTimeout(() => setToast(''), 3000)
-        return
-      }
-
-      const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
+      const res = await apiFetch('/blocked/blocked-users/', {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ blocked_user: userId })
+        body: JSON.stringify({ blocked_user: userId }),
       })
+      if (res.ok) {
+        setBlockedUsers(prev => prev.filter(b => b.blocked.id !== userId))
+        showToast('Utilisateur débloqué ✓')
+      }
+    } catch {
+      showToast('Erreur lors du déblocage', 'error')
+    }
+  }, [showToast])
 
-      if (response.ok) {
-        setToast('Utilisateur débloqué avec succès')
-        setTimeout(() => setToast(''), 3000)
-        loadBlockedUsers()
+  // ─── Filtered, Deduplicated & Sorted Demandes ──────────────────────────────
+  const deduplicatedDemandes = useMemo(() => {
+    const threadMap = new Map<string, Demande>()
+    for (const d of demandes) {
+      const isSender = d.senderId === currentUserId
+      const partnerKey = isSender ? String(d.receiverId || d.receiverUsername) : String(d.senderId || d.senderUsername)
+      const existing = threadMap.get(partnerKey)
+
+      if (!existing) {
+        threadMap.set(partnerKey, d)
       } else {
-        throw new Error('Erreur lors du déblocage')
-      }
-    } catch (err) {
-      console.error('Error unblocking user:', err)
-      setToast('Erreur lors du déblocage')
-      setTimeout(() => setToast(''), 3000)
-    }
-  }
+        const isCurrentAccepted = d.status === 'accepted'
+        const isExistingAccepted = existing.status === 'accepted'
 
-  const handleMessageClick = (conversationId: string) => {
-    navigate(`/pro/conversation/${conversationId}`)
-  }
-
-  const handleRespond = async (requestId: string, action: 'accept' | 'reject') => {
-    try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        navigate('/login')
-        return
-      }
-      
-      const endpoint = action === 'accept' ? 'accept' : 'reject'
-      
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/${endpoint}/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        if (isCurrentAccepted && !isExistingAccepted) {
+          threadMap.set(partnerKey, d)
+        } else if (!isCurrentAccepted && isExistingAccepted) {
+          // Keep existing accepted
+        } else {
+          const timeD = new Date(d.lastMessage?.created_at || d.createdAt).getTime()
+          const timeEx = new Date(existing.lastMessage?.created_at || existing.createdAt).getTime()
+          if (timeD > timeEx) {
+            threadMap.set(partnerKey, d)
+          }
         }
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.detail || 'Failed to respond to request')
       }
-      
-      const responseData = await response.json()
-      
-      // Update local state
-      setRequests(requests.map(req => 
-        req.id === requestId 
-          ? { ...req, status: action === 'accept' ? 'accepted' : 'rejected' } 
-          : req
-      ))
-      
-      setToast(action === 'accept' ? 'Demande acceptée' : 'Demande refusée')
-      setTimeout(() => setToast(''), 3000)
-      
-      // If accepted and conversation was created, navigate to conversation
-      if (action === 'accept' && responseData.conversation_id) {
-        navigate(`/pro/conversation/${responseData.conversation_id}`)
-        return
-      }
-      
-      // Reload requests to get updated data (if not navigating away)
-      const reloadResponse = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (reloadResponse.ok) {
-        const data = await reloadResponse.json()
-        const transformedRequests: Request[] = data.map((item: any) => ({
-          id: item.id,
-          senderId: String(item.sender_id || (item.sender?.id)),
-          senderName: item.sender?.username || item.sender,
-          senderAvatar: null,
-          senderProfession: 'Professionnel',
-          receiverId: String(item.receiver_id || (item.receiver?.id)),
-          receiverName: item.receiver?.username || item.receiver,
-          receiverAvatar: null,
-          receiverProfession: 'Professionnel',
-          message: item.message,
-          status: item.status === 'envoye' ? 'pending' : 
-                 item.status === 'accepte' ? 'accepted' : 
-                 item.status === 'refuse' ? 'rejected' : 
-                 item.status === 'annule' ? 'cancelled' :
-                 item.status === 'bloque' ? 'expired' : 'pending',
-          createdAt: item.created_at,
-          respondedAt: undefined
-        }))
-        setRequests(transformedRequests)
-      }
-    } catch (err) {
-      console.error('Error responding to request:', err)
-      setToast(err instanceof Error ? err.message : 'Erreur lors de la réponse')
-      setTimeout(() => setToast(''), 3000)
     }
-  }
+    return Array.from(threadMap.values())
+  }, [demandes, currentUserId])
 
-  const handleCancelRequest = async (requestId: string) => {
-    try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        navigate('/login')
-        return
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase()
+    const list = deduplicatedDemandes.filter(d => {
+      const isSender = d.senderId === currentUserId
+      const username = (isSender ? d.receiverUsername : d.senderUsername).toLowerCase()
+      const name = (isSender ? d.receiverName : d.senderName).toLowerCase()
+      const msg = d.message.toLowerCase()
+      const matchesSearch = !q || username.includes(q) || name.includes(q) || msg.includes(q)
+
+      switch (activeTab) {
+        case 'accepted': return d.status === 'accepted' && matchesSearch
+        case 'received': return !isSender && d.status === 'pending' && matchesSearch
+        case 'sent': return isSender && d.status === 'pending' && matchesSearch
+        default: return matchesSearch
       }
-      
-      const response = await fetch(`${FINAL_API_BASE_URL}/demandes/${requestId}/cancel/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.detail || 'Failed to cancel request')
-      }
-      
-      // Update local state - change status to cancelled
-      setRequests(requests.map(req => 
-        req.id === requestId 
-          ? { ...req, status: 'cancelled' as any } 
-          : req
-      ))
-      
-      setToast('Demande annulée')
-      setTimeout(() => setToast(''), 3000)
-      
-      // Reload requests to get updated data
-      const reloadResponse = await fetch(`${FINAL_API_BASE_URL}/demandes/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (reloadResponse.ok) {
-        const data = await reloadResponse.json()
-        const transformedRequests: Request[] = data.map((item: any) => ({
-          id: item.id,
-          senderId: String(item.sender_id || (item.sender?.id)),
-          senderName: item.sender?.username || item.sender,
-          senderAvatar: null,
-          senderProfession: 'Professionnel',
-          receiverId: String(item.receiver_id || (item.receiver?.id)),
-          receiverName: item.receiver?.username || item.receiver,
-          receiverAvatar: null,
-          receiverProfession: 'Professionnel',
-          message: item.message,
-          status: item.status === 'envoye' ? 'pending' : 
-                 item.status === 'accepte' ? 'accepted' : 
-                 item.status === 'refuse' ? 'rejected' : 
-                 item.status === 'annule' ? 'cancelled' :
-                 item.status === 'bloque' ? 'expired' : 'pending',
-          createdAt: item.created_at,
-          respondedAt: undefined
-        }))
-        setRequests(transformedRequests)
-      }
-    } catch (err) {
-      console.error('Error cancelling request:', err)
-      setToast(err instanceof Error ? err.message : 'Erreur lors de l\'annulation')
-      setTimeout(() => setToast(''), 3000)
-    }
-  }
+    })
 
-  const handleBlockFromRequest = async (_requestId: string, senderId: string) => {
-    try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        setToast('Token non trouvé')
-        setTimeout(() => setToast(''), 3000)
-        return
-      }
+    return list.sort((a, b) => {
+      const timeA = new Date(a.lastMessage?.created_at || a.createdAt).getTime()
+      const timeB = new Date(b.lastMessage?.created_at || b.createdAt).getTime()
+      return timeB - timeA
+    })
+  }, [deduplicatedDemandes, activeTab, searchQuery, currentUserId])
 
-      const response = await fetch(`${FINAL_API_BASE_URL}/blocked/blocked-users/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ blocked_user: senderId })
-      })
+  // Tab counts
+  const counts = useMemo(() => ({
+    all: deduplicatedDemandes.length,
+    accepted: deduplicatedDemandes.filter(d => d.status === 'accepted').length,
+    received: deduplicatedDemandes.filter(d => d.senderId !== currentUserId && d.status === 'pending').length,
+    sent: deduplicatedDemandes.filter(d => d.senderId === currentUserId && d.status === 'pending').length,
+  }), [deduplicatedDemandes, currentUserId])
 
-      if (response.ok) {
-        setToast('Utilisateur bloqué avec succès')
-        setTimeout(() => setToast(''), 3000)
-        loadBlockedUsers()
-      } else {
-        throw new Error('Erreur lors du blocage')
-      }
-    } catch (err) {
-      console.error('Error blocking user:', err)
-      setToast('Erreur lors du blocage')
-      setTimeout(() => setToast(''), 3000)
-    }
-  }
+  const tabs: { id: Tab; label: string; icon: any }[] = [
+    { id: 'all', label: 'Tous', icon: Users },
+    { id: 'accepted', label: 'Discussions', icon: MessageCircle },
+    { id: 'received', label: 'Reçues', icon: Inbox },
+    { id: 'sent', label: 'Envoyées', icon: Send },
+  ]
 
-  const filteredRequests = requests.filter(request => {
-    const matchesTab = activeTab === 'all'
-      ? request.status !== 'cancelled' // Hide cancelled from all
-      : activeTab === 'received'
-      ? request.receiverId === currentUserId && request.status === 'pending'
-      : activeTab === 'accepted'
-      ? request.status === 'accepted'
-      : activeTab === 'sent'
-      ? request.senderId === currentUserId && request.status !== 'cancelled'
-      : true
-    
-    const matchesSearch = searchQuery === '' || 
-      (activeTab === 'all' || activeTab === 'received' || activeTab === 'accepted'
-        ? request.senderName.toLowerCase().includes(searchQuery.toLowerCase()) || request.receiverName.toLowerCase().includes(searchQuery.toLowerCase())
-        : request.receiverName.toLowerCase().includes(searchQuery.toLowerCase()))
-    
-    // Debug logging
-    if (activeTab === 'received' && request.status === 'pending') {
-      console.log('Received request check:', {
-        requestReceiverId: request.receiverId,
-        currentUserId: currentUserId,
-        match: request.receiverId === currentUserId
-      })
-    }
-    
-    return matchesTab && matchesSearch
-  })
-
-  const filteredImportantMessages = importantMessages.filter(message => 
-    message.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    message.sender.fullName.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const filteredBlockedUsers = blockedUsers.filter(user => 
-    user.blocked.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.blocked.username.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const getSearchPlaceholder = () => {
-    switch (activeTab) {
-      case 'all': return 'Rechercher une demande...'
-      case 'received': return 'Rechercher un expéditeur...'
-      case 'accepted': return 'Rechercher un expéditeur...'
-      case 'sent': return 'Rechercher un destinataire...'
-      case 'important': return 'Rechercher un message...'
-      case 'blocked': return 'Rechercher un utilisateur...'
-      default: return 'Rechercher...'
-    }
-  }
-
-  const StatusBadge = ({ status }: { status: string }) => {
-    const configs = {
-      pending: { bg: resolvedTheme === 'dark' ? 'bg-amber-900/30' : 'bg-amber-100', text: resolvedTheme === 'dark' ? 'text-amber-300' : 'text-amber-700', icon: Clock, label: 'En attente' },
-      accepted: { bg: resolvedTheme === 'dark' ? 'bg-green-900/30' : 'bg-green-100', text: resolvedTheme === 'dark' ? 'text-green-300' : 'text-green-700', icon: CheckCircle, label: 'Acceptée' },
-      rejected: { bg: resolvedTheme === 'dark' ? 'bg-red-900/30' : 'bg-red-100', text: resolvedTheme === 'dark' ? 'text-red-300' : 'text-red-700', icon: XCircle, label: 'Refusée' },
-      expired: { bg: resolvedTheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100', text: resolvedTheme === 'dark' ? 'text-gray-300' : 'text-gray-700', icon: Clock, label: 'Expirée' },
-      cancelled: { bg: resolvedTheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100', text: resolvedTheme === 'dark' ? 'text-gray-300' : 'text-gray-700', icon: X, label: 'Annulée' }
-    }
-    const config = configs[status as keyof typeof configs] || configs.pending
-    const Icon = config.icon
-
-    return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-        <Icon className="w-3.5 h-3.5" />
-        {config.label}
-      </span>
-    )
-  }
+  const base = isDark ? 'bg-[#0b0e14] text-white' : 'bg-slate-50 text-slate-900'
+  const leftBg = isDark ? 'bg-[#0f131a] border-slate-800/80' : 'bg-white border-slate-200'
+  const card = isDark ? 'bg-slate-900/90 border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'
+  const subtle = isDark ? 'text-slate-400' : 'text-slate-500'
 
   return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-16 sm:pb-20`}>
-      {/* Toast */}
+    <div className={`flex-1 h-full min-h-0 flex overflow-hidden ${base}`}>
+
+      {/* ── Toast Notification ── */}
       {toast && (
-        <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/90 backdrop-blur text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium shadow-lg flex items-center gap-1.5 sm:gap-2">
-          <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {toast}
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[999] px-5 py-3 rounded-2xl shadow-2xl text-sm font-medium
+          ${toast.type === 'error'
+            ? 'bg-red-600 text-white shadow-red-950/30'
+            : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-emerald-950/30'}`}>
+          {toast.msg}
         </div>
       )}
 
-      {/* Header */}
-      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border-b fixed top-0 left-0 right-0 z-[100] md:mt-0 w-full px-3 sm:px-4 py-2.5 sm:py-3 md:py-2`}>
-        <div className="max-w-5xl mx-auto">
-          {/* Mobile layout */}
-          <div className="flex flex-col md:hidden gap-2 sm:gap-3">
-            <div className="flex items-center gap-2 sm:gap-3">
+      {/* ── LEFT PANE : Requests & Discussions Hub (WhatsApp Style List) ── */}
+      <div className={`flex flex-col border-r ${leftBg} ${selectedConversationId ? 'hidden lg:flex lg:w-[420px] xl:w-[460px]' : 'w-full lg:w-[420px] xl:w-[460px]'} flex-shrink-0 h-full overflow-hidden`}>
+        
+        {/* Top Header */}
+        <div className={`flex-shrink-0 p-3.5 border-b backdrop-blur-xl ${isDark ? 'border-white/5 bg-black/40' : 'border-slate-200 bg-white/80'}`}>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2.5">
               <button
-                onClick={handleBack}
-                className={`p-1.5 sm:p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
+                onClick={() => {
+                  if (window.history.length > 1) navigate(-1)
+                  else navigate('/pro')
+                }}
+                className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
               >
-                <ArrowLeft className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+                <ArrowLeft size={18} />
               </button>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center">
-                  <Handshake className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                </div>
-                <div>
-                  <h1 className={`text-base sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Demandes</h1>
-                  <p className={`text-[10px] sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} hidden sm:block`}>Gérez vos demandes et conversations</p>
-                </div>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm">
+                <Inbox size={18} />
               </div>
+              <h1 className="font-bold text-base">Demandes & Discussions</h1>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-1 sm:gap-2">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors ${
-                  activeTab === 'all'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Tous ({requests.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('received')}
-                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors ${
-                  activeTab === 'received'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Reçues ({requests.filter(r => r.receiverId === currentUserId && r.status === 'pending').length})
-              </button>
-              <button
-                onClick={() => setActiveTab('accepted')}
-                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors ${
-                  activeTab === 'accepted'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Acceptées ({requests.filter(r => r.status === 'accepted').length})
-              </button>
-              <button
-                onClick={() => setActiveTab('sent')}
-                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors ${
-                  activeTab === 'sent'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Envoyées ({requests.filter(r => r.senderId === currentUserId).length})
-              </button>
-              <button
-                onClick={() => setActiveTab('important')}
-                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors ${
-                  activeTab === 'important'
-                    ? `${resolvedTheme === 'dark' ? 'bg-amber-900/30 text-amber-300 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Importants
-              </button>
-              <button
-                onClick={() => setActiveTab('blocked')}
-                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors ${
-                  activeTab === 'blocked'
-                    ? `${resolvedTheme === 'dark' ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-50 text-red-700 border-red-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Bloqués
-              </button>
-            </div>
-
-            {/* Search */}
-            <div>
-              <div className="relative">
-                <Search className={`absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={getSearchPlaceholder()}
-                  className={`w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm border ${resolvedTheme === 'dark' ? 'border-zinc-600 text-white bg-zinc-700' : 'border-gray-300 text-gray-900 bg-white'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop layout */}
-          <div className="hidden md:flex items-center gap-2 sm:gap-4">
             <button
-              onClick={handleBack}
-              className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
+              onClick={() => { setShowBlockedPanel(true); loadBlockedUsers() }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors
+                ${isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
             >
-              <ArrowLeft className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+              <Shield size={13} /> Bloqués
             </button>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center">
-                <Handshake className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-              </div>
-              <h1 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Demandes</h1>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-1">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                  activeTab === 'all'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Tous ({requests.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('received')}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                  activeTab === 'received'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Reçues ({requests.filter(r => r.receiverId === currentUserId && r.status === 'pending').length})
-              </button>
-              <button
-                onClick={() => setActiveTab('accepted')}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                  activeTab === 'accepted'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Acceptées ({requests.filter(r => r.status === 'accepted').length})
-              </button>
-              <button
-                onClick={() => setActiveTab('sent')}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                  activeTab === 'sent'
-                    ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Envoyées ({requests.filter(r => r.senderId === currentUserId).length})
-              </button>
-              <button
-                onClick={() => setActiveTab('important')}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                  activeTab === 'important'
-                    ? `${resolvedTheme === 'dark' ? 'bg-amber-900/30 text-amber-300 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Importants
-              </button>
-              <button
-                onClick={() => setActiveTab('blocked')}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                  activeTab === 'blocked'
-                    ? `${resolvedTheme === 'dark' ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-50 text-red-700 border-red-200'} border`
-                    : `${resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-gray-600 hover:text-gray-900'}`
-                }`}
-              >
-                Bloqués
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="relative w-32 sm:w-48 flex-shrink-0">
-              <Search className={`absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={getSearchPlaceholder()}
-                className={`w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1 sm:py-1.5 text-xs sm:text-sm border ${resolvedTheme === 'dark' ? 'border-zinc-600 text-white bg-zinc-700' : 'border-gray-300 text-gray-900 bg-white'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-              />
-            </div>
-
-            <div className="flex-1" />
           </div>
+
+          {/* Search bar */}
+          <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border ${isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'}`}>
+            <Search size={15} className={subtle} />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par @username..."
+              className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')}>
+                <X size={13} className={subtle} />
+              </button>
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-1.5 pt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            {tabs.map(tab => {
+              const Icon = tab.icon
+              const active = activeTab === tab.id
+              const isDiscussions = tab.id === 'accepted'
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all
+                    ${active
+                      ? isDiscussions
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/30 font-semibold'
+                        : 'bg-violet-600 text-white shadow-md shadow-violet-900/30 font-semibold'
+                      : isDark ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+                >
+                  <Icon size={13} />
+                  {tab.label}
+                  {counts[tab.id] > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ml-0.5
+                      ${active ? 'bg-white/20 text-white' : isDiscussions ? 'bg-emerald-500/20 text-emerald-400' : 'bg-violet-500/20 text-violet-400'}`}>
+                      {counts[tab.id]}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Scrollable list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2.5" style={{ scrollbarWidth: 'thin' }}>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 size={28} className="animate-spin text-emerald-500" />
+              <p className={`text-xs ${subtle}`}>Chargement des échanges...</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-60">
+              <MessageCircle size={40} className={subtle} />
+              <p className={`text-xs text-center ${subtle}`}>
+                {searchQuery ? 'Aucun résultat trouvé' : 'Aucune demande pour le moment'}
+              </p>
+            </div>
+          ) : filtered.map(d => {
+            const isSender = d.senderId === currentUserId
+            const otherUsername = (isSender ? d.receiverUsername : d.senderUsername) || (isSender ? d.receiverName : d.senderName)
+            const otherAvatar = isSender ? d.receiverAvatar : d.senderAvatar
+            const isAccepted = d.status === 'accepted'
+            const isSelected = String(d.conversationId) === String(selectedConversationId)
+            const isLoadingAction = loadingAction?.startsWith(d.id + ':')
+
+            // ─── 1. WhatsApp Discussion Card (Accepted) ────────────────────────
+            if (isAccepted) {
+              const previewMsg = d.lastMessage?.content || d.message || 'Discussion active'
+              const msgTime = timeAgo(d.lastMessage?.created_at || d.createdAt)
+
+              return (
+                <div
+                  key={d.id}
+                  onClick={() => handleOpenConversation(d)}
+                  className={`rounded-2xl border p-3.5 cursor-pointer transition-all duration-150 ${card}
+                    ${isSelected
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-500/10'
+                      : 'hover:border-emerald-500/50 hover:shadow-md'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar src={otherAvatar} name={otherUsername} size={46} />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h3 className="font-bold text-sm truncate text-emerald-400">
+                          @{otherUsername.replace(/^@/, '')}
+                        </h3>
+                        <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">
+                          {msgTime}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 text-xs text-slate-300">
+                          <CheckCheck size={14} className="text-emerald-400 flex-shrink-0" />
+                          <p className="truncate text-xs">
+                            {previewMsg}
+                          </p>
+                        </div>
+
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 flex-shrink-0">
+                          <MessageSquare size={10} /> Ouvrir
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            // ─── 2. Request Card (Pending / Rejected / Cancelled) ──────────────
+            return (
+              <div
+                key={d.id}
+                className={`rounded-2xl border p-3.5 transition-all duration-150 ${card}
+                  ${isLoadingAction ? 'opacity-70 pointer-events-none' : 'hover:border-violet-500/30'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <Avatar src={otherAvatar} name={otherUsername} size={42} />
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm">@{otherUsername.replace(/^@/, '')}</span>
+                      <span className={`text-[11px] ml-auto ${subtle}`}>{timeAgo(d.createdAt)}</span>
+                    </div>
+
+                    <p className={`text-xs mt-0.5 ${subtle}`}>
+                      {isSender ? '→ Demande envoyée' : '← Demande reçue'}
+                    </p>
+
+                    {d.message && (
+                      <p className={`text-xs mt-2 px-3 py-1.5 rounded-xl leading-relaxed
+                        ${isDark ? 'bg-slate-800/80 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
+                        "{d.message}"
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
+                      <StatusBadge status={d.status} />
+
+                      <div className="flex items-center gap-2">
+                        {!isSender && d.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleReject(d)}
+                              disabled={!!loadingAction}
+                              className="px-2.5 py-1 rounded-xl text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                            >
+                              Refuser
+                            </button>
+                            <button
+                              onClick={() => handleBlock(d)}
+                              disabled={!!loadingAction}
+                              className="px-2.5 py-1 rounded-xl text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
+                            >
+                              Bloquer
+                            </button>
+                            <button
+                              onClick={() => handleAccept(d)}
+                              disabled={!!loadingAction}
+                              className="px-3 py-1 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm hover:scale-105 transition-all flex items-center gap-1"
+                            >
+                              <Check size={12} /> Accepter
+                            </button>
+                          </>
+                        )}
+
+                        {isSender && d.status === 'pending' && (
+                          <button
+                            onClick={() => handleCancel(d)}
+                            disabled={!!loadingAction}
+                            className="px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 transition-colors"
+                          >
+                            Annuler
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 pt-44 sm:pt-52 md:pt-20">
-        {/* Requests tabs */}
-        {(activeTab === 'all' || activeTab === 'received' || activeTab === 'accepted' || activeTab === 'sent') && (
-          <>
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className={`w-8 h-8 animate-spin ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
-              </div>
-            ) : error ? (
-              <div className="text-center py-12">
-                <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
-              </div>
-            ) : filteredRequests.length === 0 ? (
-              <div className="text-center py-8 sm:py-12">
-                <Inbox className={`w-10 h-10 sm:w-12 sm:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'} mx-auto mb-3 sm:mb-4`} />
-                <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Aucune demande trouvée</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                {filteredRequests.map((request) => (
-                  <div key={request.id} className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl border p-2.5 sm:p-3 shadow-sm`}>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-start gap-2">
-                        <div className={`w-9 h-9 sm:w-10 sm:h-10 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'} rounded-full flex items-center justify-center flex-shrink-0`}>
-                          <Users className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className={`font-semibold text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
-                            {activeTab === 'received' ? request.senderName : request.receiverName}
-                          </h3>
-                          <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} truncate`}>
-                            {activeTab === 'received' ? request.senderProfession : request.receiverProfession}
-                          </p>
-                        </div>
-                      </div>
-                      <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} line-clamp-2`}>{request.message}</p>
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        <StatusBadge status={request.status} />
-                        <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                          {new Date(request.createdAt).toLocaleDateString('fr-FR')}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {activeTab === 'received' && request.status === 'pending' && (
-                      <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-                        <button
-                          onClick={() => handleRespond(request.id, 'accept')}
-                          className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-emerald-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-emerald-700 transition-colors"
-                        >
-                          Accepter
-                        </button>
-                        <button
-                          onClick={() => handleRespond(request.id, 'reject')}
-                          className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-red-700 transition-colors"
-                        >
-                          Refuser
-                        </button>
-                        <button
-                          onClick={() => handleBlockFromRequest(request.id, request.senderId)}
-                          className="px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-gray-700 transition-colors"
-                          title="Bloquer l'utilisateur"
-                        >
-                          <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    {activeTab === 'sent' && request.status === 'pending' && (
-                      <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-                        <button
-                          onClick={() => handleCancelRequest(request.id)}
-                          className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <X className="w-3 h-3 sm:w-4 sm:h-4" />
-                          Annuler
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Important messages tab */}
-        {activeTab === 'important' && (
-          <>
-            {loadingImportant ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className={`w-8 h-8 animate-spin ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
-              </div>
-            ) : filteredImportantMessages.length === 0 ? (
-              <div className="text-center py-8 sm:py-12">
-                <Star className={`w-10 h-10 sm:w-12 sm:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'} mx-auto mb-3 sm:mb-4`} />
-                <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                  {searchQuery ? 'Aucun message trouvé' : 'Aucun message important'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2 sm:space-y-3">
-                {filteredImportantMessages.map((message) => (
-                  <div
-                    key={message.id}
-                    onClick={() => handleMessageClick(message.conversationId)}
-                    className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 hover:bg-zinc-750' : 'bg-white border-gray-200 hover:bg-gray-50'} rounded-xl border p-3 sm:p-4 shadow-sm cursor-pointer transition-colors`}
-                  >
-                    <div className="flex items-start gap-2 sm:gap-3">
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'} rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-                        {message.sender.avatarUrl ? (
-                          <img 
-                            src={message.sender.avatarUrl} 
-                            alt={message.sender.fullName}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
-                            {message.sender.fullName.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className={`font-semibold text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
-                            {message.sender.fullName}
-                          </h3>
-                          <Star className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500 flex-shrink-0`} />
-                          <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} flex-shrink-0`}>
-                            {new Date(message.createdAt).toLocaleDateString('fr-FR')}
-                          </span>
-                        </div>
-                        
-                        <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} line-clamp-2 mb-1`}>
-                          {message.content}
-                        </p>
-                        
-                        <div className="flex items-center gap-1">
-                          <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
-                            {new Date(message.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {!message.read && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Blocked users tab */}
-        {activeTab === 'blocked' && (
-          <>
-            {loadingBlocked ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className={`w-8 h-8 animate-spin ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
-              </div>
-            ) : filteredBlockedUsers.length === 0 ? (
-              <div className="text-center py-8 sm:py-12">
-                <UserX className={`w-10 h-10 sm:w-12 sm:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'} mx-auto mb-3 sm:mb-4`} />
-                <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                  {searchQuery ? 'Aucun utilisateur trouvé' : 'Aucun utilisateur bloqué'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                {filteredBlockedUsers.map((blockedUser) => (
-                  <div key={blockedUser.id} className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl border p-2.5 sm:p-3 shadow-sm`}>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-start gap-2">
-                        <div className={`w-9 h-9 sm:w-10 sm:h-10 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'} rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-                          {blockedUser.blocked.avatarUrl ? (
-                            <img 
-                              src={blockedUser.blocked.avatarUrl} 
-                              alt={blockedUser.blocked.fullName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
-                              {blockedUser.blocked.fullName.charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className={`font-semibold text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
-                            {blockedUser.blocked.fullName}
-                          </h3>
-                          <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} truncate`}>
-                            {blockedUser.blocked.professionalProfile?.profession || blockedUser.blocked.username}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 sm:gap-2">
-                        <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
-                          Bloqué le {new Date(blockedUser.createdAt).toLocaleDateString('fr-FR')}
-                        </span>
-                      </div>
-
-                      <button
-                        onClick={() => handleUnblock(blockedUser.blockedId)}
-                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-emerald-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-emerald-700 transition-colors mt-1 sm:mt-2"
-                      >
-                        Débloquer
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+      {/* ── RIGHT PANE : WhatsApp Active Conversation View ── */}
+      <div className={`flex-1 flex flex-col h-full overflow-hidden ${selectedConversationId || selectedDemande ? 'flex' : 'hidden lg:flex'}`}>
+        {selectedDemande ? (
+          <ConversationView
+            conversationId={selectedDemande.conversationId}
+            partnerId={selectedDemande.senderId === currentUserId ? selectedDemande.receiverId : selectedDemande.senderId}
+            partnerUsername={selectedDemande.senderId === currentUserId ? selectedDemande.receiverUsername : selectedDemande.senderUsername}
+            partnerAvatar={selectedDemande.senderId === currentUserId ? selectedDemande.receiverAvatar : selectedDemande.senderAvatar}
+            initialMessage={selectedDemande.message}
+            onClose={() => {
+              setSelectedConversationId(null)
+              setSelectedDemande(null)
+            }}
+          />
+        ) : selectedConversationId ? (
+          <ConversationView
+            conversationId={selectedConversationId}
+            onClose={() => {
+              setSelectedConversationId(null)
+              setSelectedDemande(null)
+            }}
+          />
+        ) : (
+          <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center select-none ${isDark ? 'bg-[#090c10] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-600/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-4 shadow-xl">
+              <MessageCircle size={38} />
+            </div>
+            <h2 className={`text-lg font-bold mb-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>Messagerie Professionnelle Instantanée</h2>
+            <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
+              Sélectionnez une discussion ou acceptez une demande à gauche pour ouvrir et commencer la conversation instantanément ici à droite.
+            </p>
+          </div>
         )}
       </div>
+
+      {/* ── Blocked Users Modal Panel ── */}
+      {showBlockedPanel && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowBlockedPanel(false)}>
+          <div className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+              <h2 className="font-bold flex items-center gap-2 text-sm">
+                <Shield size={18} className="text-orange-400" /> Utilisateurs bloqués
+              </h2>
+              <button onClick={() => setShowBlockedPanel(false)}>
+                <X size={18} className={subtle} />
+              </button>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto p-3 space-y-2">
+              {loadingBlocked ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 size={24} className="animate-spin text-emerald-500" />
+                </div>
+              ) : blockedUsers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 opacity-50">
+                  <UserX size={32} className={subtle} />
+                  <p className={`text-sm ${subtle}`}>Aucun utilisateur bloqué</p>
+                </div>
+              ) : blockedUsers.map(b => (
+                <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                  <Avatar src={b.blocked.avatar_url || null} name={b.blocked.full_name || b.blocked.username} size={36} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{b.blocked.full_name || b.blocked.username}</p>
+                    <p className={`text-xs ${subtle}`}>@{b.blocked.username}</p>
+                  </div>
+                  <button
+                    onClick={() => handleUnblock(b.blocked.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${isDark ? 'bg-orange-900/30 text-orange-400 hover:bg-orange-900/50' : 'bg-orange-50 text-orange-500 hover:bg-orange-100'}`}
+                  >
+                    Débloquer
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

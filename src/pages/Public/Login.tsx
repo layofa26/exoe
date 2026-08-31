@@ -79,10 +79,10 @@ export const Login = (): JSX.Element => {
   const [loading, setLoading] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const sanitizedValue = e.target.value.trim()
+    const value = e.target.name === 'username' ? e.target.value.trim() : e.target.value
     setFormData({
       ...formData,
-      [e.target.name]: sanitizedValue
+      [e.target.name]: value
     })
     setError('')
   }
@@ -90,6 +90,11 @@ export const Login = (): JSX.Element => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    if (!formData.username || !formData.password) {
+      setError("Veuillez renseigner votre nom d'utilisateur et mot de passe.")
+      return
+    }
+
     if (isRateLimited()) {
       setError(`Trop de tentatives. Réessayez dans ${getRemainingTime()} secondes.`)
       return
@@ -102,7 +107,7 @@ export const Login = (): JSX.Element => {
     const result = await login(formData.username, formData.password)
     
     if (!result.success) {
-      setError('Identifiants incorrects')
+      setError(result.error || 'Identifiants incorrects. Vérifiez votre nom d\'utilisateur ou mot de passe.')
     } else {
       resetAttempts()
     }
@@ -117,7 +122,7 @@ export const Login = (): JSX.Element => {
           Connexion à EXILE
         </h1>
         <p className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
-          Connectez-vous avec votre username
+          Connectez-vous avec votre username, email ou téléphone
         </p>
       </div>
 
@@ -131,7 +136,7 @@ export const Login = (): JSX.Element => {
       <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
         <div>
           <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-            Username *
+            Identifiant (Username, Email ou Téléphone) *
           </label>
           <div className="relative">
             <User className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
@@ -146,7 +151,7 @@ export const Login = (): JSX.Element => {
                   ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
               }`}
-              placeholder="@votre_username"
+              placeholder="@NomPrenom, email@exemple.com ou +33..."
             />
           </div>
         </div>

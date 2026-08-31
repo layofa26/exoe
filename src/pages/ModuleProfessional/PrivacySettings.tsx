@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { cacheService } from '../../services/cacheService';
 import { 
   ChevronRight, Shield, Lock, Eye, Users, Globe, Building2, UserX,
   Mail, Smartphone, Briefcase, MapPin, Clock, Play, TrendingUp, Calendar
@@ -30,29 +31,35 @@ interface PrivacySettings {
   activityVisibility: PrivacyLevel;
 }
 
+const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
+  avatarVisibility: 'PUBLIC',
+  fullNameVisibility: 'PUBLIC',
+  bioVisibility: 'PUBLIC',
+  professionVisibility: 'PUBLIC',
+  specialtyVisibility: 'PUBLIC',
+  cityVisibility: 'PUBLIC',
+  countryVisibility: 'PUBLIC',
+  emailVisibility: 'CONTACTS',
+  phoneVisibility: 'CONTACTS',
+  websitesVisibility: 'PUBLIC',
+  skillsVisibility: 'PUBLIC',
+  certificationsVisibility: 'PUBLIC',
+  eventsVisibility: 'PUBLIC',
+  videosVisibility: 'PUBLIC',
+  languagesVisibility: 'PUBLIC',
+  availabilityVisibility: 'CONTACTS',
+  activityVisibility: 'SUBSCRIBERS'
+}
+
 const PrivacySettings = () => {
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
-  const [settings, setSettings] = useState<PrivacySettings>({
-    avatarVisibility: 'PUBLIC',
-    fullNameVisibility: 'PUBLIC',
-    bioVisibility: 'PUBLIC',
-    professionVisibility: 'PUBLIC',
-    specialtyVisibility: 'PUBLIC',
-    cityVisibility: 'PUBLIC',
-    countryVisibility: 'PUBLIC',
-    emailVisibility: 'CONTACTS',
-    phoneVisibility: 'CONTACTS',
-    websitesVisibility: 'PUBLIC',
-    skillsVisibility: 'PUBLIC',
-    certificationsVisibility: 'PUBLIC',
-    eventsVisibility: 'PUBLIC',
-    videosVisibility: 'PUBLIC',
-    languagesVisibility: 'PUBLIC',
-    availabilityVisibility: 'CONTACTS',
-    activityVisibility: 'SUBSCRIBERS'
-  });
-  const [loading, setLoading] = useState(true);
+
+  // Lecture instantanée du cache (0ms)
+  const cachedSettings = cacheService.get<PrivacySettings>('pro:privacy:settings', { allowStale: true }).data
+
+  const [settings, setSettings] = useState<PrivacySettings>(() => cachedSettings || DEFAULT_PRIVACY_SETTINGS);
+  const [loading, setLoading] = useState(!cachedSettings);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -62,7 +69,6 @@ const PrivacySettings = () => {
 
   const loadSettings = async () => {
     try {
-      setLoading(true);
       const token = localStorage.getItem('accessToken')
       if (!token) return
 
@@ -72,11 +78,12 @@ const PrivacySettings = () => {
 
       if (response.ok) {
         const data = await response.json()
-        setSettings(prev => ({ ...prev, ...(data.privacy_settings || {}) }))
+        const merged = { ...DEFAULT_PRIVACY_SETTINGS, ...(data.privacy_settings || {}) }
+        setSettings(merged)
+        cacheService.set('pro:privacy:settings', merged, 15 * 60 * 1000)
       }
     } catch (error) {
       console.error('Error loading privacy settings:', error);
-      setMessage({ type: 'error', text: 'Erreur lors du chargement des paramètres' });
     } finally {
       setLoading(false);
     }

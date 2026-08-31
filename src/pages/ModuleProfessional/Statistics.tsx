@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp,
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/apiClient'
-import { getCurrentUserId } from '../../services/apiClient'
+import { useQuery } from '../../hooks/useQuery'
 
 interface StatCardProps {
   title: string
@@ -45,140 +45,110 @@ const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: StatC
   </div>
 )
 
+const DEFAULT_STATS = [
+  {
+    title: 'Vues totales',
+    value: '125.4K',
+    change: '+12.5% ce mois',
+    isPositive: true,
+    icon: Eye,
+    color: 'bg-blue-500'
+  },
+  {
+    title: 'Nouveaux abonnés',
+    value: '2,847',
+    change: '+8.2% ce mois',
+    isPositive: true,
+    icon: Users,
+    color: 'bg-green-500'
+  },
+  {
+    title: 'Likes reçus',
+    value: '8.9K',
+    change: '+15.3% ce mois',
+    isPositive: true,
+    icon: ThumbsUp,
+    color: 'bg-red-500'
+  },
+  {
+    title: 'Commentaires',
+    value: '1,234',
+    change: '-2.1% ce mois',
+    isPositive: false,
+    icon: MessageSquare,
+    color: 'bg-purple-500'
+  }
+]
+
 export const Statistics = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [period, setPeriod] = useState<'7d' | '30d' | '90d' | '1y'>('30d')
-  const [stats, setStats] = useState([
-    {
-      title: 'Vues totales',
-      value: '125.4K',
-      change: '+12.5% ce mois',
-      isPositive: true,
-      icon: Eye,
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Nouveaux abonnés',
-      value: '2,847',
-      change: '+8.2% ce mois',
-      isPositive: true,
-      icon: Users,
-      color: 'bg-green-500'
-    },
-    {
-      title: 'Likes reçus',
-      value: '8.9K',
-      change: '+15.3% ce mois',
-      isPositive: true,
-      icon: ThumbsUp,
-      color: 'bg-red-500'
-    },
-    {
-      title: 'Commentaires',
-      value: '1,234',
-      change: '-2.1% ce mois',
-      isPositive: false,
-      icon: MessageSquare,
-      color: 'bg-purple-500'
-    }
-  ])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const loadStatistics = async () => {
+  // SWR query avec chargement instantané (0ms) depuis le cache
+  const {
+    data: cachedStats,
+    isLoading: loading,
+    setData: setStats
+  } = useQuery(
+    async () => {
       try {
-        setLoading(true)
         const token = localStorage.getItem('accessToken')
-        if (!token) {
-          navigate('/login')
-          return
-        }
+        if (!token) return DEFAULT_STATS
 
-        // Load statistics from backend
         const result = await api.get<any>(`/stats/user-stats/summary/?period=${period}`)
         
         if (result.success && result.data) {
           const statsData = result.data
-          setStats([
+          return [
             {
               title: 'Vues totales',
               value: statsData.total_views?.toLocaleString() || '0',
-              change: `${statsData.views_change >= 0 ? '+' : ''}${statsData.views_change}% ce mois`,
-              isPositive: statsData.views_change >= 0,
+              change: `${statsData.views_change >= 0 ? '+' : ''}${statsData.views_change || 0}% ce mois`,
+              isPositive: (statsData.views_change || 0) >= 0,
               icon: Eye,
               color: 'bg-blue-500'
             },
             {
               title: 'Nouveaux abonnés',
               value: statsData.total_subscribers?.toLocaleString() || '0',
-              change: `${statsData.subscribers_change >= 0 ? '+' : ''}${statsData.subscribers_change}% ce mois`,
-              isPositive: statsData.subscribers_change >= 0,
+              change: `${statsData.subscribers_change >= 0 ? '+' : ''}${statsData.subscribers_change || 0}% ce mois`,
+              isPositive: (statsData.subscribers_change || 0) >= 0,
               icon: Users,
               color: 'bg-green-500'
             },
             {
               title: 'Likes reçus',
               value: statsData.total_likes?.toLocaleString() || '0',
-              change: `${statsData.likes_change >= 0 ? '+' : ''}${statsData.likes_change}% ce mois`,
-              isPositive: statsData.likes_change >= 0,
+              change: `${statsData.likes_change >= 0 ? '+' : ''}${statsData.likes_change || 0}% ce mois`,
+              isPositive: (statsData.likes_change || 0) >= 0,
               icon: ThumbsUp,
               color: 'bg-red-500'
             },
             {
               title: 'Commentaires',
               value: statsData.total_comments?.toLocaleString() || '0',
-              change: `${statsData.comments_change >= 0 ? '+' : ''}${statsData.comments_change}% ce mois`,
-              isPositive: statsData.comments_change >= 0,
+              change: `${statsData.comments_change >= 0 ? '+' : ''}${statsData.comments_change || 0}% ce mois`,
+              isPositive: (statsData.comments_change || 0) >= 0,
               icon: MessageSquare,
               color: 'bg-purple-500'
             }
-          ])
+          ]
         }
+        return DEFAULT_STATS
       } catch (err) {
         console.error('Error loading statistics:', err)
-        // Fallback to demo data if API fails
-        setStats([
-          {
-            title: 'Vues totales',
-            value: '125.4K',
-            change: '+12.5% ce mois',
-            isPositive: true,
-            icon: Eye,
-            color: 'bg-blue-500'
-          },
-          {
-            title: 'Nouveaux abonnés',
-            value: '2,847',
-            change: '+8.2% ce mois',
-            isPositive: true,
-            icon: Users,
-            color: 'bg-green-500'
-          },
-          {
-            title: 'Likes reçus',
-            value: '8.9K',
-            change: '+15.3% ce mois',
-            isPositive: true,
-            icon: ThumbsUp,
-            color: 'bg-red-500'
-          },
-          {
-            title: 'Commentaires',
-            value: '1,234',
-            change: '-2.1% ce mois',
-            isPositive: false,
-            icon: MessageSquare,
-            color: 'bg-purple-500'
-          }
-        ])
-      } finally {
-        setLoading(false)
+        return DEFAULT_STATS
       }
+    },
+    {
+      cacheKey: `pro:statistics:data:${period}`,
+      cacheTime: 10 * 60 * 1000,
+      initialData: DEFAULT_STATS
     }
+  )
 
-    loadStatistics()
-  }, [navigate, period])
+  const stats = cachedStats || DEFAULT_STATS
 
   return (
     <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-16 sm:pb-20`}>

@@ -5,11 +5,12 @@ import {
   Briefcase, Plus, Edit2, Lock, X,
   Users, Video, MessageSquare,
   TrendingUp, Settings, Camera, Heart, ArrowLeft,
-  ChevronDown, Award
+  ChevronDown, Award, Sparkles
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useNotifications } from '../../contexts/NotificationContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { getCurrentUserId } from '../../services/apiClient'
+import { cacheService } from '../../services/cacheService'
 import { 
   getProfileWithFallback, 
   mapBackendProfile, 
@@ -20,7 +21,40 @@ import {
   getDaysUntilPhotoModification
 } from '../../hooks/useProfileUtils'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+
+async function authFetch(path: string, options?: RequestInit): Promise<Response> {
+  let token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+  const headers: Record<string, string> = {
+    ...(options?.headers as Record<string, string> || {}),
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  let res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+  if (res.status === 401) {
+    const refresh = localStorage.getItem('refreshToken') || localStorage.getItem('refresh_token')
+    if (refresh) {
+      try {
+        const refreshRes = await fetch(`${API_BASE_URL}/token/refresh/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh })
+        })
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json()
+          if (refreshData.access) {
+            localStorage.setItem('accessToken', refreshData.access)
+            headers['Authorization'] = `Bearer ${refreshData.access}`
+            res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+          }
+        }
+      } catch {}
+    }
+  }
+  return res
+}
 
 interface Skill {
   id: string
@@ -40,44 +74,40 @@ interface UserProfile {
   photoLastModified?: string
   profession?: string
   speciality?: string
-  lastProfessionUpdate?: string
-  last_profession_update?: string
-  bio?: string
   location?: string
-  country?: string
-  city?: string
-  websites?: string[]
-  status?: 'online' | 'offline'
-  createdAt?: string
-  date_joined?: string
+  website?: string
+  bio?: string
   skills?: Skill[]
-  username?: string
-  fullName?: string
+  websites?: string[]
   avatarUrl?: string
   photo_url?: string
-  banner_url?: string
-  professionalProfile?: {
-    profession?: string
-    specialty?: string
-    bio?: string
-    country?: string
-    city?: string
-    phone?: string
-    email?: string
-    websites?: string[]
-    skills?: Skill[]
-  }
+  bannerUrl?: string
+  cover_url?: string
+  username?: string
+  fullName?: string
+  full_name?: string
+  lastProfessionUpdate?: string
+  last_profession_update?: string
+  phone?: string
+  showEmail?: boolean
+  showPhone?: boolean
+  showLocation?: boolean
+  badges?: Array<{ id: number | string; name: string; description: string; [key: string]: unknown }>
+  certifications?: Array<{ id: string; name: string; issuer: string; date: string }>
+  education?: Array<{ id: string; degree: string; school: string; year: string }>
+  experience?: Array<{ id: string; title: string; company: string; period: string }>
 }
 
 interface UserStatistics {
+  views?: number
+  subscribers?: number
+  rating?: number
+  experience?: number
   videos?: {
     total: number
     totalViews: number
     totalLikes: number
     totalComments: number
-  }
-  events?: {
-    total: number
   }
   engagement?: {
     views: number
@@ -99,6 +129,7 @@ interface RecentActivity {
 
 const Profile = () => {
   const { resolvedTheme } = useTheme()
+  const { user } = useAuth()
   const navigate = useNavigate()
   
   // Helper function to format time ago
@@ -122,22 +153,56 @@ const Profile = () => {
     return `Il y a ${years} ans`
   }
   
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Initialisation instantanée depuis le cache mémoire / localStorage (0ms latence)
+  const initialProfileCache = cacheService.get<UserProfile>('pro:profile:data', { maxAge: 10 * 60 * 1000, allowStale: true })
+  const initialStatsCache = cacheService.get<UserStatistics>('pro:profile:stats', { maxAge: 10 * 60 * 1000, allowStale: true })
+  const initialActivitiesCache = cacheService.get<RecentActivity[]>('pro:profile:activities', { maxAge: 10 * 60 * 1000, allowStale: true })
+
+  const [profile, setProfileState] = useState<UserProfile | null>(initialProfileCache.data)
+  const [statistics, setStatisticsState] = useState<UserStatistics | null>(initialStatsCache.data)
+  const [recentActivities, setRecentActivitiesState] = useState<RecentActivity[]>(initialActivitiesCache.data || [])
+  const [loading, setLoading] = useState<boolean>(!initialProfileCache.hasCache)
   const [error, setError] = useState<string | null>(null)
-  const [statistics, setStatistics] = useState<UserStatistics | null>(null)
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [imageCacheBuster, setImageCacheBuster] = useState(Date.now())
 
+  // Setters avec synchronisation automatique du cache
+  const setProfile = (updater: UserProfile | null | ((prev: UserProfile | null) => UserProfile | null)) => {
+    setProfileState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      if (next) cacheService.set('pro:profile:data', next, 10 * 60 * 1000)
+      return next
+    })
+  }
+
+  const setStatistics = (updater: UserStatistics | null | ((prev: UserStatistics | null) => UserStatistics | null)) => {
+    setStatisticsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      if (next) cacheService.set('pro:profile:stats', next, 10 * 60 * 1000)
+      return next
+    })
+  }
+
+  const setRecentActivities = (updater: RecentActivity[] | ((prev: RecentActivity[]) => RecentActivity[])) => {
+    setRecentActivitiesState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      if (next) cacheService.set('pro:profile:activities', next, 10 * 60 * 1000)
+      return next
+    })
+  }
+
   const [showProfessionModal, setShowProfessionModal] = useState(false)
+  const [showSpecialityModal, setShowSpecialityModal] = useState(false)
   const [showSkillModal, setShowSkillModal] = useState(false)
   const [showBioModal, setShowBioModal] = useState(false)
+  const [showLocationModal, setShowLocationModal] = useState(false)
   const [showWebsitesModal, setShowWebsitesModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ type: 'website' | 'skill', item: string } | null>(null)
   const [showSkillsDropdown, setShowSkillsDropdown] = useState(false)
   const [showWebsitesDropdown, setShowWebsitesDropdown] = useState(false)
   const [showMobileInfoDropdown, setShowMobileInfoDropdown] = useState(false)
   const [newProfession, setNewProfession] = useState('')
+  const [newSpeciality, setNewSpeciality] = useState('')
+  const [newLocation, setNewLocation] = useState('')
   const [newSkill, setNewSkill] = useState({ name: '', category: 'Technique', level: 'Intermédiaire' })
   const [newBio, setNewBio] = useState('')
   const [newWebsite, setNewWebsite] = useState('')
@@ -147,9 +212,26 @@ const Profile = () => {
   const [uploadedBanner, setUploadedBanner] = useState<string>('')
   const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 })
   const [cropScale, setCropScale] = useState(1)
+  const [bannerError, setBannerError] = useState(false)
+  const [avatarError, setAvatarError] = useState(false)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false)
+  const [showSkillsAccordion, setShowSkillsAccordion] = useState(true)
+  const [showExtraSkillsDropdown, setShowExtraSkillsDropdown] = useState(false)
+  const extraSkillsRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
-  const { showProfileUpdated } = useNotifications()
+
+  // Fermer le menu déroulant des compétences au clic extérieur
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (extraSkillsRef.current && !extraSkillsRef.current.contains(e.target as Node)) {
+        setShowExtraSkillsDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Recharge le profil depuis le backend et synchronise le profil local
   const refreshProfile = async (token: string): Promise<UserProfile | null> => {
@@ -169,31 +251,35 @@ const Profile = () => {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        setLoading(true)
-        setError(null)
-        
-        // Vérifier le token JWT
         const token = localStorage.getItem('accessToken')
         if (!token) {
           navigate('/login')
           return
         }
 
-        // Charger le profil depuis le backend
+        // 1. Charger immédiatement le profil principal (0-50ms)
         const loadedProfile = await refreshProfile(token)
+        setLoading(false)
 
-        // Charger les statistiques videos de l'utilisateur connecte
-        if (loadedProfile?.userId) {
-          try {
-            const videosResponse = await fetch(`${API_BASE_URL}/accueil/videos/?owner=${loadedProfile.userId}`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            })
-            if (videosResponse.ok) {
-              const videosData = await videosResponse.json()
-              const videos: any[] = videosData.results || videosData || []
+        if (!loadedProfile) {
+          setProfile({
+            username: user?.username || localStorage.getItem('exile_username') || 'Utilisateur',
+            fullName: user?.fullName || user?.username || 'Utilisateur',
+            avatarUrl: user?.avatarUrl,
+            email: user?.email || ''
+          })
+        }
+
+        // 2. Charger les statistiques et données annexes en parallèle
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        const userId = loadedProfile?.userId || user?.id
+
+        await Promise.allSettled([
+          // Vidéos
+          userId ? fetch(`${API_BASE_URL}/accueil/videos/?owner=${userId}`, { headers })
+            .then(r => r.ok ? r.json() : [])
+            .then(data => {
+              const videos: any[] = data.results || data || []
               setStatistics(prev => ({
                 ...prev,
                 videos: {
@@ -203,90 +289,54 @@ const Profile = () => {
                   totalComments: videos.reduce((sum, v) => sum + (v.comments || v.comments_count || 0), 0)
                 }
               }))
-            }
-          } catch (error) {
-            console.error('Error loading video statistics:', error)
-          }
-        }
+            }).catch(() => {}) : Promise.resolve(),
 
-        if (!loadedProfile) {
-          console.log('No profile data found, creating empty profile')
-          setProfile({
-            username: localStorage.getItem('exile_username') || 'Utilisateur',
-            fullName: localStorage.getItem('exile_username') || 'Utilisateur',
-            email: ''
-          })
-        }
-
-        // Charger les abonnés
-        try {
-          const subscribersResponse = await fetch(`${API_BASE_URL}/abonnement/abonnements/subscribers/`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          if (subscribersResponse.ok) {
-            const subscribersData = await subscribersResponse.json()
-            setStatistics(prev => ({
-              ...prev,
-              subscriptions: { followers: subscribersData.count || subscribersData.length || 0 }
-            }))
-          }
-        } catch (error) {
-          console.error('Error loading subscribers:', error)
-        }
-
-        // Charger l'activité récente
-        try {
-          const activitiesResponse = await fetch(`${API_BASE_URL}/activities/`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          if (activitiesResponse.ok) {
-            const activitiesData = await activitiesResponse.json()
-            const activities = activitiesData.results || activitiesData
-            setRecentActivities(activities.map((activity: any) => ({
-              id: activity.id,
-              type: activity.activity_type,
-              description: activity.description,
-              timestamp: activity.created_at,
-              user: activity.username || activity.user_full_name
-            })))
-          }
-        } catch (error) {
-          console.error('Error loading activities:', error)
-        }
-
-        // Charger les badges
-        try {
-          const badgesResponse = await fetch(`${API_BASE_URL}/badges/user-badges/`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          if (badgesResponse.ok) {
-            const badgesData = await badgesResponse.json()
-            const badges = badgesData.results || badgesData
-            setStatistics(prev => ({
-              ...prev,
-              badges: badges.map((badge: any) => ({
-                id: badge.id,
-                name: badge.badge_details?.name || 'Badge',
-                description: badge.badge_details?.description || '',
-                icon: badge.badge_details?.icon || '🏆',
-                color: badge.badge_details?.color || '#3B82F6',
-                earnedAt: badge.earned_at
+          // Abonnés
+          fetch(`${API_BASE_URL}/abonnement/abonnements/subscribers/`, { headers })
+            .then(r => r.ok ? r.json() : {})
+            .then(subscribersData => {
+              setStatistics(prev => ({
+                ...prev,
+                subscriptions: { followers: subscribersData.count || (Array.isArray(subscribersData) ? subscribersData.length : 0) }
               }))
-            }))
-          }
-        } catch (error) {
-          console.error('Error loading badges:', error)
-        }
-        
+            }).catch(() => {}),
+
+          // Activités
+          fetch(`${API_BASE_URL}/activities/`, { headers })
+            .then(r => r.ok ? r.json() : [])
+            .then(activitiesData => {
+              const activities = activitiesData.results || activitiesData || []
+              if (Array.isArray(activities)) {
+                setRecentActivities(activities.map((activity: any) => ({
+                  id: activity.id,
+                  type: activity.activity_type || 'activity',
+                  description: activity.description || '',
+                  timestamp: activity.created_at,
+                  user: activity.username || activity.user_full_name
+                })))
+              }
+            }).catch(() => {}),
+
+          // Badges
+          fetch(`${API_BASE_URL}/badges/user-badges/`, { headers })
+            .then(r => r.ok ? r.json() : [])
+            .then(badgesData => {
+              const badges = badgesData.results || badgesData || []
+              if (Array.isArray(badges)) {
+                setStatistics(prev => ({
+                  ...prev,
+                  badges: badges.map((badge: any) => ({
+                    id: badge.id,
+                    name: badge.badge_details?.name || badge.name || 'Badge',
+                    description: badge.badge_details?.description || '',
+                    icon: badge.badge_details?.icon || '🏆',
+                    color: badge.badge_details?.color || '#3B82F6',
+                    earnedAt: badge.earned_at
+                  }))
+                }))
+              }
+            }).catch(() => {})
+        ])
       } catch (error) {
         console.error('Error loading profile:', error)
         setError('Impossible de charger le profil. Veuillez vérifier votre connexion ou réessayer.')
@@ -313,6 +363,60 @@ const Profile = () => {
     loadProfile();
   }, [navigate])
 
+  // Détection automatique de la localisation (Pays et Ville)
+  useEffect(() => {
+    const detectLocation = async () => {
+      if (profile && !profile.location && !profile.city && !profile.country) {
+        try {
+          const geoRes = await fetch('https://ipapi.co/json/')
+          if (geoRes.ok) {
+            const geo = await geoRes.json()
+            const detectedLocation = [geo.city, geo.country_name].filter(Boolean).join(', ')
+            if (detectedLocation) {
+              const res = await authFetch('/profil/profils/me/', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  location: detectedLocation,
+                  city: geo.city || '',
+                  country: geo.country_name || ''
+                })
+              })
+              if (res.ok) {
+                const data = await res.json()
+                setProfile(mapBackendProfile(data))
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+    detectLocation()
+  }, [profile?.location, profile?.city, profile?.country])
+
+  // Modifier la localisation manuellement
+  const handleLocationUpdate = async () => {
+    if (newLocation.trim()) {
+      try {
+        const response = await authFetch('/profil/profils/me/', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ location: newLocation.trim() })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setProfile(mapBackendProfile(data))
+          setNewLocation('')
+          setShowLocationModal(false)
+        } else {
+          alert('Erreur lors de la mise à jour de la localisation')
+        }
+      } catch (error) {
+        console.error('Error updating location:', error)
+      }
+    }
+  }
+
   // Calculer les jours restants avant modification
   const getDaysUntilModification = () => {
     return getDaysUntilProfessionModification(profile?.lastProfessionUpdate)
@@ -326,51 +430,49 @@ const Profile = () => {
     return Math.floor(daysSinceUpdate)
   }
 
+  // Modifier la spécialité
+  const handleSpecialityUpdate = async () => {
+    const cleanSpec = newSpeciality.trim()
+    if (cleanSpec) {
+      try {
+        // Mise à jour optimiste immédiate (0ms)
+        setProfile(prev => prev ? { ...prev, speciality: cleanSpec } : null)
+        setShowSpecialityModal(false)
+
+        const response = await authFetch('/profil/profils/me/', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ speciality: cleanSpec })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          const mapped = mapBackendProfile(data)
+          mapped.speciality = cleanSpec
+          setProfile(mapped)
+          setNewSpeciality('')
+        }
+      } catch (error) {
+        console.error('Error updating speciality:', error)
+      }
+    }
+  }
+
   // Modifier la profession
   const handleProfessionUpdate = async () => {
-    if (!profile) return
-    if (newProfession.trim() && newProfession.length >= 3 && newProfession.length <= 50) {
+    if (newProfession.trim() && newProfession.length >= 2 && newProfession.length <= 50) {
       try {
-        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
-        if (!token) {
-          alert('Vous devez être connecté pour modifier votre profession')
-          return
-        }
-
-        // Vérifier restriction 30 jours
-        const lastUpdate = profile.last_profession_update || profile.lastProfessionUpdate
-        if (lastUpdate) {
-          const daysSinceUpdate = getDaysSinceLastProfessionUpdate(lastUpdate)
-          if (daysSinceUpdate < 30) {
-            const daysRemaining = 30 - daysSinceUpdate
-            alert(`Vous devez attendre ${daysRemaining} jours avant de modifier votre profession à nouveau`)
-            return
-          }
-        }
-
-        // Récupérer le profil existant pour avoir son ID
-        const existingProfile = await getProfileWithFallback(token)
-        if (!existingProfile) {
-          alert('Impossible de récupérer votre profil')
-          return
-        }
-
-        const response = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
+        const response = await authFetch('/profil/profils/me/', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ profession: newProfession.trim() })
         })
-
         if (response.ok) {
-          await refreshProfile(token)
+          const data = await response.json()
+          setProfile(mapBackendProfile(data))
           setNewProfession('')
           setShowProfessionModal(false)
-          showProfileUpdated()
         } else {
-          const errorData = await response.json()
+          const errorData = await response.json().catch(() => ({}))
           alert(errorData.detail || 'Erreur lors de la mise à jour de la profession')
         }
       } catch (error) {
@@ -382,90 +484,41 @@ const Profile = () => {
 
   // Ajouter une compétence
   const handleAddSkill = async () => {
-    if (!profile) return
     if (newSkill.name.trim() && newSkill.name.length >= 2 && newSkill.name.length <= 30) {
-      if ((profile.skills?.length || 0) < 10) {
-        const skill: Skill = {
-          id: `skill-${Date.now()}`,
-          name: newSkill.name,
-          category: newSkill.category,
-          level: newSkill.level,
-          createdAt: new Date().toISOString()
+      try {
+        const categoryMap: Record<string, string> = {
+          'Technique': 'technical',
+          'Soft Skills': 'soft',
+          'Langue': 'language',
+          'Communication': 'communication',
+          'Management': 'management',
+          'Autre': 'other'
         }
-        try {
-          const token = localStorage.getItem('accessToken')
-          if (!token) {
-            alert('Token non trouvé. Veuillez vous reconnecter.')
-            return
-          }
-
-          console.log('Adding skill:', skill)
-          
-          // Récupérer d'abord le profil existant pour avoir son ID
-          const existingProfile = await getProfileWithFallback(token)
-          console.log('Get profile data:', existingProfile)
-
-          if (!existingProfile) {
-            alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
-            return
-          }
-          
-          // Mapper les catégories et niveaux français vers anglais
-          const categoryMap: { [key: string]: string } = {
-            'Technique': 'technical',
-            'Soft Skills': 'soft',
-            'Langue': 'language',
-            'Communication': 'communication',
-            'Management': 'management',
-            'Autre': 'other'
-          }
-          
-          const levelMap: { [key: string]: string } = {
-            'Débutant': 'beginner',
-            'Intermédiaire': 'intermediate',
-            'Avancé': 'advanced',
-            'Expert': 'expert'
-          }
-          
-          const englishCategory = categoryMap[newSkill.category] || newSkill.category
-          const englishLevel = levelMap[newSkill.level] || newSkill.level
-          
-          console.log('Sending to backend:', { name: newSkill.name, category: englishCategory, level: englishLevel, profile: existingProfile.id })
-          
-          // Ajouter la compétence via l'endpoint du profil
-          const response = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
-            method: 'PATCH',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              skills: [...(profile.skills || []), newSkill.name]
-            })
+        const levelMap: Record<string, string> = {
+          'Débutant': 'beginner',
+          'Intermédiaire': 'intermediate',
+          'Avancé': 'advanced',
+          'Expert': 'expert'
+        }
+        const response = await authFetch('/profil/skills/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newSkill.name.trim(),
+            category: categoryMap[newSkill.category] || newSkill.category,
+            level: levelMap[newSkill.level] || newSkill.level
           })
-
-          console.log('Add skill response status:', response.status)
-          
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error('Add skill error:', errorText)
-            throw new Error(`Erreur lors de l'ajout de la compétence: ${response.status} - ${errorText}`)
-          }
-
-          const data = await response.json()
-          console.log('Profile updated with skill:', data)
-          
-          // Mettre à jour l'état local avec les compétences du profil mis à jour
-          setProfile({ ...profile, skills: data.skills || [...(profile.skills || []), newSkill.name] })
-          setNewSkill({ name: '', category: '', level: 'intermediate' })
-          showProfileUpdated()
-          
-          console.log('Skill added successfully')
-          
-        } catch (error) {
-          console.error('Error adding skill:', error)
-          alert(`Erreur lors de l'ajout de la compétence: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+        })
+        if (response.ok) {
+          const token = localStorage.getItem('accessToken') || ''
+          await refreshProfile(token)
+          setNewSkill({ name: '', category: 'Technique', level: 'Intermédiaire' })
+          setShowSkillModal(false)
+        } else {
+          alert('Erreur lors de l\'ajout de la compétence')
         }
+      } catch (error) {
+        console.error('Error adding skill:', error)
       }
     }
   }
@@ -490,104 +543,49 @@ const Profile = () => {
     }
   }
 
-  // Confirmer le crop et sauvegarder l'image
+  // Confirmer le crop et sauvegarder l'image instantanément (0ms UI update)
   const handleCropConfirm = async () => {
-    if (!profile) return
     try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
+      if (!uploadedImage) return
+      const previewUrl = uploadedImage
 
-      console.log('Updating profile photo...')
-      console.log('Uploaded image type:', typeof uploadedImage)
-      console.log('Uploaded image length:', uploadedImage?.length)
-
-      // Convertir base64 en blob
-      const response = await fetch(uploadedImage)
-      const blob = await response.blob()
-      const file = new File([blob], 'profile.jpg', { type: 'image/jpeg' })
-
-      console.log('File created:', file.name, file.size, file.type)
-
-      // Récupérer d'abord le profil existant
-      const existingProfile = await getProfileWithFallback(token)
-      console.log('Get profile data:', existingProfile)
-
-      if (!existingProfile) {
-        console.log('No existing profile, creating new one...')
-        // Créer un nouveau profil avec photo
-        const formData = new FormData()
-        formData.append('photo', file)
-        formData.append('bio', profile.bio || '')
-        formData.append('location', profile.location || '')
-        formData.append('website', profile.websites?.[0] || '')
-
-        // Récupérer l'ID de l'utilisateur
-        const userId = localStorage.getItem('exile_user_id')
-
-        const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData
-        })
-
-        console.log('Create profile response status:', createResponse.status)
-        
-        if (!createResponse.ok) {
-          const errorText = await createResponse.text()
-          console.error('Create profile error:', errorText)
-          throw new Error(`Erreur lors de la création du profil: ${createResponse.status} - ${errorText}`)
-        }
-        
-        console.log('Profile created successfully')
-      } else {
-        console.log('Updating existing profile:', existingProfile.id)
-        // Mettre à jour le profil existant avec photo
-        const formData = new FormData()
-        formData.append('photo', file)
-        formData.append('bio', existingProfile.bio || '')
-        formData.append('location', existingProfile.location || '')
-        formData.append('website', existingProfile.website || '')
-
-        console.log('Updating profile with FormData...')
-        
-        // Utiliser l'endpoint direct avec l'ID du profil
-        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData
-        })
-
-        console.log('Update profile response status:', updateResponse.status)
-        
-        if (!updateResponse.ok) {
-          const errorText = await updateResponse.text()
-          console.error('Update profile error:', errorText)
-          throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
-        }
-        
-        console.log('Profile updated successfully')
-      }
-
+      // 1. Mise à jour instantanée de l'UI (0ms)
+      setProfile(prev => prev ? {
+        ...prev,
+        photo: previewUrl,
+        avatarUrl: previewUrl,
+        photo_url: previewUrl
+      } : null)
+      setAvatarError(false)
       setShowCropModal(false)
       setUploadedImage('')
-      showProfileUpdated()
-
-      // Update cache buster to force image refresh
       setImageCacheBuster(Date.now())
 
-      // Recharger le profil depuis le backend au lieu de recharger la page
-      await refreshProfile(token)
-      
+      // 2. Diffuser l'événement pour mettre à jour le Header et le reste du site immédiatement
+      window.dispatchEvent(new CustomEvent('exile_profile_updated', { detail: { avatarUrl: previewUrl } }))
+
+      // 3. Sauvegarde sur le serveur en arrière-plan
+      const response = await fetch(previewUrl)
+      const blob = await response.blob()
+      const file = new File([blob], `profile_${Date.now()}.jpg`, { type: 'image/jpeg' })
+
+      const formData = new FormData()
+      formData.append('photo', file)
+
+      const updateResponse = await authFetch('/profil/profils/me/', {
+        method: 'PATCH',
+        body: formData
+      })
+
+      if (updateResponse.ok) {
+        const updatedData = await updateResponse.json()
+        const mapped = mapBackendProfile(updatedData)
+        setProfile(mapped)
+        const finalUrl = mapped.avatarUrl || mapped.photo_url || previewUrl
+        window.dispatchEvent(new CustomEvent('exile_profile_updated', { detail: { avatarUrl: finalUrl } }))
+      }
     } catch (error) {
-      console.error('Error updating photo:', error)
-      alert(`Erreur lors de la mise à jour de la photo: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+      console.error('Error uploading photo in background:', error)
     }
   }
 
@@ -663,92 +661,44 @@ const Profile = () => {
     }
   }
 
-  // Confirmer l'upload de bannière
+  // Confirmer l'upload de bannière instantanément (0ms UI update)
   const handleBannerConfirm = async () => {
-    if (!profile) return
     try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
+      if (!uploadedBanner) return
+      const previewUrl = uploadedBanner
 
-      console.log('Updating profile banner...')
-      console.log('Current profile:', profile)
-      console.log('Profile ID:', profile?.id)
-      
-      if (!profile?.id) {
-        alert('Profil non trouvé. Veuillez recharger la page.')
-        return
-      }
-      
-      // Convertir base64 en blob
-      const response = await fetch(uploadedBanner)
+      // 1. Mise à jour instantanée de l'UI (0ms)
+      setProfile(prev => prev ? {
+        ...prev,
+        banner: previewUrl,
+        bannerUrl: previewUrl,
+        banner_url: previewUrl
+      } : null)
+      setBannerError(false)
+      setShowBannerModal(false)
+      setUploadedBanner('')
+      setImageCacheBuster(Date.now())
+
+      // 2. Sauvegarde sur le serveur en arrière-plan
+      const response = await fetch(previewUrl)
       const blob = await response.blob()
-      const file = new File([blob], 'banner.jpg', { type: 'image/jpeg' })
-      
-      console.log('Banner file created:', file.name, file.size, file.type)
-      
-      // Utiliser l'endpoint standard avec l'ID du profil
+      const file = new File([blob], `banner_${Date.now()}.jpg`, { type: 'image/jpeg' })
+
       const formData = new FormData()
       formData.append('banner', file)
 
-      console.log('Updating profile with banner using PATCH on /profil/profils/{id}/ endpoint...')
-      
-      const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${profile.id}/`, {
+      const updateResponse = await authFetch('/profil/profils/me/', {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
         body: formData
       })
 
-      console.log('Update profile response status:', updateResponse.status)
-      
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text()
-        console.error('Update profile error:', errorText)
-        throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
+      if (updateResponse.ok) {
+        const updatedData = await updateResponse.json()
+        const mapped = mapBackendProfile(updatedData)
+        setProfile(mapped)
       }
-      
-      const updatedData = await updateResponse.json()
-      console.log('Profile updated successfully, response:', updatedData)
-      console.log('Banner URL in response:', updatedData.banner_url || updatedData.banner)
-      console.log('All banner-related fields:', {
-        banner: updatedData.banner,
-        banner_url: updatedData.banner_url,
-        photo: updatedData.photo,
-        photo_url: updatedData.photo_url
-      })
-      
-      // Vérifier si le backend retourne les bonnes données
-      if (!updatedData.banner && !updatedData.banner_url) {
-        console.error('Backend did not return banner or banner_url after upload')
-        alert('Erreur: Le backend n\'a pas retourné l\'URL de la bannière après l\'upload')
-        return
-      }
-
-      // Mettre à jour immédiatement l'état du profil avec les données retournées par l'API
-      const bannerUrl = updatedData.banner_url || updatedData.banner
-      if (bannerUrl) {
-        setProfile(prev => prev ? { 
-          ...prev, 
-          banner: bannerUrl,
-          banner_url: updatedData.banner_url || bannerUrl
-        } : null)
-        console.log('Profile state updated with banner URL:', bannerUrl)
-      }
-
-      setShowBannerModal(false)
-      setUploadedBanner('')
-      showProfileUpdated()
-
-      // Update cache buster to force image refresh
-      setImageCacheBuster(Date.now())
-      
     } catch (error) {
-      console.error('Error updating banner:', error)
-      alert(`Erreur lors de la mise à jour de la bannière: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+      console.error('Error uploading banner in background:', error)
     }
   }
 
@@ -758,134 +708,51 @@ const Profile = () => {
     setUploadedBanner('')
   }
 
-  // Modifier le bio
+  // Modifier le bio (30 caractères max)
   const handleBioUpdate = async () => {
-    if (!profile) return
-    if (newBio.trim() && newBio.length <= 60) {
-      try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          alert('Token non trouvé. Veuillez vous reconnecter.')
-          return
-        }
+    const cleanBio = newBio.trim().slice(0, 30)
+    try {
+      setProfile(prev => prev ? { ...prev, bio: cleanBio } : null)
+      setShowBioModal(false)
 
-        console.log('Updating bio to:', newBio)
-        
-        // Récupérer d'abord le profil existant
-        const existingProfile = await getProfileWithFallback(token)
-        console.log('Get profile data:', existingProfile)
-
-        if (!existingProfile) {
-          alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
-          return
-        }
-
-        // Mettre à jour le profil existant
-        console.log('Updating existing profile with bio:', newBio)
-        console.log('Existing profile data:', existingProfile)
-        
-        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            bio: newBio,
-            location: existingProfile.location || '',
-            website: existingProfile.website || ''
-          })
-        })
-
-        console.log('Update profile response status:', updateResponse.status)
-        
-        if (!updateResponse.ok) {
-          const errorText = await updateResponse.text()
-          console.error('Update profile error:', errorText)
-          throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
-        }
-        
-        console.log('Profile updated successfully')
-
+      const response = await authFetch('/profil/profils/me/', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bio: cleanBio })
+      })
+      if (response.ok) {
+        const data = await response.json()
+        const mapped = mapBackendProfile(data)
+        mapped.bio = cleanBio
+        setProfile(mapped)
         setNewBio('')
-        setShowBioModal(false)
-        showProfileUpdated()
-
-        // Recharger le profil depuis le backend au lieu de recharger la page
-        await refreshProfile(token)
-        
-      } catch (error) {
-        console.error('Error updating bio:', error)
-        alert('Erreur lors de la mise à jour de la bio')
       }
+    } catch (error) {
+      console.error('Error updating bio:', error)
     }
   }
 
   // Ajouter un site web
   const handleAddWebsite = async () => {
-    if (!profile) return
-    if (newWebsite.trim() && !(profile.websites || []).includes(newWebsite) && (profile.websites || []).length < 6) {
+    if (newWebsite.trim() && !(profile?.websites || []).includes(newWebsite)) {
       try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          alert('Token non trouvé. Veuillez vous reconnecter.')
-          return
-        }
-
-        // Valider et formater l'URL
         let formattedWebsite = newWebsite.trim()
         if (!formattedWebsite.startsWith('http://') && !formattedWebsite.startsWith('https://')) {
           formattedWebsite = 'https://' + formattedWebsite
         }
-
-        console.log('Adding website:', formattedWebsite)
-        
-        // Récupérer d'abord le profil existant
-        const existingProfile = await getProfileWithFallback(token)
-        console.log('Get profile data:', existingProfile)
-
-        if (!existingProfile) {
-          alert('Profil non trouvé. Veuillez d\'abord créer un profil.')
-          return
-        }
-
-        // Mettre à jour le profil existant
-        console.log('Updating existing profile with website:', formattedWebsite)
-        console.log('Existing profile data:', existingProfile)
-        
-        const updateResponse = await fetch(`${API_BASE_URL}/profil/profils/${existingProfile.id}/`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            bio: existingProfile.bio || '',
-            location: existingProfile.location || '',
-            website: formattedWebsite
-          })
+        const response = await authFetch('/profil/profils/me/', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: formattedWebsite })
         })
-
-        console.log('Update profile response status:', updateResponse.status)
-        
-        if (!updateResponse.ok) {
-          const errorText = await updateResponse.text()
-          console.error('Update profile error:', errorText)
-          throw new Error(`Erreur lors de la mise à jour du profil: ${updateResponse.status} - ${errorText}`)
+        if (response.ok) {
+          const data = await response.json()
+          setProfile(mapBackendProfile(data))
+          setNewWebsite('')
+          setShowWebsitesModal(false)
         }
-        
-        console.log('Profile updated successfully')
-
-        setNewWebsite('')
-        setShowWebsitesModal(false)
-        showProfileUpdated()
-
-        // Recharger le profil depuis le backend au lieu de recharger la page
-        await refreshProfile(token)
-        
       } catch (error) {
         console.error('Error adding website:', error)
-        alert(`Erreur lors de l'ajout du site web: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
       }
     }
   }
@@ -897,31 +764,28 @@ const Profile = () => {
 
   // Confirmer suppression
   const handleDeleteConfirm = async () => {
-    if (!profile || !showDeleteConfirm) return
+    if (!showDeleteConfirm) return
     try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/profil/profils/${profile.id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
+      if (showDeleteConfirm.type === 'skill') {
+        const rawId = showDeleteConfirm.item.replace('skill-', '')
+        await authFetch(`/profil/skills/${rawId}/`, { method: 'DELETE' })
+        const token = localStorage.getItem('accessToken') || ''
+        await refreshProfile(token)
+      } else if (showDeleteConfirm.type === 'website') {
+        const response = await authFetch('/profil/profils/me/', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: '' })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setProfile(mapBackendProfile(data))
         }
-      })
-
-      if (response.ok) {
-        alert('Profil supprimé avec succès')
-        setShowDeleteConfirm(null)
-        showProfileUpdated()
-      } else {
-        throw new Error('Erreur lors de la suppression')
       }
+      setShowDeleteConfirm(null)
     } catch (error) {
-      console.error('Error deleting profile:', error)
-      alert('Erreur lors de la suppression du profil')
+      console.error('Error deleting item:', error)
+      setShowDeleteConfirm(null)
     }
   }
 
@@ -960,8 +824,8 @@ const Profile = () => {
     navigate(path)
   }
 
-  // Badges - à connecter au backend
-  const badges: any[] = []
+  // Badges - utiliser les données du backend
+  const badges = statistics?.badges || []
 
   // Catégories de compétences
   const skillCategories = ['Technique', 'Soft Skills', 'Langue', 'Communication', 'Management', 'Autre']
@@ -1037,68 +901,96 @@ const Profile = () => {
         {/* Profile Content */}
         {!loading && !error && profile && (
           <>
-            {/* Profile Header - YouTube-style layout */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-          {/* Left column - Profile info - Mobile: full width banner/photo section */}
-          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-xl p-0 sm:p-3 sm:p-4`}>
-            {/* Banner Section - YouTube style - Mobile: full width */}
-            <div className="relative group mb-3 sm:mb-4">
-              <div className="w-full h-32 sm:h-36 md:h-44 bg-gradient-to-r from-blue-500 to-purple-600 rounded-b-xl sm:rounded-xl overflow-hidden border-2 border-gray-200 dark:border-zinc-600 shadow-md">
-                {(() => {
-                  console.log('Rendering banner check:', {
-                    hasProfile: !!profile,
-                    bannerValue: profile?.banner,
-                    bannerUrlValue: profile?.banner_url,
-                    imageCacheBuster
-                  })
-                  const bannerUrl = profile?.banner_url || profile?.banner
-                  return bannerUrl ? (
-                    <img 
-                      src={bannerUrl} 
-                      alt="Banner" 
-                      className="w-full h-full object-cover"
-                      onLoad={() => console.log('Banner image loaded successfully')}
-                      onError={(e) => console.error('Banner image failed to load:', e.currentTarget.src)}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center">
-                      <span className="text-white text-sm sm:text-base font-medium opacity-80">Ajouter une bannière</span>
-                      <span className="text-white text-[10px] sm:text-xs opacity-60 mt-1">Recommandé: 2560x1440px (PC) / 1546x423px (Mobile)</span>
-                    </div>
-                  )
-                })()}
-              </div>
-              <button
-                onClick={() => bannerInputRef.current?.click()}
-                className="absolute bottom-2 right-2 p-1.5 bg-white/90 dark:bg-zinc-700/90 text-gray-900 dark:text-white rounded-full shadow-lg hover:bg-white dark:hover:bg-zinc-600 transition-colors opacity-0 group-hover:opacity-100"
-              >
-                <Camera className="w-3 h-3 sm:w-4 sm:h-4" />
-              </button>
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleBannerUpload}
-                className="hidden"
-              />
-            </div>
+            {/* Profile Header - Pro Responsive layout (Mobile, Tablet, Desktop) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+              {/* Left column - Profile info */}
+              <div className={`lg:col-span-4 xl:col-span-4 ${resolvedTheme === 'dark' ? 'bg-zinc-800/95 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-3 sm:p-4 md:p-5 shadow-sm`}>
+                {/* Banner Section */}
+                <div className="relative group mb-3 sm:mb-4">
+                  {(() => {
+                    const rawBanner = profile?.banner_url || profile?.banner
+                    const bannerUrl = !bannerError && rawBanner 
+                      ? (rawBanner.startsWith('data:') || rawBanner.startsWith('blob:') 
+                          ? rawBanner 
+                          : (rawBanner.includes('?') ? `${rawBanner}&_t=${imageCacheBuster}` : `${rawBanner}?_t=${imageCacheBuster}`)) 
+                      : null
 
-            <div className="flex flex-col items-center gap-2 sm:gap-3 -mt-10 sm:-mt-10 md:-mt-12 px-3 sm:px-0">
-              {/* Photo centrée avec upload - chevauchant la bannière - Mobile: plus grand avec cadre plus épais */}
-              <div className="relative group">
-                <div className="w-24 h-24 sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-bold overflow-hidden border-6 sm:border-4 border-white dark:border-zinc-800 ring-2 ring-blue-500/60 shadow-xl">
-                  {profile?.avatarUrl || profile?.photo_url || profile?.photo ? (
-                    <img src={`${profile?.avatarUrl || profile?.photo_url || profile?.photo}?t=${imageCacheBuster}`} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    profile?.name?.charAt(0) || profile?.fullName?.charAt(0) || '?'
-                  )}
+                    return (
+                      <div className={`w-full h-36 sm:h-44 md:h-52 lg:h-44 ${bannerUrl ? 'bg-zinc-900 dark:bg-black' : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700'} rounded-xl overflow-hidden border border-gray-200 dark:border-zinc-700 shadow-md relative`}>
+                        {bannerUrl ? (
+                          <img 
+                            src={bannerUrl} 
+                            alt="Bannière" 
+                            className="w-full h-full object-cover object-center"
+                            onError={() => {
+                              console.warn('Banner failed to load, fallback to gradient')
+                              setBannerError(true)
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center">
+                            <Camera className="w-6 h-6 text-white/80 mb-1" />
+                            <span className="text-white text-xs sm:text-sm font-semibold">Ajouter une bannière</span>
+                            <span className="text-white/60 text-[10px] mt-0.5">Recommandé : 2560x1440px</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  <button
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full shadow-lg transition-all backdrop-blur-sm opacity-90 group-hover:opacity-100"
+                    title="Modifier la bannière"
+                  >
+                    <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
+                  <input
+                    ref={bannerInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBannerUpload}
+                    className="hidden"
+                  />
                 </div>
+
+                <div className="flex flex-col items-center gap-2 sm:gap-3 -mt-10 sm:-mt-12 md:-mt-14 px-3 sm:px-0">
+                  {/* Photo centrée avec upload - chevauchant la bannière */}
+                  <div className="relative group">
+                    {(() => {
+                      const rawPhoto = profile?.avatarUrl || profile?.photo_url || profile?.photo
+                      const photoUrl = !avatarError && rawPhoto 
+                        ? (rawPhoto.startsWith('data:') || rawPhoto.startsWith('blob:') 
+                            ? rawPhoto 
+                            : (rawPhoto.includes('?') ? `${rawPhoto}&_t=${imageCacheBuster}` : `${rawPhoto}?_t=${imageCacheBuster}`)) 
+                        : null
+
+                      return (
+                        <div className={`w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 ${photoUrl ? 'bg-zinc-900 dark:bg-black' : 'bg-gradient-to-br from-blue-500 to-indigo-600'} rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-bold overflow-hidden border-4 border-white dark:border-zinc-800 ring-2 ring-blue-500/50 shadow-xl relative`}>
+                          {photoUrl ? (
+                            <img 
+                              src={photoUrl} 
+                              alt="Photo de profil" 
+                              className="w-full h-full object-cover object-center"
+                              onError={() => {
+                                console.warn('Avatar failed to load, fallback to initial')
+                                setAvatarError(true)
+                              }}
+                            />
+                          ) : (
+                            <span className="flex items-center justify-center w-full h-full font-bold text-white text-2xl sm:text-3xl">
+                              {(profile?.username || profile?.name || profile?.fullName || user?.username || 'U').replace(/^@/, '').charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                 {canModifyPhoto(profile?.photoLastModified) ? (
                   <button
                     onClick={triggerFileInput}
-                    className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors opacity-0 group-hover:opacity-100"
+                    className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-transform active:scale-90"
+                    title="Changer la photo"
                   >
-                    <Camera className="w-3 h-3" />
+                    <Camera className="w-3.5 h-3.5" />
                   </button>
                 ) : (
                   <div className="absolute bottom-0 right-0 flex items-center gap-1 px-2 py-1 bg-gray-500/80 text-white rounded-full shadow-lg">
@@ -1114,31 +1006,26 @@ const Profile = () => {
                   className="hidden"
                   disabled={!canModifyPhoto(profile?.photoLastModified)}
                 />
-                <div className={`mt-1.5 flex items-center justify-center gap-1 ${profile?.status === 'online' ? 'text-green-500' : 'text-gray-500'}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${profile?.status === 'online' ? 'bg-green-500' : 'bg-gray-500'}`} />
-                  <span className="text-xs font-medium">{profile?.status === 'online' ? 'En ligne' : 'Hors ligne'}</span>
+                <div className={`mt-1.5 flex items-center justify-center gap-1.5 ${profile?.status === 'online' ? 'text-emerald-500' : 'text-gray-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${profile?.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`} />
+                  <span className="text-xs font-semibold">{profile?.status === 'online' ? 'En ligne' : 'Hors ligne'}</span>
                 </div>
               </div>
 
               {/* Info centrée */}
               <div className="text-center space-y-1.5 sm:space-y-2 w-full">
-                {/* Name - Mobile: only username, Desktop: full name */}
+                {/* Username */}
                 <div>
-                  <h2 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile?.username || 'Utilisateur'}
+                  <h2 className={`text-lg sm:text-xl md:text-2xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {profile?.username?.startsWith('@') ? profile.username : `@${profile?.username || 'Utilisateur'}`}
                   </h2>
-                  <p className={`hidden sm:block text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    {profile?.name || profile?.fullName || ''}
-                  </p>
                 </div>
 
                 {/* Profession */}
                 <div className="flex items-center justify-center gap-1.5">
                   <Briefcase className={`w-4 h-4 md:w-5 md:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                   <span className={`text-sm md:text-base font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile?.profession && profile?.speciality 
-                      ? `${profile.profession} - ${profile.speciality}`
-                      : profile?.profession || profile?.speciality || 'Non renseigné'}
+                    {profile?.profession || 'Non renseigné'}
                   </span>
                   {canModifyProfession(profile?.lastProfessionUpdate) ? (
                     <button
@@ -1155,6 +1042,23 @@ const Profile = () => {
                   )}
                 </div>
 
+                {/* Spécialité */}
+                <div className="flex items-center justify-center gap-1.5">
+                  <Award className={`w-4 h-4 md:w-5 md:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                  <span className={`text-sm md:text-base font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {profile?.speciality || 'Non renseigné'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setNewSpeciality(profile?.speciality || '')
+                      setShowSpecialityModal(true)
+                    }}
+                    className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                  >
+                    <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                  </button>
+                </div>
+
                 {/* Mobile: Compact info with dropdown */}
                 <div className="sm:hidden">
                   <button
@@ -1167,9 +1071,12 @@ const Profile = () => {
                     <ChevronDown className={`w-4 h-4 transition-transform ${showMobileInfoDropdown ? 'rotate-180' : ''}`} />
                   </button>
                   {showMobileInfoDropdown && (
-                    <div className={`mt-2 p-3 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'}`}>
+                    <div className={`mt-2 p-3 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'} space-y-3`}>
                       {/* Bio */}
-                      <div className="mb-3">
+                      <div>
+                        <label className={`text-xs font-medium mb-1 block ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                          Bio
+                        </label>
                         <div className="flex items-center justify-between gap-2">
                           <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                             {profile?.bio || 'Aucune bio'}
@@ -1187,22 +1094,37 @@ const Profile = () => {
                       </div>
 
                       {/* Location */}
-                      <div className="mb-3 flex items-center gap-1.5">
-                        <MapPin className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                        <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                          {profile?.city && profile?.country 
-                            ? `${profile.city}, ${profile.country}`
-                            : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
-                        </span>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                            Localisation
+                          </label>
+                          <button
+                            onClick={() => {
+                              setNewLocation(profile?.location || profile?.city || '')
+                              setShowLocationModal(true)
+                            }}
+                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
+                          >
+                            <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                          <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                            {profile?.city && profile?.country 
+                              ? `${profile.city}, ${profile.country}`
+                              : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Websites */}
-                      <div className="mb-3">
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Globe className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                          <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                             Sites web
-                          </span>
+                          </label>
                           <button
                             onClick={() => setShowWebsitesModal(true)}
                             className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
@@ -1212,7 +1134,7 @@ const Profile = () => {
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {(profile?.websites || []).map((website, index) => (
+                          {(profile?.websites || []).slice(0, 2).map((website, index) => (
                             <div key={index} className="flex items-center gap-1">
                               <a
                                 href={website}
@@ -1230,6 +1152,19 @@ const Profile = () => {
                               </button>
                             </div>
                           ))}
+                          {(profile?.websites || []).length > 2 && (
+                            <div className="relative">
+                              <button
+                                onClick={() => setShowWebsitesDropdown(!showWebsitesDropdown)}
+                                className={`text-xs px-2 py-0.5 rounded-lg border font-semibold flex items-center gap-1 ${
+                                  resolvedTheme === 'dark' ? 'bg-zinc-700/80 border-zinc-600 text-blue-400' : 'bg-gray-100 border-gray-200 text-blue-600'
+                                }`}
+                              >
+                                <span>+{(profile?.websites || []).length - 2}</span>
+                                <ChevronDown className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1266,6 +1201,15 @@ const Profile = () => {
                         ? `${profile.city}, ${profile.country}`
                         : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
                     </span>
+                    <button
+                      onClick={() => {
+                        setNewLocation(profile?.location || profile?.city || '')
+                        setShowLocationModal(true)
+                      }}
+                      className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                    >
+                      <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                    </button>
                   </div>
 
                   {/* Websites */}
@@ -1284,7 +1228,7 @@ const Profile = () => {
                       </button>
                     </div>
                     <div className="flex flex-wrap justify-center gap-1.5">
-                      {(profile?.websites || []).slice(0, 3).map((website, index) => (
+                      {(profile?.websites || []).slice(0, 2).map((website, index) => (
                         <div key={index} className="flex items-center gap-1">
                           <a
                             href={website}
@@ -1302,31 +1246,38 @@ const Profile = () => {
                           </button>
                         </div>
                       ))}
-                      {(profile?.websites || []).length > 3 && (
+                      {(profile?.websites || []).length > 2 && (
                         <div className="relative">
                           <button
                             onClick={() => setShowWebsitesDropdown(!showWebsitesDropdown)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'}`}
+                            className={`text-xs px-2 py-0.5 rounded-lg border font-semibold flex items-center gap-1 ${
+                              resolvedTheme === 'dark'
+                                ? 'bg-zinc-700/80 border-zinc-600 text-blue-400'
+                                : 'bg-gray-100 border-gray-200 text-blue-600'
+                            }`}
                           >
-                            +{(profile?.websites || []).length - 3}
+                            <span>+{(profile?.websites || []).length - 2} autres</span>
+                            <ChevronDown className="w-3 h-3" />
                           </button>
                           {showWebsitesDropdown && (
-                            <div className={`absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
-                              {(profile?.websites || []).slice(3).map((website, index) => (
-                                <div key={index} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-700">
+                            <div className={`absolute top-full right-0 mt-2 w-56 rounded-xl shadow-xl border z-50 p-1 ${
+                              resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'
+                            } animate-in fade-in`}>
+                              {(profile?.websites || []).slice(2).map((website, index) => (
+                                <div key={index} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-zinc-700/60 rounded-lg">
                                   <a
                                     href={website}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}
+                                    className={`text-xs truncate mr-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}
                                   >
                                     {website}
                                   </a>
                                   <button
                                     onClick={() => handleDeleteWebsite(website)}
-                                    className="hover:opacity-70"
+                                    className="hover:opacity-70 p-1 text-red-500"
                                   >
-                                    <X className="w-3 h-3 text-red-500" />
+                                    <X className="w-3 h-3" />
                                   </button>
                                 </div>
                               ))}
@@ -1350,105 +1301,179 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Skills Section */}
-            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 dark:border-zinc-700">
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <h3 className={`text-base md:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  Compétences
-                </h3>
+            {/* Redesigned Skills Section with Accordion Dropdown */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700/80">
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  onClick={() => setShowSkillsAccordion(!showSkillsAccordion)}
+                  className="flex items-center gap-2 group hover:opacity-85 transition-opacity"
+                  type="button"
+                >
+                  <div className="p-1 rounded-lg bg-blue-500/10 text-blue-500">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className={`text-sm sm:text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      Compétences
+                    </h3>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                      {(profile?.skills || []).length}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${showSkillsAccordion ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
                 {(profile?.skills || []).length < 10 && (
                   <button
                     onClick={() => setShowSkillModal(true)}
-                    className="flex items-center gap-1 text-[10px] md:text-xs text-blue-600 hover:text-blue-700"
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all active:scale-95"
                   >
-                    <Plus className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                    <Plus className="w-3.5 h-3.5" />
                     Ajouter
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1 sm:gap-1.5">
-                {(profile?.skills || []).slice(0, 2).map((skill) => (
-                  <div
-                    key={skill.id}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] md:text-xs ${
-                      skill.category === 'Technique' || skill.category === 'technical'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                        : skill.category === 'Soft Skills' || skill.category === 'soft'
-                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                        : skill.category === 'Langue' || skill.category === 'language'
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        : skill.category === 'Communication' || skill.category === 'communication'
-                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                        : skill.category === 'Management' || skill.category === 'management'
-                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300'
-                    }`}
-                  >
-                    <span>{skill.name}</span>
-                    <span className="text-[10px] opacity-70">({skill.level})</span>
-                    <button
-                      onClick={() => handleDeleteSkill(skill.id)}
-                      className="ml-0.5 hover:opacity-70"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                ))}
-                {(profile?.skills || []).length > 2 && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowSkillsDropdown(!showSkillsDropdown)}
-                      className={`px-2 py-1 rounded-full text-[10px] md:text-xs ${
-                        resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
-                      }`}
-                    >
-                      +{(profile?.skills || []).length - 2}
-                    </button>
-                    {showSkillsDropdown && (
-                      <div className={`absolute top-full left-0 mt-2 w-48 rounded-lg shadow-lg border z-50 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
-                        {(profile?.skills || []).slice(2).map((skill) => (
-                          <div key={skill.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-700">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs ${
-                                skill.category === 'Technique' || skill.category === 'technical'
-                                  ? 'text-blue-600'
-                                  : skill.category === 'Soft Skills' || skill.category === 'soft'
-                                  ? 'text-purple-600'
-                                  : skill.category === 'Langue' || skill.category === 'language'
-                                  ? 'text-green-600'
-                                  : skill.category === 'Communication' || skill.category === 'communication'
-                                  ? 'text-orange-600'
-                                  : skill.category === 'Management' || skill.category === 'management'
-                                  ? 'text-yellow-600'
-                                  : 'text-gray-600'
-                              }`}>
-                                {skill.name}
-                              </span>
-                              <span className="text-xs opacity-70">({skill.level})</span>
-                            </div>
+
+              {showSkillsAccordion && (
+                <div className="mt-2.5">
+                  {(profile?.skills || []).length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Affichage des 2 premières compétences */}
+                      {(profile?.skills || []).slice(0, 2).map((skill) => {
+                        const categoryStyles: Record<string, { bg: string, border: string, text: string, dot: string }> = {
+                          technical: { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800/50', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+                          soft: { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800/50', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
+                          language: { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800/50', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+                          communication: { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800/50', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+                          management: { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-800/50', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
+                          other: { bg: 'bg-zinc-100 dark:bg-zinc-800', border: 'border-zinc-200 dark:border-zinc-700', text: 'text-zinc-700 dark:text-zinc-300', dot: 'bg-zinc-400' }
+                        }
+
+                        const levelLabels: Record<string, string> = {
+                          beginner: 'Débutant',
+                          intermediate: 'Intermédiaire',
+                          advanced: 'Avancé',
+                          expert: 'Expert',
+                          'Débutant': 'Débutant',
+                          'Intermédiaire': 'Intermédiaire',
+                          'Avancé': 'Avancé',
+                          'Expert': 'Expert'
+                        }
+
+                        const style = categoryStyles[skill.category?.toLowerCase()] || categoryStyles.technical
+                        const levelText = levelLabels[skill.level] || skill.level
+
+                        return (
+                          <div
+                            key={skill.id}
+                            className={`group relative flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl border ${style.bg} ${style.border} transition-all hover:shadow-sm`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                            <span className={`text-xs font-semibold ${style.text}`}>
+                              {skill.name}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-medium">
+                              {levelText}
+                            </span>
                             <button
                               onClick={() => handleDeleteSkill(skill.id)}
-                              className="hover:opacity-70"
+                              className="opacity-60 hover:opacity-100 p-0.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors"
+                              title="Supprimer"
                             >
                               <X className="w-3 h-3 text-red-500" />
                             </button>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {(profile?.skills || []).length === 0 && (
-                  <p className={`text-[10px] md:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                    Aucune compétence ajoutée
-                  </p>
-                )}
-              </div>
+                        )
+                      })}
+
+                      {/* Menu déroulant pour les compétences à partir de la 3ème */}
+                      {(profile?.skills || []).length > 2 && (
+                        <div className="relative" ref={extraSkillsRef}>
+                          <button
+                            type="button"
+                            onClick={() => setShowExtraSkillsDropdown(!showExtraSkillsDropdown)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-300 dark:border-zinc-700 bg-gray-100/80 dark:bg-zinc-800/90 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+                          >
+                            <span>+{(profile?.skills || []).length - 2} autres</span>
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showExtraSkillsDropdown ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {showExtraSkillsDropdown && (
+                            <div className="absolute left-0 top-full mt-2 w-72 max-h-56 overflow-y-auto p-2 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-gray-200 dark:border-zinc-700 z-50 flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                              <div className="text-[11px] font-semibold text-gray-500 dark:text-zinc-400 px-2 py-1 border-b border-gray-100 dark:border-zinc-700/60 flex items-center justify-between">
+                                <span>Autres compétences ({(profile?.skills || []).length - 2})</span>
+                              </div>
+                              {(profile?.skills || []).slice(2).map((skill) => {
+                                const categoryStyles: Record<string, { bg: string, border: string, text: string, dot: string }> = {
+                                  technical: { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800/50', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+                                  soft: { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800/50', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
+                                  language: { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800/50', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+                                  communication: { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800/50', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+                                  management: { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-800/50', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
+                                  other: { bg: 'bg-zinc-100 dark:bg-zinc-800', border: 'border-zinc-200 dark:border-zinc-700', text: 'text-zinc-700 dark:text-zinc-300', dot: 'bg-zinc-400' }
+                                }
+                                const levelLabels: Record<string, string> = {
+                                  beginner: 'Débutant',
+                                  intermediate: 'Intermédiaire',
+                                  advanced: 'Avancé',
+                                  expert: 'Expert',
+                                  'Débutant': 'Débutant',
+                                  'Intermédiaire': 'Intermédiaire',
+                                  'Avancé': 'Avancé',
+                                  'Expert': 'Expert'
+                                }
+                                const style = categoryStyles[skill.category?.toLowerCase()] || categoryStyles.technical
+                                const levelText = levelLabels[skill.level] || skill.level
+
+                                return (
+                                  <div
+                                    key={skill.id}
+                                    className={`flex items-center justify-between gap-2 p-2 rounded-xl border ${style.bg} ${style.border}`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0`} />
+                                      <span className={`text-xs font-semibold ${style.text} truncate`}>
+                                        {skill.name}
+                                      </span>
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-medium flex-shrink-0">
+                                        {levelText}
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleDeleteSkill(skill.id)}
+                                      className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors flex-shrink-0"
+                                      title="Supprimer"
+                                    >
+                                      <X className="w-3.5 h-3.5 text-red-500" />
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`p-3.5 rounded-xl border border-dashed text-center ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800/50' : 'border-gray-200 bg-gray-50'}`}>
+                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1.5`}>
+                        Aucune compétence renseignée
+                      </p>
+                      <button
+                        onClick={() => setShowSkillModal(true)}
+                        className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Ajouter une première compétence
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right column - Statistics, Quick Access, Activity, Badges */}
-          <div className="md:col-span-2 space-y-3 sm:space-y-4">
+              {/* Right column - Statistics, Quick Access, Activity, Badges */}
+              <div className="lg:col-span-8 xl:col-span-8 space-y-4 sm:space-y-6">
             {/* Statistics */}
             <div>
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -1458,10 +1483,10 @@ const Profile = () => {
                 {stats.map((stat, index) => (
                   <div
                     key={index}
-                    className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg p-2 sm:p-3`}
+                    className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg p-3 sm:p-3`}
                   >
-                    <div className="flex items-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
-                      <stat.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                    <div className="flex items-center gap-1.5 sm:gap-1.5 mb-1.5 sm:mb-1.5">
+                      <stat.icon className={`w-4 h-4 sm:w-4 sm:h-4 ${
                         stat.color === 'blue' ? 'text-blue-500' :
                         stat.color === 'purple' ? 'text-purple-500' :
                         stat.color === 'green' ? 'text-green-500' :
@@ -1469,11 +1494,11 @@ const Profile = () => {
                         stat.color === 'orange' ? 'text-orange-500' :
                         'text-pink-500'
                       }`} />
-                      <span className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      <span className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                         {stat.label}
                       </span>
                     </div>
-                    <p className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    <p className={`text-xl sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       {stat.value}
                     </p>
                   </div>
@@ -1507,30 +1532,36 @@ const Profile = () => {
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Activité Récente
               </h3>
-              <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg p-2 sm:p-3 space-y-1.5 sm:space-y-2`}>
-                {recentActivities.map((activity: any, index: number) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
-                      activity.type === 'event' ? 'bg-blue-100 text-blue-600' :
-                      activity.type === 'request' ? 'bg-green-100 text-green-600' :
-                      activity.type === 'video' ? 'bg-red-100 text-red-600' :
-                      'bg-purple-100 text-purple-600'
-                    }`}>
-                      {activity.type === 'event' && <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                      {activity.type === 'request' && <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                      {activity.type === 'video' && <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                      {activity.type === 'conversation' && <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg p-3 sm:p-3 space-y-2 sm:space-y-2`}>
+                {recentActivities.length > 0 ? (
+                  recentActivities.map((activity: any, index: number) => (
+                    <div key={activity.id || index} className="flex items-center gap-3">
+                      <div className={`w-8 h-8 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        activity.type === 'event' ? 'bg-blue-100 text-blue-600' :
+                        activity.type === 'request' ? 'bg-green-100 text-green-600' :
+                        activity.type === 'video' ? 'bg-red-100 text-red-600' :
+                        'bg-purple-100 text-purple-600'
+                      }`}>
+                        {activity.type === 'event' && <Calendar className="w-4 h-4 sm:w-4 sm:h-4" />}
+                        {activity.type === 'request' && <MessageSquare className="w-4 h-4 sm:w-4 sm:h-4" />}
+                        {activity.type === 'video' && <Video className="w-4 h-4 sm:w-4 sm:h-4" />}
+                        {activity.type === 'conversation' && <MessageSquare className="w-4 h-4 sm:w-4 sm:h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs sm:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
+                          {activity.description || activity.title}
+                        </p>
+                        <p className={`text-[10px] sm:text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
+                          {activity.timestamp ? formatTimeAgo(activity.timestamp) : activity.time}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className={`text-[10px] sm:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                        {activity.title}
-                      </p>
-                      <p className={`text-[9px] sm:text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                        {activity.time}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className={`text-xs sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} text-center py-2`}>
+                    Aucune activité récente
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1539,21 +1570,27 @@ const Profile = () => {
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Badges et Récompenses
               </h3>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                {badges.map((badge: any, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full ${
-                      badge.color === 'yellow' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                      badge.color === 'green' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                      badge.color === 'blue' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                      'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                    }`}
-                  >
-                    <badge.icon className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                    <span className="text-[10px] sm:text-xs font-medium">{badge.name}</span>
-                  </div>
-                ))}
+              <div className="flex flex-wrap gap-2 sm:gap-2">
+                {badges.length > 0 ? (
+                  badges.map((badge: any, index: number) => (
+                    <div
+                      key={badge.id || index}
+                      className={`flex items-center gap-1.5 sm:gap-1.5 px-3 sm:px-3 py-1.5 sm:py-1.5 rounded-full ${
+                        badge.color === 'yellow' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                        badge.color === 'green' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                        badge.color === 'blue' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                        'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                      }`}
+                    >
+                      <span className="text-sm sm:text-base">{badge.icon || '🏆'}</span>
+                      <span className="text-xs sm:text-xs font-medium">{badge.name}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className={`text-xs sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
+                    Aucun badge obtenu
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1596,6 +1633,48 @@ const Profile = () => {
                 onClick={handleProfessionUpdate}
                 className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base"
                 disabled={!newProfession.trim() || newProfession.length < 3 || newProfession.length > 50}
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Speciality Modal */}
+      {showSpecialityModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
+          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
+            <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Modifier la spécialité
+            </h3>
+            <input
+              type="text"
+              value={newSpeciality}
+              onChange={(e) => setNewSpeciality(e.target.value)}
+              placeholder="Entrez votre nouvelle spécialité"
+              className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border ${
+                resolvedTheme === 'dark'
+                  ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500'
+                  : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
+              } focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base`}
+            />
+            <div className="flex gap-2 sm:gap-3 mt-3 sm:mt-4">
+              <button
+                onClick={() => {
+                  setShowSpecialityModal(false)
+                  setNewSpeciality('')
+                }}
+                className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base ${
+                  resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
+                }`}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSpecialityUpdate}
+                className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base"
+                disabled={!newSpeciality.trim()}
               >
                 Confirmer
               </button>
@@ -1718,31 +1797,29 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Bio Modal */}
-      {showBioModal && (
+      {/* Location Modal */}
+      {showLocationModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Modifier le bio
+              Modifier la localisation
             </h3>
-            <textarea
-              value={newBio}
-              onChange={(e) => setNewBio(e.target.value)}
-              placeholder="Entrez votre bio (max 60 caractères)"
-              rows={4}
-              maxLength={60}
+            <input
+              type="text"
+              value={newLocation}
+              onChange={(e) => setNewLocation(e.target.value)}
+              placeholder="Ex: Port-au-Prince, Haïti ou Paris, France"
               className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border ${
                 resolvedTheme === 'dark'
                   ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500'
                   : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
-              } focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm sm:text-base`}
+              } focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base`}
             />
-            <div className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-right`}>{newBio.length}/60</div>
             <div className="flex gap-2 sm:gap-3 mt-3 sm:mt-4">
               <button
                 onClick={() => {
-                  setShowBioModal(false)
-                  setNewBio('')
+                  setShowLocationModal(false)
+                  setNewLocation('')
                 }}
                 className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base ${
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
@@ -1751,11 +1828,72 @@ const Profile = () => {
                 Annuler
               </button>
               <button
-                onClick={handleBioUpdate}
+                onClick={handleLocationUpdate}
                 className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base"
-                disabled={!newBio.trim()}
+                disabled={!newLocation.trim()}
               >
                 Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bio Modal */}
+      {showBioModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
+          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl border ${resolvedTheme === 'dark' ? 'border-zinc-700' : 'border-gray-100'}`}>
+            <h3 className={`text-lg sm:text-xl font-bold mb-1 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Modifier votre bio
+            </h3>
+            <p className={`text-xs mb-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+              Présentez-vous brièvement (30 caractères max).
+            </p>
+            <input
+              type="text"
+              value={newBio}
+              onChange={(e) => setNewBio(e.target.value.slice(0, 30))}
+              placeholder="Ex: Passionné d'art & tech"
+              maxLength={30}
+              className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border ${
+                resolvedTheme === 'dark'
+                  ? 'bg-zinc-700/80 border-zinc-600 text-white placeholder-zinc-500'
+                  : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
+              } focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
+            />
+            <div className="flex items-center justify-between mt-2">
+              <div className="w-1/2 bg-gray-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-300 ${
+                    newBio.length > 25 ? 'bg-amber-500' : newBio.length >= 30 ? 'bg-red-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${(Math.min(newBio.length, 30) / 30) * 100}%` }}
+                />
+              </div>
+              <span className={`text-xs font-semibold ${
+                newBio.length >= 30 ? 'text-amber-500' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'
+              }`}>
+                {newBio.length}/30
+              </span>
+            </div>
+            <div className="flex gap-2 sm:gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowBioModal(false)
+                  setNewBio('')
+                }}
+                className={`flex-1 px-3 sm:px-4 py-2.5 rounded-xl text-sm font-semibold ${
+                  resolvedTheme === 'dark' ? 'bg-zinc-700 hover:bg-zinc-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                } transition-colors`}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleBioUpdate}
+                className="flex-1 px-3 sm:px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-md active:scale-98"
+                disabled={newBio.length > 30}
+              >
+                Enregistrer
               </button>
             </div>
           </div>
@@ -1843,12 +1981,21 @@ const Profile = () => {
             <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={handleBannerConfirm}
-                className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
+                disabled={isUploadingBanner}
+                className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm flex items-center justify-center gap-2"
               >
-                Confirmer
+                {isUploadingBanner ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Enregistrement...</span>
+                  </>
+                ) : (
+                  <span>Confirmer</span>
+                )}
               </button>
               <button
                 onClick={handleBannerCancel}
+                disabled={isUploadingBanner}
                 className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-gray-900 dark:text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
               >
                 Annuler
@@ -1920,6 +2067,7 @@ const Profile = () => {
             <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={handleCropCancel}
+                disabled={isUploadingPhoto}
                 className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base ${
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
                 }`}
@@ -1928,9 +2076,17 @@ const Profile = () => {
               </button>
               <button
                 onClick={handleCropConfirm}
-                className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base"
+                disabled={isUploadingPhoto}
+                className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm sm:text-base flex items-center justify-center gap-2"
               >
-                Confirmer
+                {isUploadingPhoto ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Enregistrement...</span>
+                  </>
+                ) : (
+                  <span>Confirmer</span>
+                )}
               </button>
             </div>
           </div>

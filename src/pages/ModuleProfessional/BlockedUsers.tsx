@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/apiClient'
-import { getCurrentUserId } from '../../services/apiClient'
+import { useQuery } from '../../hooks/useQuery'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -32,51 +32,50 @@ interface BlockedUser {
 export const BlockedUsers = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
-  
-  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState('')
 
   const handleBack = () => {
     navigate('/pro/requests')
   }
 
-  const loadBlockedUsers = useCallback(async () => {
+  // SWR query avec chargement instantané (0ms) depuis le cache
+  const {
+    data: cachedBlockedUsers,
+    isLoading: loading,
+    error: queryError,
+    refetch: loadBlockedUsers,
+    setData: setBlockedUsers
+  } = useQuery<BlockedUser[]>(
+    async () => {
       try {
-        setLoading(true)
-        setError(null)
-        
         const token = localStorage.getItem('accessToken')
-        if (!token) {
-          navigate('/login')
-          return
-        }
-        
-        // Load blocked users from backend
+        if (!token) return []
+
         const result = await api.get<any>('/blocked/blocked/')
-        
         if (result.success && result.data) {
-          const blockedUsersData = (result.data.results || result.data).map((block: any) => ({
+          return (result.data.results || result.data).map((block: any) => ({
             id: String(block.id),
             blockerId: String(block.blocker),
             blockedId: String(block.blocked),
             blocked: block.blocked_user || {},
             createdAt: block.created_at
           }))
-          setBlockedUsers(blockedUsersData)
         }
+        return []
       } catch (err) {
         console.error('Error loading blocked users:', err)
-        setError('Erreur lors du chargement des utilisateurs bloqués')
-      } finally {
-        setLoading(false)
+        return []
       }
-  }, [navigate])
+    },
+    {
+      cacheKey: 'pro:blocked:list',
+      cacheTime: 10 * 60 * 1000,
+      initialData: []
+    }
+  )
 
-  useEffect(() => {
-    loadBlockedUsers()
-  }, [loadBlockedUsers])
+  const blockedUsers = cachedBlockedUsers || []
+  const error = queryError ? queryError.message : null
 
   const handleUnblock = async (userId: string) => {
     try {

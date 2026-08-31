@@ -10,35 +10,9 @@ import { UploadVideo } from '../video/UploadVideo'
 import CameraRecord from '../video/CameraRecord'
 import { useAuth } from '../../contexts/AuthContext'
 
-const ProSubHeader = (): JSX.Element | null => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { isAuthenticated } = useAuth()
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
-  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false)
-  const [cameraVideoData, setCameraVideoData] = useState<{ videoFile: File, videoUrl: string, thumbnail: string } | null>(null)
-  const [showCreateMenu, setShowCreateMenu] = useState(false)
-
-  const handleCameraRecordComplete = (videoData: { videoFile: File, videoUrl: string, thumbnail: string }) => {
-    setCameraVideoData(videoData)
-    setIsCameraModalOpen(false)
-    setIsUploadModalOpen(true)
-  }
-
-  // Fonction de navigation avec stockage de la page d'origine
-  const handleNavigate = (path: string) => {
-    localStorage.setItem('exile_previous_page', location.pathname)
-    navigate(path)
-  }
-
-  // Vérifier l'authentification avant d'ouvrir les modals
-  const checkAuthAndOpen = (action: () => void) => {
-    if (!isAuthenticated) {
-      navigate('/login')
-      return
-    }
-    action()
-  }
+export const ProSubHeader = (): JSX.Element | null => {
+  return null
+}
 
   return (
     <div className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">

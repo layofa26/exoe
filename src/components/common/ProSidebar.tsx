@@ -1,98 +1,55 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Home, Calendar, Inbox, Heart, Plus, Video, Camera, X
+  Home,
+  Calendar,
+  Inbox,
+  Heart,
+  Plus,
+  Video as VideoIcon,
+  CalendarPlus,
+  Radio,
+  X,
+  Megaphone
 } from 'lucide-react'
-import ThemeToggle from './ThemeToggle'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { UploadVideo } from '../video/UploadVideo'
-import CameraRecord from '../video/CameraRecord'
 import { getCurrentUserId } from '../../services/apiClient'
-import { requestApi } from '../../services/requestApi'
+import { UploadVideo } from '../video/UploadVideo'
 
-interface NavItem {
-  to: string
-  label: string
-  icon: React.ElementType
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 export const ProSidebar = (): JSX.Element | null => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { resolvedTheme, theme, setTheme } = useTheme()
-  const { isAuthenticated, user, logout } = useAuth()
-  const [isCreatingEvent, setIsCreatingEvent] = useState(false)
-  const [isUploadingVideo, setIsUploadingVideo] = useState(false)
+  const { resolvedTheme } = useTheme()
+  const { isAuthenticated } = useAuth()
+  const isDark = resolvedTheme === 'dark'
+  
   const [newRequestsCount, setNewRequestsCount] = useState(0)
-  const [showCreateMenu, setShowCreateMenu] = useState(false)
+  const [showMobileActionMenu, setShowMobileActionMenu] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
-  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false)
-  const [cameraVideoData, setCameraVideoData] = useState<{ videoFile: File, videoUrl: string, thumbnail: string } | null>(null)
 
-  useEffect(() => {
-    const checkGlobalUIState = () => {
-      const creating = localStorage.getItem('exile_creating_event') === 'true'
-      const uploading = localStorage.getItem('exile_uploading_video') === 'true'
-      setIsCreatingEvent(creating)
-      setIsUploadingVideo(uploading)
-    }
-
-    checkGlobalUIState()
-    window.addEventListener('storage', checkGlobalUIState)
-
-    // Poll localStorage every 100ms to detect changes from same window
-    const interval = setInterval(checkGlobalUIState, 100)
-
-    return () => {
-      window.removeEventListener('storage', checkGlobalUIState)
-      clearInterval(interval)
-    }
-  }, [])
-
-  // Écouter l'événement de vidéo uploadée pour s'assurer que le sidebar reste visible
-  useEffect(() => {
-    const handleVideoUploaded = () => {
-      console.log('Video uploaded event detected in ProSidebar')
-      setIsUploadingVideo(false)
-    }
-
-    window.addEventListener('video-uploaded', handleVideoUploaded)
-    return () => window.removeEventListener('video-uploaded', handleVideoUploaded)
-  }, [])
-
+  // Badge demandes reçues (pending)
   useEffect(() => {
     const loadUnreadRequests = async () => {
       const currentUserId = getCurrentUserId()
-      if (!currentUserId) {
-        setNewRequestsCount(0)
-        return
-      }
-
+      if (!currentUserId) { setNewRequestsCount(0); return }
       const token = localStorage.getItem('accessToken')
       if (!token) return
-
-      const result = await requestApi.getDemandes()
-      if (!result.success || !result.data) {
-        setNewRequestsCount(0)
-        return
-      }
-
-      const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
-      const myUsername = storedProfile.username
-      setNewRequestsCount(
-        result.data.filter(r => r.receiver === myUsername && r.status === 'envoye').length
-      )
+      try {
+        const res = await fetch(`${API_BASE_URL}/demandes/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const raw: any[] = Array.isArray(data) ? data : (data.results || [])
+        setNewRequestsCount(raw.filter(r => String(r.receiver?.id || r.receiver_id) === currentUserId && r.status === 'envoye').length)
+      } catch { setNewRequestsCount(0) }
     }
-
     loadUnreadRequests()
   }, [location.pathname])
 
-  const handleLogout = () => {
-    logout()
-  }
-
-  // Fonction de navigation avec stockage de la page d'origine
   const handleNavigate = (path: string) => {
     localStorage.setItem('exile_previous_page', '/pro')
     navigate(path)
@@ -103,245 +60,247 @@ export const ProSidebar = (): JSX.Element | null => {
     '/pro/statistics',
     '/pro/calendar',
     '/pro/my-videos',
-    '/pro/drafts'
+    '/pro/drafts',
+    '/pro/subscribers',
+    '/pro/settings',
+    '/pro/conversations'
   ].some(path => location.pathname.startsWith(path))
 
   const isLiveRoom = location.pathname.includes('/live')
   const isPreviewPage = location.pathname.includes('/preview')
 
-  // FIX: Kache ak CSS olye return null pou evite re-render ki redirijte
-  const shouldHide = isManagementPage || isLiveRoom || isCreatingEvent || isUploadingVideo || isPreviewPage
-
-  const handleCameraRecordComplete = (videoData: { videoFile: File, videoUrl: string, thumbnail: string }) => {
-    setCameraVideoData(videoData)
-    setIsCameraModalOpen(false)
-    setIsUploadModalOpen(true)
-  }
-
-  // Vérifier l'authentification avant d'ouvrir les modals
-  const checkAuthAndOpen = (action: () => void) => {
-    if (!isAuthenticated) {
-      navigate('/login')
-      return
-    }
-    action()
-  }
-
-  const navItems: NavItem[] = [
-    { to: '/pro', label: 'Accueil', icon: Home },
-    { to: '/pro/requests', label: 'Demandes', icon: Inbox },
-  ]
-
-  const navItemsRight: NavItem[] = [
-    { to: '/pro/events', label: 'Événements', icon: Calendar },
-    { to: '/pro/subscriptions', label: 'Abonnement', icon: Heart },
-  ]
+  const shouldHide = isManagementPage || isLiveRoom || isPreviewPage
 
   return (
     <div style={{ display: shouldHide ? 'none' : 'contents' }}>
-      {/* Mobile & Tablet: Bottom navigation - 4 carrés style YouTube mobile */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border-t z-[10000]`}>
-        <nav className="flex justify-around items-center h-16">
-          {navItems.map((item) => (
+      {/* Mobile Action Sheet Backdrop - Clean & Minimalist */}
+      {showMobileActionMenu && (
+        <div
+          className="fixed inset-0 z-[19999] bg-black/70 backdrop-blur-sm md:hidden animate-in fade-in duration-150 flex items-end"
+          onClick={() => setShowMobileActionMenu(false)}
+        >
+          <div
+            className={`w-full ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'} rounded-t-3xl border-t p-5 pb-8 shadow-2xl space-y-3 animate-in slide-in-from-bottom duration-200`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle / Title */}
+            <div className="flex flex-col items-center gap-2 pb-2">
+              <div className="w-10 h-1 rounded-full bg-zinc-700/60" />
+              <div className="w-full flex items-center justify-between">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Créer & Publier</p>
+                <button onClick={() => setShowMobileActionMenu(false)} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* 1. Publier une Vidéo */}
             <button
-              key={item.to}
-              onClick={() => handleNavigate(item.to)}
-              className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
-                location.pathname === item.to || (item.to === '/pro' && location.pathname === '/pro')
-                  ? 'text-orange-500'
-                  : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'
+              onClick={() => {
+                setShowMobileActionMenu(false)
+                setIsUploadModalOpen(true)
+              }}
+              className={`w-full p-3.5 rounded-2xl flex items-center gap-3.5 transition-all text-left ${
+                isDark ? 'bg-zinc-800/60 hover:bg-zinc-800 text-zinc-100' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'
               }`}
             >
-              <div className="relative">
-                <item.icon className="w-6 h-6" />
-                {item.to === '/pro/requests' && newRequestsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {newRequestsCount > 9 ? '9+' : newRequestsCount}
-                  </span>
-                )}
+              <div className="w-10 h-10 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center shadow-sm">
+                <VideoIcon className="w-5 h-5" />
               </div>
-              <span className="text-[10px] mt-1 font-medium">{item.label}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold">Publier une Vidéo</p>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Tutoriel, expertise, étude de cas</p>
+              </div>
             </button>
-          ))}
 
-          {/* Bouton Créer - Au centre */}
-          <div className="relative flex flex-col items-center justify-center flex-1 h-full">
+            {/* 2. Créer un Événement */}
             <button
-              onClick={() => setShowCreateMenu(!showCreateMenu)}
-              className={`flex flex-col items-center justify-center transition-all`}
+              onClick={() => {
+                setShowMobileActionMenu(false)
+                navigate('/pro/events?create=true')
+              }}
+              className={`w-full p-3.5 rounded-2xl flex items-center gap-3.5 transition-all text-left ${
+                isDark ? 'bg-zinc-800/60 hover:bg-zinc-800 text-zinc-100' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'
+              }`}
             >
-              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
-                <Plus className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-sm">
+                <CalendarPlus className="w-5 h-5" />
               </div>
-              <span className="text-[10px] mt-1 font-medium text-orange-500">Créer</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold">Créer un Événement</p>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Webinaire, atelier, conférence</p>
+              </div>
             </button>
 
-            {/* Create Menu Dropdown - Mobile simple */}
-            {showCreateMenu && (
-              <div className={`fixed bottom-16 left-0 right-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border-t z-[10001] p-4`}>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => checkAuthAndOpen(() => { setIsUploadModalOpen(true); setShowCreateMenu(false); })}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                  >
-                    <Video className="w-6 h-6 text-blue-500" />
-                    <span className={`font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Importer vidéo</span>
-                  </button>
-                  <button
-                    onClick={() => checkAuthAndOpen(() => { setIsCameraModalOpen(true); setShowCreateMenu(false); })}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                  >
-                    <Camera className="w-6 h-6 text-green-500" />
-                    <span className={`font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Caméra</span>
-                  </button>
-                  <button
-                    onClick={() => checkAuthAndOpen(() => { handleNavigate('/pro/events?create=true'); setShowCreateMenu(false); })}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                  >
-                    <Calendar className="w-6 h-6 text-purple-500" />
-                    <span className={`font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Créer événement</span>
-                  </button>
-                </div>
+            {/* 3. Lancer un Live */}
+            <button
+              onClick={() => {
+                setShowMobileActionMenu(false)
+                navigate('/pro/events?create=true&live=true')
+              }}
+              className={`w-full p-3.5 rounded-2xl flex items-center gap-3.5 transition-all text-left ${
+                isDark ? 'bg-zinc-800/60 hover:bg-zinc-800 text-zinc-100' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
+                <Radio className="w-5 h-5 animate-pulse" />
               </div>
-            )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold">Lancer un Live</p>
+                  <span className="px-1.5 py-0.2 bg-red-600 text-white text-[9px] font-bold rounded uppercase">Direct</span>
+                </div>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Masterclass en direct & chat interactif</p>
+              </div>
+            </button>
+
+            {/* 4. Campagne Publicitaire (PUB) */}
+            <button
+              onClick={() => {
+                setShowMobileActionMenu(false)
+                navigate('/pub/d4sh-m4n4g3r_adm!n99')
+              }}
+              className={`w-full p-3.5 rounded-2xl flex items-center gap-3.5 transition-all text-left ${
+                isDark ? 'bg-zinc-800/60 hover:bg-zinc-800 text-zinc-100' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                <Megaphone className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold">Campagne Publicitaire (PUB)</p>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Promouvoir vos produits & services</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile: Bottom Navigation avec 5 items (Center + Prominent Button) */}
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border-t z-[10000] px-2 py-1`}>
+        <nav className="flex items-center justify-around h-14">
+          {/* 1. Accueil */}
+          <button
+            onClick={() => handleNavigate('/pro')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              location.pathname === '/pro'
+                ? 'text-[#FF6B00] font-bold'
+                : isDark ? 'text-zinc-400' : 'text-gray-600'
+            }`}
+          >
+            <Home className="w-5 h-5" />
+            <span className="text-[10px] mt-0.5">Accueil</span>
+          </button>
+
+          {/* 2. Demandes */}
+          <button
+            onClick={() => handleNavigate('/pro/requests')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors relative ${
+              location.pathname === '/pro/requests'
+                ? 'text-[#FF6B00] font-bold'
+                : isDark ? 'text-zinc-400' : 'text-gray-600'
+            }`}
+          >
+            <div className="relative">
+              <Inbox className="w-5 h-5" />
+              {newRequestsCount > 0 && (
+                <span className="absolute -top-1 -right-2 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {newRequestsCount > 9 ? '9+' : newRequestsCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] mt-0.5">Demandes</span>
+          </button>
+
+          {/* 3. CENTER + BUTTON (PUBLIER - Exact EXILE Orange #FF6B00) */}
+          <div className="flex-1 flex items-center justify-center -mt-5">
+            <button
+              onClick={() => {
+                if (!isAuthenticated) {
+                  navigate('/login')
+                  return
+                }
+                setShowMobileActionMenu(!showMobileActionMenu)
+              }}
+              className="w-12 h-12 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white flex items-center justify-center shadow-lg shadow-[#FF6B00]/40 active:scale-95 transition-transform"
+              title="Publier"
+            >
+              <Plus className="w-6 h-6 stroke-[2.5]" />
+            </button>
           </div>
 
-          {navItemsRight.map((item) => (
-            <button
-              key={item.to}
-              onClick={() => handleNavigate(item.to)}
-              className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
-                location.pathname === item.to
-                  ? 'text-orange-500'
-                  : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'
-              }`}
-            >
-              <item.icon className="w-6 h-6" />
-              <span className="text-[10px] mt-1 font-medium">{item.label}</span>
-            </button>
-          ))}
+          {/* 4. Événements */}
+          <button
+            onClick={() => handleNavigate('/pro/events')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              location.pathname.startsWith('/pro/events')
+                ? 'text-[#FF6B00] font-bold'
+                : isDark ? 'text-zinc-400' : 'text-gray-600'
+            }`}
+          >
+            <Calendar className="w-5 h-5" />
+            <span className="text-[10px] mt-0.5">Événements</span>
+          </button>
+
+          {/* 5. Abonnement */}
+          <button
+            onClick={() => handleNavigate('/pro/subscriptions')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              location.pathname.startsWith('/pro/subscriptions')
+                ? 'text-[#FF6B00] font-bold'
+                : isDark ? 'text-zinc-400' : 'text-gray-600'
+            }`}
+          >
+            <Heart className="w-5 h-5" />
+            <span className="text-[10px] mt-0.5">Abonnement</span>
+          </button>
         </nav>
       </div>
 
-      {/* Desktop: Bottom horizontal navigation */}
-      <div className={`hidden md:flex fixed bottom-0 left-0 right-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border-t z-[10000] shadow-lg`}>
-        <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-          <nav className="flex items-center justify-center gap-1 sm:gap-2 flex-1">
-            {navItems.map((item) => (
+      {/* Desktop: Bottom horizontal bar */}
+      <div className={`hidden md:flex fixed bottom-0 left-0 right-0 ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border-t z-[10000] shadow-lg`}>
+        <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-center gap-3">
+          {[
+            { to: '/pro', label: 'Accueil', icon: Home },
+            { to: '/pro/requests', label: 'Demandes', icon: Inbox, badge: newRequestsCount },
+            { to: '/pro/events', label: 'Événements', icon: Calendar },
+            { to: '/pro/subscriptions', label: 'Abonnement', icon: Heart }
+          ].map((item) => {
+            const isItemActive = location.pathname === item.to || (item.to === '/pro' && location.pathname === '/pro')
+            return (
               <button
                 key={item.to}
                 onClick={() => handleNavigate(item.to)}
-                className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-xl transition-all ${
-                  location.pathname === item.to || (item.to === '/pro' && location.pathname === '/pro')
-                    ? 'bg-orange-500 text-white'
-                    : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                className={`flex items-center gap-2 px-5 py-2 rounded-xl transition-all ${
+                  isItemActive
+                    ? 'bg-[#FF6B00] text-white font-semibold shadow-sm'
+                    : isDark ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
                 <div className="relative">
-                  <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                  {item.to === '/pro/requests' && newRequestsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {newRequestsCount > 9 ? '9+' : newRequestsCount}
+                  <item.icon className="w-4 h-4" />
+                  {item.badge && item.badge > 0 ? (
+                    <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                      {item.badge > 9 ? '9+' : item.badge}
                     </span>
-                  )}
+                  ) : null}
                 </div>
-                <span className="text-xs sm:text-sm font-medium">{item.label}</span>
+                <span className="text-xs font-semibold">{item.label}</span>
               </button>
-            ))}
-
-            {/* Bouton Créer - Tablette uniquement (md) - Après Événements */}
-            <div className="relative hidden md:block lg:hidden">
-              <button
-                onClick={() => setShowCreateMenu(!showCreateMenu)}
-                className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-xl transition-all`}
-              >
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                </div>
-                <span className="text-xs sm:text-sm font-medium text-orange-500">Créer</span>
-              </button>
-
-              {/* Create Menu Dropdown - Tablette uniquement */}
-              {showCreateMenu && (
-                <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 rounded-lg shadow-lg py-2 z-[10001] max-h-[80vh] overflow-y-auto ${
-                  resolvedTheme === 'dark' ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-gray-200'
-                }`}>
-                  {/* Section Vidéos */}
-                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">
-                    Vidéos
-                  </div>
-                  <button
-                    onClick={() => checkAuthAndOpen(() => { setIsUploadModalOpen(true); setShowCreateMenu(false); })}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-3"
-                  >
-                    <Video className="w-4 h-4 text-blue-500" />
-                    Importer une vidéo
-                  </button>
-                  <button
-                    onClick={() => checkAuthAndOpen(() => { setIsCameraModalOpen(true); setShowCreateMenu(false); })}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-3"
-                  >
-                    <Camera className="w-4 h-4 text-green-500" />
-                    Enregistrer avec caméra
-                  </button>
-
-                  {/* Section Événements */}
-                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase border-t border-gray-200 dark:border-zinc-700 mt-2">
-                    Événements
-                  </div>
-                  <button
-                    onClick={() => checkAuthAndOpen(() => { handleNavigate('/pro/events?create=true'); setShowCreateMenu(false); })}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-3"
-                  >
-                    <Calendar className="w-4 h-4 text-purple-500" />
-                    Créer un événement
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {navItemsRight.map((item) => (
-              <button
-                key={item.to}
-                onClick={() => handleNavigate(item.to)}
-                className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-xl transition-all ${
-                  location.pathname === item.to
-                    ? 'bg-orange-500 text-white'
-                    : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="text-xs sm:text-sm font-medium">{item.label}</span>
-              </button>
-            ))}
-          </nav>
-
-          {/* Right Side: Theme Toggle only for desktop */}
-          <div className="hidden lg:flex items-center gap-2">
-            <ThemeToggle />
-          </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* Video Upload Modal */}
+      {/* Upload Video Modal Triggered from ProSidebar Mobile */}
       {isUploadModalOpen && (
         <UploadVideo
           isOpen={isUploadModalOpen}
           onClose={() => setIsUploadModalOpen(false)}
-          initialVideoData={cameraVideoData ?? undefined}
-        />
-      )}
-
-      {/* Camera Record Modal */}
-      {isCameraModalOpen && (
-        <CameraRecord
-          isOpen={isCameraModalOpen}
-          onClose={() => setIsCameraModalOpen(false)}
-          onRecordComplete={handleCameraRecordComplete}
         />
       )}
     </div>
   )
 }
 
-export default ProSidebar
+export default ProSidebar

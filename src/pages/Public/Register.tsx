@@ -22,7 +22,8 @@ import {
 interface FormData {
   fullName: string
   username: string
-  contact: string
+  email: string
+  phone: string
   password: string
   confirmPassword: string
   birthDay: string
@@ -42,7 +43,8 @@ export const Register = (): JSX.Element => {
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     username: '',
-    contact: '',
+    email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
     birthDay: '',
@@ -80,34 +82,27 @@ export const Register = (): JSX.Element => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     // Sanitize input to prevent XSS
     const { name, value } = e.target
-    // Ne pas trim() le mot de passe pour préserver les caractères spéciaux
-    // Ne pas trim() le nom complet pour préserver les espaces (nom et prénom)
     const sanitizedValue = name === 'password' || name === 'confirmPassword' || name === 'fullName' ? value : value.trim()
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [name]: sanitizedValue
-    })
+    }))
     setError('')
 
     // Validation email en temps réel
-    if (name === 'contact' && !isPhoneInput) {
+    if (name === 'email') {
       const emailValidation = validateEmail(sanitizedValue)
       setIsEmailValid(emailValidation.valid)
-    }
-    
-    // Nettoyer l'erreur quand le téléphone devient valide
-    if (name === 'contact' && isPhoneInput && isPhoneValid) {
-      setError('')
     }
   }
 
   const handleProfessionSelect = (profession: string) => {
-    setFormData({ ...formData, profession })
+    setFormData(prev => ({ ...prev, profession }))
     setShowProfessionDropdown(false)
   }
 
   const validateStep1 = (): boolean => {
-    if (!formData.fullName || !formData.contact || !formData.password) {
+    if (!formData.fullName || (!formData.email && !isPhoneInput) || (!formData.phone && isPhoneInput) || !formData.password) {
       setError('Veuillez remplir tous les champs obligatoires')
       return false
     }
@@ -122,12 +117,12 @@ export const Register = (): JSX.Element => {
 
     // Validation téléphone ou email
     if (isPhoneInput) {
-      if (!isPhoneValid) {
-        setError('Numéro de téléphone invalide')
+      if (!formData.phone || !isPhoneValid) {
+        setError('Veuillez saisir un numéro de téléphone valide')
         return false
       }
     } else {
-      const emailValidation = validateEmail(formData.contact)
+      const emailValidation = validateEmail(formData.email)
       if (!emailValidation.valid) {
         setError(emailValidation.error || 'Email invalide')
         return false
@@ -217,9 +212,9 @@ export const Register = (): JSX.Element => {
     const birthDateStr = `${formData.birthYear}-${formData.birthMonth.padStart(2, '0')}-${formData.birthDay.padStart(2, '0')}`
 
     const result = await registerPro({
-      fullName: formData.fullName, // Ne pas trim pour préserver les espaces entre nom et prénom
-      email: formData.contact.includes('@') ? formData.contact : '',
-      phone: formData.contact.includes('@') ? '' : formData.contact,
+      fullName: formData.fullName,
+      email: !isPhoneInput ? formData.email : '',
+      phone: isPhoneInput ? formData.phone : '',
       password: formData.password,
       birthDate: birthDateStr,
       gender: formData.gender,
@@ -298,373 +293,393 @@ export const Register = (): JSX.Element => {
 
           {showWelcome && (
             <div className={`mb-4 sm:mb-6 p-4 sm:p-6 ${resolvedTheme === 'dark' ? 'bg-green-900/20 border-green-800' : 'bg-green-50 border-green-200'} border rounded-lg text-center`}>
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-500 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                </div>
-                <h3 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  Bienvenue, {formData.fullName} !
-                </h3>
-                <p className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                  {formData.profession}
-                </p>
-                <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                  Redirection vers votre tableau de bord...
-                </p>
-              </div>
+              <CheckCircle className="w-10 h-10 sm:w-12 sm:h-12 text-green-500 mx-auto mb-2 sm:mb-3 animate-bounce" />
+              <h2 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>
+                Bienvenue sur EXILE !
+              </h2>
+              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                Votre compte professionnel a été créé avec succès. Redirection en cours...
+              </p>
             </div>
           )}
 
           {!showWelcome && (
             <>
-          {/* Step 1 */}
-          {step === 1 && (
-            <form className="space-y-4 sm:space-y-6">
-              {/* Nom complet */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Nom complet *
-                </label>
-                <input
-                  type="text"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  required
-                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
-                    resolvedTheme === 'dark'
-                      ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                  }`}
-                  placeholder="EXILE Flaendy"
-                />
-              </div>
-
-              {/* Date de naissance - 3 champs alignés */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Date de naissance * (vous devez avoir au moins 18 ans)
-                </label>
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                  <div>
-                    <select
-                      name="birthDay"
-                      value={formData.birthDay}
-                      onChange={handleChange}
-                      required
-                      className={`w-full px-2 sm:px-3 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-xs sm:text-sm ${
-                        resolvedTheme === 'dark'
-                          ? 'bg-zinc-800 border-zinc-700 text-white'
-                          : 'bg-white border-gray-300 text-gray-900'
-                      }`}
-                    >
-                      <option value="">Jour</option>
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                        <option key={day} value={day.toString()}>{day}</option>
-                      ))}
-                    </select>
+              {/* Step indicator */}
+              <div className="flex items-center justify-center mb-6 sm:mb-8">
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm ${
+                    step >= 1 ? 'bg-primary text-white' : 'bg-gray-300 text-gray-600'
+                  }`}>
+                    1
                   </div>
-                  <div>
-                    <select
-                      name="birthMonth"
-                      value={formData.birthMonth}
-                      onChange={handleChange}
-                      required
-                      className={`w-full px-2 sm:px-3 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-xs sm:text-sm ${
-                        resolvedTheme === 'dark'
-                          ? 'bg-zinc-800 border-zinc-700 text-white'
-                          : 'bg-white border-gray-300 text-gray-900'
-                      }`}
-                    >
-                      <option value="">Mois</option>
-                      <option value="1">Janvier</option>
-                      <option value="2">Février</option>
-                      <option value="3">Mars</option>
-                      <option value="4">Avril</option>
-                      <option value="5">Mai</option>
-                      <option value="6">Juin</option>
-                      <option value="7">Juillet</option>
-                      <option value="8">Août</option>
-                      <option value="9">Septembre</option>
-                      <option value="10">Octobre</option>
-                      <option value="11">Novembre</option>
-                      <option value="12">Décembre</option>
-                    </select>
-                  </div>
-                  <div>
-                    <select
-                      name="birthYear"
-                      value={formData.birthYear}
-                      onChange={handleChange}
-                      required
-                      className={`w-full px-2 sm:px-3 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-xs sm:text-sm ${
-                        resolvedTheme === 'dark'
-                          ? 'bg-zinc-800 border-zinc-700 text-white'
-                          : 'bg-white border-gray-300 text-gray-900'
-                      }`}
-                    >
-                      <option value="">Année</option>
-                      {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - 18 - i).map(year => (
-                        <option key={year} value={year.toString()}>{year}</option>
-                      ))}
-                    </select>
+                  <div className={`w-8 sm:w-12 h-1 rounded ${
+                    step >= 2 ? 'bg-primary' : 'bg-gray-300'
+                  }`} />
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm ${
+                    step >= 2 ? 'bg-primary text-white' : 'bg-gray-300 text-gray-600'
+                  }`}>
+                    2
                   </div>
                 </div>
               </div>
 
-              {/* Genre */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Genre *
-                </label>
-                <div className="relative">
-                  <Users className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    required
-                    className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent appearance-none transition-colors text-sm sm:text-base ${
-                      resolvedTheme === 'dark'
-                        ? 'bg-zinc-800 border-zinc-700 text-white'
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="">Sélectionnez...</option>
-                    <option value="masculin">Masculin</option>
-                    <option value="feminin">Féminin</option>
-                    <option value="personnalise">Personnaliser</option>
-                  </select>
-                  <ChevronDown className={`absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5 pointer-events-none`} />
-                </div>
-              </div>
-
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Numéro de mobile ou adresse e-mail *
-                </label>
-                
-                {/* Toggle Email/Téléphone */}
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsPhoneInput(false)}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      !isPhoneInput
-                        ? resolvedTheme === 'dark'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-blue-600 text-white'
-                        : resolvedTheme === 'dark'
-                        ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    Email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsPhoneInput(true)}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isPhoneInput
-                        ? resolvedTheme === 'dark'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-blue-600 text-white'
-                        : resolvedTheme === 'dark'
-                        ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    Téléphone
-                  </button>
-                </div>
-
-                {/* Input Email */}
-                {!isPhoneInput && (
-                  <div className="relative">
-                    <Smartphone className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
+              {/* Step 1 */}
+              {step === 1 && (
+                <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-3 sm:space-y-4">
+                  {/* Nom complet */}
+                  <div>
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1 sm:mb-1.5`}>
+                      Nom complet *
+                    </label>
                     <input
-                      type="email"
-                      name="contact"
-                      value={formData.contact}
+                      type="text"
+                      name="fullName"
+                      value={formData.fullName}
                       onChange={handleChange}
                       required
-                      className={`w-full pl-9 sm:pl-10 pr-12 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
-                        error && !isEmailValid ? 'border-red-500' : isEmailValid ? 'border-green-500' : 'border-gray-300 dark:border-zinc-700'
-                      } ${
+                      className={`w-full px-3 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
                         resolvedTheme === 'dark'
-                          ? 'bg-zinc-800 text-white placeholder-zinc-500'
-                          : 'bg-white text-gray-900 placeholder-gray-400'
+                          ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                       }`}
-                      placeholder="votre@email.com"
+                      placeholder="Nom et prénom (ex: Toot Diaman)"
                     />
-                    {isEmailValid && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500">
-                        ✓
-                      </div>
-                    )}
-                    {error && !isEmailValid && formData.contact && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500">
-                        ✕
-                      </div>
-                    )}
                   </div>
-                )}
 
-                {/* Input Téléphone avec libphonenumber-js */}
-                {isPhoneInput && (
-                  <PhoneInput
-                    value={formData.contact}
-                    onChange={(value: string, isValid: boolean) => {
-                      setFormData({ ...formData, contact: value })
-                      setIsPhoneValid(isValid)
-                      // Nettoyer l'erreur si le numéro devient valide
-                      if (isValid) {
-                        setError('')
-                      }
-                    }}
-                    error={error && !isPhoneValid ? error : ''}
-                    defaultCountryCode="509"
-                    showHelpText={true}
-                    className={`w-full ${
-                      resolvedTheme === 'dark'
-                        ? 'bg-zinc-800 text-white placeholder-zinc-500'
-                        : 'bg-white text-gray-900 placeholder-gray-400'
-                    }`}
-                  />
-                )}
-              </div>
+                  {/* Date de naissance */}
+                  <div>
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1 sm:mb-1.5`}>
+                      Date de naissance * (vous devez avoir au moins 18 ans)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <select
+                          name="birthDay"
+                          value={formData.birthDay}
+                          onChange={handleChange}
+                          required
+                          className={`w-full px-2 sm:px-3 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-xs sm:text-sm ${
+                            resolvedTheme === 'dark'
+                              ? 'bg-zinc-800 border-zinc-700 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="">Jour</option>
+                          {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                            <option key={day} value={day.toString()}>{day}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <select
+                          name="birthMonth"
+                          value={formData.birthMonth}
+                          onChange={handleChange}
+                          required
+                          className={`w-full px-2 sm:px-3 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-xs sm:text-sm ${
+                            resolvedTheme === 'dark'
+                              ? 'bg-zinc-800 border-zinc-700 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="">Mois</option>
+                          <option value="1">Janvier</option>
+                          <option value="2">Février</option>
+                          <option value="3">Mars</option>
+                          <option value="4">Avril</option>
+                          <option value="5">Mai</option>
+                          <option value="6">Juin</option>
+                          <option value="7">Juillet</option>
+                          <option value="8">Août</option>
+                          <option value="9">Septembre</option>
+                          <option value="10">Octobre</option>
+                          <option value="11">Novembre</option>
+                          <option value="12">Décembre</option>
+                        </select>
+                      </div>
+                      <div>
+                        <select
+                          name="birthYear"
+                          value={formData.birthYear}
+                          onChange={handleChange}
+                          required
+                          className={`w-full px-2 sm:px-3 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-xs sm:text-sm ${
+                            resolvedTheme === 'dark'
+                              ? 'bg-zinc-800 border-zinc-700 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="">Année</option>
+                          {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - 18 - i).map(year => (
+                            <option key={year} value={year.toString()}>{year}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
 
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Mot de passe *
-                </label>
-                <div className="relative">
-                  <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    className={`w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
-                      resolvedTheme === 'dark'
-                        ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                    placeholder="8 caractères minimum"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className={`absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
-                  </button>
-                </div>
-              </div>
+                  {/* Genre */}
+                  <div>
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
+                      Genre *
+                    </label>
+                    <div className="relative">
+                      <Users className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
+                      <select
+                        name="gender"
+                        value={formData.gender}
+                        onChange={handleChange}
+                        required
+                        className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent appearance-none transition-colors text-sm sm:text-base ${
+                          resolvedTheme === 'dark'
+                            ? 'bg-zinc-800 border-zinc-700 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                      >
+                        <option value="">Sélectionnez...</option>
+                        <option value="masculin">Masculin</option>
+                        <option value="feminin">Féminin</option>
+                        <option value="personnalise">Personnaliser</option>
+                      </select>
+                      <ChevronDown className={`absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5 pointer-events-none`} />
+                    </div>
+                  </div>
 
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Confirmer le mot de passe *
-                </label>
-                <div className="relative">
-                  <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    required
-                    autoComplete="new-password"
-                    className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
-                      resolvedTheme === 'dark'
-                        ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                    placeholder="Répétez le mot de passe"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleNext}
-                className="w-full bg-primary text-white font-semibold py-2.5 sm:py-3 rounded-lg hover:bg-primary/90 transition-colors shadow-sm hover:shadow text-sm sm:text-base"
-              >
-                Continuer
-              </button>
-            </form>
-          )}
-
-          {/* Step 2 */}
-          {step === 2 && (
-            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-              {/* Profession Input with Dropdown */}
-              <div className="relative">
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Profession *
-                </label>
-                <div className="relative">
-                  <Briefcase className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
-                  <input
-                    type="text"
-                    name="profession"
-                    value={formData.profession}
-                    onChange={handleChange}
-                    onFocus={() => setShowProfessionDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowProfessionDropdown(false), 200)}
-                    required
-                    className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
-                      resolvedTheme === 'dark'
-                        ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                    placeholder="Tapez ou sélectionnez une profession..."
-                    autoComplete="off"
-                  />
-                  <ChevronDown className={`absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5 pointer-events-none`} />
-                </div>
-
-                {showProfessionDropdown && (
-                  <div className={`absolute z-10 w-full mt-1 border rounded-lg shadow-lg max-h-60 overflow-auto ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
-                    {ALL_PROFESSIONS.sort().filter(p => 
-                      p.toLowerCase().includes(formData.profession.toLowerCase())
-                    ).slice(0, 10).map((profession) => (
+                  <div>
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
+                      Numéro de mobile ou adresse e-mail *
+                    </label>
+                    
+                    {/* Toggle Email/Téléphone */}
+                    <div className="flex gap-2 mb-2">
                       <button
-                        key={profession}
                         type="button"
                         onClick={() => {
-                          setFormData({ ...formData, profession })
-                          setShowProfessionDropdown(false)
+                          setIsPhoneInput(false)
+                          setError('')
                         }}
-                        className={`w-full text-left px-3 sm:px-4 py-2 text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-white' : 'hover:bg-gray-50 text-gray-900'}`}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          !isPhoneInput
+                            ? 'bg-blue-600 text-white'
+                            : resolvedTheme === 'dark'
+                            ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
                       >
-                        {profession}
+                        Email
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPhoneInput(true)
+                          setError('')
+                        }}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          isPhoneInput
+                            ? 'bg-blue-600 text-white'
+                            : resolvedTheme === 'dark'
+                            ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        Téléphone
+                      </button>
+                    </div>
 
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
-                  Spécialité (optionnel)
-                </label>
-                <input
-                  type="text"
-                  name="specialty"
-                  value={formData.specialty}
-                  onChange={handleChange}
-                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
-                    resolvedTheme === 'dark'
-                      ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
-                      : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400 focus:bg-white'
-                  }`}
-                  placeholder="Ex: React, Marketing digital..."
-                />
-              </div>
+                    {/* Input Email */}
+                    {!isPhoneInput && (
+                      <div className="relative">
+                        <Smartphone className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          required
+                          className={`w-full pl-9 sm:pl-10 pr-12 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
+                            error && !isEmailValid ? 'border-red-500' : isEmailValid ? 'border-green-500' : 'border-gray-300 dark:border-zinc-700'
+                          } ${
+                            resolvedTheme === 'dark'
+                              ? 'bg-zinc-800 text-white placeholder-zinc-500'
+                              : 'bg-white text-gray-900 placeholder-gray-400'
+                          }`}
+                          placeholder="votre@email.com"
+                        />
+                        {isEmailValid && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold">
+                            ✓
+                          </div>
+                        )}
+                        {error && !isEmailValid && formData.email && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 font-bold">
+                            ✕
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Input Téléphone avec libphonenumber-js */}
+                    {isPhoneInput && (
+                      <PhoneInput
+                        value={formData.phone}
+                        onChange={(value: string, isValid: boolean) => {
+                          setFormData(prev => ({ ...prev, phone: value }))
+                          setIsPhoneValid(isValid)
+                          if (isValid) {
+                            setError('')
+                          }
+                        }}
+                        error={error && !isPhoneValid ? error : ''}
+                        defaultCountryCode="509"
+                        showHelpText={true}
+                        className={`w-full ${
+                          resolvedTheme === 'dark'
+                            ? 'bg-zinc-800 text-white placeholder-zinc-500'
+                            : 'bg-white text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
+                      Mot de passe *
+                    </label>
+                    <div className="relative">
+                      <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        className={`w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
+                          resolvedTheme === 'dark'
+                            ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                        placeholder="8 caractères minimum"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className={`absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-gray-400 hover:text-gray-600'}`}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
+                      Confirmer le mot de passe *
+                    </label>
+                    <div className="relative">
+                      <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        required
+                        autoComplete="new-password"
+                        className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
+                          resolvedTheme === 'dark'
+                            ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                        placeholder="Répétez le mot de passe"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="w-full bg-primary text-white font-semibold py-2.5 sm:py-3 rounded-lg hover:bg-primary/90 transition-colors shadow-sm hover:shadow text-sm sm:text-base"
+                  >
+                    Continuer
+                  </button>
+                </form>
+              )}
+
+              {/* Step 2 */}
+              {step === 2 && (
+                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                  {/* Profession Input with Dropdown */}
+                  <div className="relative">
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
+                      Profession *
+                    </label>
+                    <div className="relative">
+                      <Briefcase className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} w-4 h-4 sm:w-5 sm:h-5`} />
+                      <input
+                        type="text"
+                        name="profession"
+                        value={formData.profession}
+                        onChange={handleChange}
+                        onFocus={() => setShowProfessionDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowProfessionDropdown(false), 250)}
+                        required
+                        className={`w-full pl-9 sm:pl-10 pr-10 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
+                          resolvedTheme === 'dark'
+                            ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                        placeholder="Tapez ou sélectionnez une profession..."
+                        autoComplete="off"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowProfessionDropdown(prev => !prev)}
+                        className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                        title="Ouvrir la liste"
+                      >
+                        <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${showProfessionDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {showProfessionDropdown && (
+                      <div className={`absolute z-20 w-full mt-1 border rounded-xl shadow-xl max-h-60 overflow-auto ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
+                        {ALL_PROFESSIONS.sort().filter(p => 
+                          p.toLowerCase().includes((formData.profession || '').toLowerCase())
+                        ).slice(0, 15).map((profession) => (
+                          <button
+                            key={profession}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              handleProfessionSelect(profession)
+                            }}
+                            className={`w-full text-left px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-colors ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-white' : 'hover:bg-blue-50 text-gray-900'}`}
+                          >
+                            {profession}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
+                      Spécialité (optionnel)
+                    </label>
+                    <input
+                      type="text"
+                      name="specialty"
+                      value={formData.specialty}
+                      onChange={handleChange}
+                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors text-sm sm:text-base ${
+                        resolvedTheme === 'dark'
+                          ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
+                          : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400 focus:bg-white'
+                      }`}
+                      placeholder="Ex: React, Marketing digital..."
+                    />
+                  </div>
 
               <div className="flex space-x-3 sm:space-x-4">
                 <button

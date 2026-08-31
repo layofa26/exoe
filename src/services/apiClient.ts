@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 // Ensure API_BASE_URL always ends with /api/v1 for production URLs
-const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
-  ? API_BASE_URL.replace('/api', '/api/v1') 
-  : API_BASE_URL
+const FINAL_API_BASE_URL = API_BASE_URL.includes('/api/v1')
+  ? API_BASE_URL
+  : API_BASE_URL + '/v1'
 const API_TIMEOUT = 15000 // 15 seconds
 const MAX_RETRIES = 3
 const RETRY_DELAY = 1000 // 1 second

@@ -1,36 +1,52 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, TrendingUp, Users, UserCheck, UserPlus, Download, MessageCircle, ArrowLeft } from 'lucide-react'
+import {
+  Search,
+  Users,
+  UserCheck,
+  UserPlus,
+  MessageSquare,
+  ArrowLeft,
+  MapPin,
+  Briefcase,
+  ExternalLink,
+  Sparkles,
+  Calendar,
+  X
+} from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useQuery } from '../../hooks/useQuery'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 interface Subscriber {
   id: string
-  name: string
+  userId?: string
   username: string
   avatar: string
   profession: string
   location: string
   subscribedAt: string
   isFollowing: boolean
-  mutualConnections: number
 }
 
 export const Subscribers = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
-  const [subscribers, setSubscribers] = useState<Subscriber[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filter, setFilter] = useState<'all' | 'recent' | 'mutual'>('all')
+  const [filter, setFilter] = useState<'all' | 'recent'>('all')
 
-  useEffect(() => {
-    const loadSubscribers = async () => {
+  // SWR query avec chargement instantané (0ms) depuis le cache
+  const {
+    data: cachedSubscribers,
+    isLoading: loading,
+    setData: setSubscribers
+  } = useQuery<Subscriber[]>(
+    async () => {
       try {
-        setLoading(true)
-        const token = localStorage.getItem('accessToken')
-        
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+        if (!token) return []
+
         const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/subscribers/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -38,232 +54,284 @@ export const Subscribers = (): JSX.Element => {
           }
         })
         
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`)
-        }
+        if (!response.ok) return []
         
         const data = await response.json()
-        const subscribersData = data.results || data
+        const subscribersData = Array.isArray(data) ? data : (data.results || [])
         
-        setSubscribers(subscribersData.map((sub: any) => ({
-          id: sub.id,
-          name: sub.user?.full_name || sub.professionnel || 'Utilisateur',
-          username: sub.user?.username || '@user',
-          avatar: sub.user?.avatar || '',
-          profession: sub.user?.profession || 'Non renseigné',
-          location: sub.user?.city && sub.user?.country 
-            ? `${sub.user.city}, ${sub.user.country}` 
-            : sub.user?.city || sub.user?.country || 'Non renseigné',
-          subscribedAt: sub.created_at,
-          isFollowing: false,
-          mutualConnections: 0
-        })))
+        return subscribersData.map((sub: any) => {
+          const rawUser = sub.user || sub.abonne || sub
+          const rawUsername = rawUser?.username || sub.username || 'Utilisateur'
+          const formattedUsername = rawUsername.startsWith('@') ? rawUsername : `@${rawUsername}`
+          
+          return {
+            id: String(sub.id),
+            userId: String(rawUser?.id || sub.user_id || sub.id),
+            username: formattedUsername,
+            avatar: rawUser?.avatar || rawUser?.photo || sub.avatar || '',
+            profession: rawUser?.profession || sub.profession || 'Professionnel',
+            location: rawUser?.city && rawUser?.country 
+              ? `${rawUser.city}, ${rawUser.country}` 
+              : rawUser?.city || rawUser?.country || rawUser?.location || 'Non renseigné',
+            subscribedAt: sub.created_at || new Date().toISOString(),
+            isFollowing: false
+          }
+        })
       } catch (error) {
         console.error('Error loading subscribers:', error)
-        setSubscribers([])
-      } finally {
-        setLoading(false)
+        return []
       }
+    },
+    {
+      cacheKey: 'pro:subscribers:list',
+      cacheTime: 5 * 60 * 1000,
+      initialData: []
     }
-    loadSubscribers()
-  }, [])
+  )
+
+  const subscribers = cachedSubscribers || []
 
   const filteredSubscribers = subscribers.filter(sub => {
-    const matchesSearch = sub.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        sub.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        sub.profession.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = sub.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        sub.profession.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        sub.location.toLowerCase().includes(searchQuery.toLowerCase())
     
     if (filter === 'recent') {
-      return matchesSearch && new Date(sub.subscribedAt) > new Date('2024-01-01')
-    }
-    if (filter === 'mutual') {
-      return matchesSearch && sub.mutualConnections > 0
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      return matchesSearch && new Date(sub.subscribedAt) > thirtyDaysAgo
     }
     return matchesSearch
   })
 
-  const toggleFollow = (id: string) => {
-    setSubscribers(subs => 
-      subs.map(sub => 
-        sub.id === id ? { ...sub, isFollowing: !sub.isFollowing } : sub
-      )
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex items-center justify-center`}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
   const stats = {
     total: subscribers.length,
-    newThisMonth: subscribers.filter(s => new Date(s.subscribedAt) > new Date('2024-01-01')).length,
-    mutual: subscribers.filter(s => s.mutualConnections > 0).length,
-    following: subscribers.filter(s => s.isFollowing).length
+    recent: subscribers.filter(s => new Date(s.subscribedAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length
+  }
+
+  const toggleFollow = (id: string) => {
+    setSubscribers(subs => 
+      subs ? subs.map(sub => 
+        sub.id === id ? { ...sub, isFollowing: !sub.isFollowing } : sub
+      ) : []
+    )
   }
 
   return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-16 sm:pb-20`}>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
-        {/* Header */}
-        <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-10 mb-4 sm:mb-6 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 py-3 sm:py-4`}>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => navigate('/pro/profile')}
-              className={`p-1.5 sm:p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
-            >
-              <ArrowLeft className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
-            </button>
-            <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
-              <div>
-                <h1 className={`text-lg sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Mes abonnés</h1>
-                <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Gérez votre communauté</p>
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-gray-50 text-gray-900'} pb-24`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+        
+        {/* Top Header */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/pro/profile')}
+            className={`p-2.5 rounded-xl border transition-all ${
+              resolvedTheme === 'dark'
+                ? 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-white'
+                : 'bg-white border-gray-200 hover:bg-gray-100 text-gray-900'
+            } shadow-sm active:scale-95`}
+            title="Retour au profil"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <Users className="w-6 h-6 text-blue-500" />
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Mes abonnés</h1>
+            </div>
+            <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+              Consultez et interagissez avec les membres qui vous suivent
+            </p>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4 max-w-xl">
+          <div className={`p-4 rounded-2xl border ${
+            resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+          } shadow-sm`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Total Abonnés</span>
+              <Users className="w-4 h-4 text-blue-500" />
+            </div>
+            <p className="text-2xl font-extrabold">{stats.total}</p>
+          </div>
+
+          <div className={`p-4 rounded-2xl border ${
+            resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+          } shadow-sm`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Nouveaux (30j)</span>
+              <Sparkles className="w-4 h-4 text-emerald-500" />
+            </div>
+            <p className="text-2xl font-extrabold text-emerald-500">+{stats.recent}</p>
+          </div>
+        </div>
+
+        {/* Search & Filter */}
+        <div className={`p-3 sm:p-4 rounded-2xl border ${
+          resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+        } shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3`}>
+          <div className="relative flex-1">
+            <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
+            <input
+              type="text"
+              placeholder="Rechercher un abonné par nom, profession ou ville..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`w-full pl-10 pr-9 py-2 rounded-xl text-sm border transition-colors ${
+                resolvedTheme === 'dark'
+                  ? 'bg-zinc-800/80 border-zinc-700 text-white placeholder-zinc-500 focus:border-blue-500'
+                  : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+              } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {[
+              { id: 'all', label: 'Tous', count: stats.total },
+              { id: 'recent', label: 'Récents', count: stats.recent }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id as any)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                  filter === f.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span>{f.label}</span>
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                  filter === f.id ? 'bg-white/20 text-white' : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-400' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {f.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Subscribers Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className={`rounded-2xl border p-4 animate-pulse ${
+                resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-full ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-200'}`} />
+                  <div className="flex-1 space-y-2">
+                    <div className={`h-4 w-3/4 rounded ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-200'}`} />
+                    <div className={`h-3 w-1/2 rounded ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-200'}`} />
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
-          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl p-2.5 sm:p-4 shadow-sm border`}>
-            <div className={`flex items-center gap-1.5 sm:gap-2 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1`}>
-              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm">Total</span>
+        ) : filteredSubscribers.length === 0 ? (
+          <div className={`p-12 text-center rounded-3xl border ${
+            resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-gray-200'
+          } shadow-sm`}>
+            <div className="w-16 h-16 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center mx-auto mb-4">
+              <Users className="w-8 h-8" />
             </div>
-            <p className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{stats.total}</p>
-          </div>
-          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl p-2.5 sm:p-4 shadow-sm border`}>
-            <div className={`flex items-center gap-1.5 sm:gap-2 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1`}>
-              <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm">Nouveaux</span>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">+{stats.newThisMonth}</p>
-            <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>ce mois</p>
-          </div>
-          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl p-2.5 sm:p-4 shadow-sm border`}>
-            <div className={`flex items-center gap-1.5 sm:gap-2 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1`}>
-              <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm">Mutuels</span>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.mutual}</p>
-          </div>
-          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl p-2.5 sm:p-4 shadow-sm border`}>
-            <div className={`flex items-center gap-1.5 sm:gap-2 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1`}>
-              <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm">Vous suivez</span>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.following}</p>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-3 sm:p-4 mb-4 sm:mb-6 border`}>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-              <input
-                type="text"
-                placeholder="Rechercher un abonné..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm border ${resolvedTheme === 'dark' ? 'border-zinc-600 bg-zinc-700 text-white' : 'border-gray-300 bg-white text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50`}
-              />
-            </div>
-
-            {/* Filter */}
-            <div className="flex gap-1 sm:gap-2">
-              {[
-                { id: 'all', label: 'Tous' },
-                { id: 'recent', label: 'Récents' },
-                { id: 'mutual', label: 'Mutuels' }
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setFilter(f.id as any)}
-                  className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                    filter === f.id
-                      ? 'bg-primary text-white'
-                      : resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Export */}
-            <button className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition-colors`}>
-              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline text-xs sm:text-sm">Exporter</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Subscribers List */}
-        {filteredSubscribers.length === 0 ? (
-          <div className={`text-center py-12 sm:py-16 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border`}>
-            <Users className={`w-12 h-12 sm:w-16 sm:h-16 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-300'} mx-auto mb-3 sm:mb-4`} />
-            <h3 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-1.5 sm:mb-2`}>
-              {searchQuery ? 'Aucun abonné trouvé' : 'Pas encore d\'abonnés'}
+            <h3 className="text-lg font-bold mb-1">
+              {searchQuery ? 'Aucun abonné trouvé' : 'Aucun abonné pour le moment'}
             </h3>
             <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-              {searchQuery ? 'Essayez une autre recherche' : 'Partagez votre profil pour gagner des abonnés'}
+              {searchQuery ? 'Modifiez votre recherche.' : 'Publiez des vidéos et participez aux événements pour développer votre audience.'}
             </p>
           </div>
         ) : (
-          <div className="space-y-1 sm:space-y-1">
-            {filteredSubscribers.map((subscriber) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {filteredSubscribers.map((sub) => (
               <div
-                key={subscriber.id}
-                className={`${resolvedTheme === 'dark' ? 'bg-zinc-800/50 hover:bg-zinc-700' : 'bg-white hover:bg-gray-50'} border-l-4 border-purple-500 rounded-r-lg p-2.5 sm:p-3 transition-colors`}
+                key={sub.id}
+                className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${
+                  resolvedTheme === 'dark'
+                    ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                    : 'bg-white border-gray-200 hover:border-gray-300'
+                } flex flex-col justify-between`}
               >
-                <div className="flex items-center gap-3 sm:gap-4">
-                  {/* Avatar */}
-                  <div className="relative flex-shrink-0">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-pro to-emerald-400 rounded-full flex items-center justify-center text-white text-sm sm:text-base font-bold">
-                      {subscriber.name.charAt(0)}
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-base flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden border border-white/10">
+                        {sub.avatar ? (
+                          <img src={sub.avatar} alt={sub.username} className="w-full h-full object-cover" />
+                        ) : (
+                          sub.username.replace('@', '').charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-extrabold text-sm sm:text-base truncate text-gray-900 dark:text-white">
+                          {sub.username}
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-zinc-400 truncate">
+                          <Briefcase className="w-3 h-3 flex-shrink-0 text-blue-500" />
+                          <span className="truncate">{sub.profession}</span>
+                        </div>
+                      </div>
                     </div>
-                    {subscriber.mutualConnections > 0 && (
-                      <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-blue-500 text-white text-[9px] sm:text-[10px] rounded-full flex items-center justify-center border-2 ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-white'}`}>
-                        {subscriber.mutualConnections}
-                      </span>
-                    )}
-                  </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <h3 className={`font-semibold text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>{subscriber.name}</h3>
-                      <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>@{subscriber.username}</span>
-                    </div>
-                    <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>{subscriber.profession}</p>
-                    <div className={`flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mt-0.5 sm:mt-1`}>
-                      <span className="truncate">{subscriber.location}</span>
-                      <span className="hidden sm:inline">•</span>
-                      <span className="hidden sm:inline">Abonné depuis {new Date(subscriber.subscribedAt).toLocaleDateString('fr-FR')}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                    <button className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-700' : 'text-gray-500 hover:bg-gray-100'} hover:text-primary rounded-lg transition-colors`}>
-                      <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </button>
                     <button
-                      onClick={() => toggleFollow(subscriber.id)}
-                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                        subscriber.isFollowing
-                          ? resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          : 'bg-primary text-white hover:bg-primary/90'
-                      }`}
+                      onClick={() => navigate(`/pro/conversations?to=${sub.userId || sub.id}`)}
+                      className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 dark:text-blue-400 transition-colors flex-shrink-0"
+                      title="Envoyer un message"
                     >
-                      {subscriber.isFollowing ? 'Suivi' : 'Suivre'}
+                      <MessageSquare className="w-4 h-4" />
                     </button>
                   </div>
+
+                  <div className="space-y-1.5 text-xs text-gray-500 dark:text-zinc-400 pt-2 border-t border-gray-100 dark:border-zinc-800/80">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3 h-3 text-gray-400" />
+                      <span className="truncate">{sub.location}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 text-gray-400" />
+                      <span>Abonné depuis le {new Date(sub.subscribedAt).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 flex items-center gap-2">
+                  <button
+                    onClick={() => toggleFollow(sub.id)}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                      sub.isFollowing
+                        ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                    }`}
+                  >
+                    {sub.isFollowing ? (
+                      <>
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Abonné</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>S'abonner en retour</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => navigate(`/pro/profile/${sub.userId || sub.id}`)}
+                    className="p-2 rounded-xl border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                    title="Voir le profil public"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             ))}

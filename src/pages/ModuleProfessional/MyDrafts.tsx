@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, Edit, Trash2, Clock, AlertCircle, CheckCircle } from 'lucide-react'
+import { useQuery } from '../../hooks/useQuery'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -17,20 +17,18 @@ interface Draft {
 }
 
 export const MyDrafts = () => {
-  const [drafts, setDrafts] = useState<Draft[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    loadDrafts()
-  }, [])
-
-  const loadDrafts = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('accessToken')
-      if (!token) return
+  const {
+    data: cachedDrafts,
+    isLoading: loading,
+    error: queryError,
+    refetch: loadDrafts,
+    setData: setDrafts
+  } = useQuery<Draft[]>(
+    async () => {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+      if (!token) return []
 
       const response = await fetch(`${API_BASE_URL}/accueil/videos/drafts/`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -38,17 +36,19 @@ export const MyDrafts = () => {
 
       if (response.ok) {
         const data = await response.json()
-        setDrafts(data.results || data)
-      } else {
-        setError('Impossible de charger les brouillons')
+        return data.results || data || []
       }
-    } catch (err) {
-      console.error('Error loading drafts:', err)
-      setError('Impossible de charger les brouillons')
-    } finally {
-      setLoading(false)
+      return []
+    },
+    {
+      cacheKey: 'pro:videos:drafts',
+      cacheTime: 3 * 60 * 1000,
+      initialData: []
     }
-  }
+  )
+
+  const drafts = cachedDrafts || []
+  const error = queryError ? queryError.message : null
 
   const handleDelete = async (draftId: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce brouillon ?')) return

@@ -30,8 +30,10 @@ export interface Ad {
   category: string;             // "Mode", "Tech", "Santé", etc.
   impressions: number;
   clicks: number;
-  budget: number;               // budget total EUR
-  spent: number;                // dépensé EUR
+  budget: number;               // budget total
+  currency?: string;            // "USD" | "HTG" | "EUR" | "CAD"
+  exchangeRate?: string;        // Taux de change ex: "1 USD = 132 HTG"
+  spent: number;                // dépensé
   status: AdStatus;
   startDate: string;
   endDate: string;
@@ -47,74 +49,34 @@ interface AdBannerProps {
 }
 
 // ─────────────────────────────────────────────────────────────
-// DONNÉES DÉMO (injectées depuis le dashboard)
+// STOCKAGE RÉEL DES ANNONCES PUBLICITAIRES
 // ─────────────────────────────────────────────────────────────
 
-export const DEMO_ADS: Ad[] = [
-  {
-    id: "ad-001",
-    brandName: "TechHaïti",
-    brandInitials: "TH",
-    brandColor: "#2563eb",
-    tagline: "Le futur du numérique commence ici.",
-    description: "Formation en développement web & mobile à Port-au-Prince. Bourses disponibles.",
-    ctaLabel: "Postuler maintenant",
-    ctaUrl: "#",
-    gradient: "from-blue-600 to-cyan-500",
-    category: "Éducation",
-    impressions: 12480,
-    clicks: 843,
-    budget: 500,
-    spent: 210,
-    status: "active",
-    startDate: "2026-04-01",
-    endDate: "2026-05-31",
-    targetViews: 20000,
-    brandLogo: undefined,
-  },
-  {
-    id: "ad-002",
-    brandName: "Solèy Market",
-    brandInitials: "SM",
-    brandColor: "#d97706",
-    tagline: "Produits locaux, qualité mondiale.",
-    description: "Livraison rapide dans tout Haïti. Épicerie fine, cosmétiques et artisanat.",
-    ctaLabel: "Visiter la boutique",
-    ctaUrl: "#",
-    gradient: "from-amber-500 to-orange-600",
-    category: "Commerce",
-    impressions: 8320,
-    clicks: 612,
-    budget: 300,
-    spent: 145,
-    status: "active",
-    startDate: "2026-04-15",
-    endDate: "2026-06-15",
-    targetViews: 15000,
-    brandLogo: undefined,
-  },
-  {
-    id: "ad-003",
-    brandName: "DigiFinance HT",
-    brandInitials: "DF",
-    brandColor: "#059669",
-    tagline: "Vos finances, simplifiées.",
-    description: "Transferts internationaux, épargne et microcrédits. 0% frais le premier mois.",
-    ctaLabel: "Ouvrir un compte",
-    ctaUrl: "#",
-    gradient: "from-emerald-500 to-teal-600",
-    category: "Finance",
-    impressions: 19650,
-    clicks: 1240,
-    budget: 800,
-    spent: 390,
-    status: "active",
-    startDate: "2026-03-01",
-    endDate: "2026-06-30",
-    targetViews: 30000,
-    brandLogo: undefined,
-  },
-];
+export const getStoredAds = (): Ad[] => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('exile_ads')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) return parsed
+      }
+    }
+  } catch (e) {
+    console.error('Erreur lors de la lecture des publicités:', e)
+  }
+  return []
+}
+
+export const saveStoredAds = (ads: Ad[]): void => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('exile_ads', JSON.stringify(ads))
+      window.dispatchEvent(new CustomEvent('exile_ads_updated', { detail: ads }))
+    }
+  } catch (e) {
+    console.error('Erreur lors de la sauvegarde des publicités:', e)
+  }
+}
 
 // ─────────────────────────────────────────────────────────────
 // HOOK : rotation des pubs

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar as CalendarIcon,
@@ -15,7 +15,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/apiClient'
 import { EventListSchema } from '../../schemas/apiSchemas'
-import { getCurrentUserId } from '../../services/apiClient'
+import { useQuery } from '../../hooks/useQuery'
 
 interface CalendarEvent {
   id: string
@@ -28,30 +28,35 @@ interface CalendarEvent {
   description?: string
 }
 
+const DEFAULT_CALENDAR_EVENTS: CalendarEvent[] = [
+  { id: '1', title: 'Consultation M. Dupont', date: '2024-01-25', time: '14:00', duration: '1h', type: 'meeting', with: 'M. Dupont', description: 'Discussion projet salon' },
+  { id: '2', title: 'Webinaire Design', date: '2024-01-26', time: '10:00', duration: '2h', type: 'event', description: 'Tendances 2024' },
+  { id: '3', title: 'Tournage vidéo', date: '2024-01-28', time: '09:00', duration: '3h', type: 'video', description: 'Tutoriel cuisine' },
+  { id: '4', title: 'Rendez-vous Marie L.', date: '2024-01-30', time: '16:00', duration: '1h', type: 'meeting', with: 'Marie L.' },
+  { id: '5', title: 'Payer facture', date: '2024-01-28', time: '09:00', duration: '', type: 'reminder' }
+]
+
 export const Calendar = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month')
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const loadEvents = async () => {
+  // SWR query avec chargement instantané (0ms) depuis le cache
+  const {
+    data: cachedEvents,
+    isLoading: loading,
+    setData: setEvents
+  } = useQuery<CalendarEvent[]>(
+    async () => {
       try {
-        setLoading(true)
         const token = localStorage.getItem('accessToken')
-        if (!token) {
-          navigate('/login')
-          return
-        }
+        if (!token) return DEFAULT_CALENDAR_EVENTS
 
-        // Load events from backend
         const result = await api.get('/evenement/evenements/', EventListSchema)
-        
-        if (result.success && result.data) {
-          const calendarEvents: CalendarEvent[] = result.data.results.map((event: any) => ({
+        if (result.success && result.data && result.data.results) {
+          return result.data.results.map((event: any) => ({
             id: String(event.id),
             title: event.title,
             date: event.start_date?.split('T')[0] || event.created_at?.split('T')[0] || '',
@@ -60,25 +65,21 @@ export const Calendar = (): JSX.Element => {
             type: 'event' as const,
             description: event.description
           }))
-          setEvents(calendarEvents)
         }
+        return DEFAULT_CALENDAR_EVENTS
       } catch (err) {
         console.error('Error loading events:', err)
-        // Fallback to demo data if API fails
-        setEvents([
-          { id: '1', title: 'Consultation M. Dupont', date: '2024-01-25', time: '14:00', duration: '1h', type: 'meeting', with: 'M. Dupont', description: 'Discussion projet salon' },
-          { id: '2', title: 'Webinaire Design', date: '2024-01-26', time: '10:00', duration: '2h', type: 'event', description: 'Tendances 2024' },
-          { id: '3', title: 'Tournage vidéo', date: '2024-01-28', time: '09:00', duration: '3h', type: 'video', description: 'Tutoriel cuisine' },
-          { id: '4', title: 'Rendez-vous Marie L.', date: '2024-01-30', time: '16:00', duration: '1h', type: 'meeting', with: 'Marie L.' },
-          { id: '5', title: 'Payer facture', date: '2024-01-28', time: '09:00', duration: '', type: 'reminder' }
-        ])
-      } finally {
-        setLoading(false)
+        return DEFAULT_CALENDAR_EVENTS
       }
+    },
+    {
+      cacheKey: 'pro:calendar:events',
+      cacheTime: 10 * 60 * 1000,
+      initialData: DEFAULT_CALENDAR_EVENTS
     }
+  )
 
-    loadEvents()
-  }, [navigate])
+  const events = cachedEvents || DEFAULT_CALENDAR_EVENTS
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()

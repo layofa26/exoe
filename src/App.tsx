@@ -5,7 +5,6 @@ import { Suspense, useEffect, useState, useMemo } from 'react'
 import Header from './components/common/Header'
 import Footer from './components/common/Footer'
 import ProSidebar from './components/common/ProSidebar'
-import ProSubHeader from './components/common/ProSubHeader'
 import ProtectedRoute from './components/common/ProtectedRoute'
 import { DraftDetectionModal } from './components/common/DraftDetectionModal'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -92,13 +91,26 @@ function App(): JSX.Element {
   // Detekte si itilizatè a nan mitan yon Live pou n kache Sidebar ak Header pwofesyonèl yo
   const isLiveRoom = location.pathname.includes('/live')
   
-  // Detekte si nou nan paj ki pa dwe gen header (conversations, profile, subscribers, calendar, settings)
+  // Detekte si nou nan modil PUB
+  const isPubRoute = location.pathname.startsWith('/pub') || location.pathname.startsWith('/pro/ads')
+
+  // Pages sans Header principal (accueil header masqué sur events, subscriptions, requests, pub dashboard, etc.)
   const isNoHeaderPage = location.pathname.startsWith('/pro/conversations') || 
                            location.pathname.startsWith('/pro/profile') ||
                            location.pathname.startsWith('/pro/subscribers') ||
                            location.pathname.startsWith('/pro/calendar') ||
-                           location.pathname.startsWith('/pro/settings')
-  
+                           location.pathname.startsWith('/pro/settings') ||
+                           location.pathname.startsWith('/pro/requests') ||
+                           location.pathname.startsWith('/pro/demandes') ||
+                           location.pathname.startsWith('/pro/my-videos') ||
+                           location.pathname.startsWith('/pro/videos') ||
+                           location.pathname.startsWith('/pro/events') ||
+                           location.pathname.startsWith('/pro/subscriptions') ||
+                           isPubRoute
+
+  // Pages où le ProSidebar doit être masqué (ProSidebar doit TOUJOURS apparaître sur Demandes !)
+  const isNoSidebarPage = location.pathname.startsWith('/pro/conversations')
+
   // Cacher header et sous-module sur mobile pour page détails vidéo uniquement
   const isVideoDetailPage = location.pathname.startsWith('/pro/video')
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
@@ -143,47 +155,8 @@ function App(): JSX.Element {
       }
     }
 
-    const checkDrafts = async () => {
-      try {
-        // Only check drafts on pro routes and if user hasn't dismissed it
-        if (!isProRoute) return
-
-        const dismissed = localStorage.getItem('exile_drafts_dismissed')
-        if (dismissed === 'true') return
-
-        // L'endpoint brouillons n'existe pas sur toutes les versions du backend
-        if (localStorage.getItem('exile_drafts_unsupported') === 'true') return
-
-        const token = localStorage.getItem('accessToken')
-        if (token) {
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
-          const response = await fetch(`${API_BASE_URL}/accueil/videos/drafts/`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-          if (response.status === 404) {
-            localStorage.setItem('exile_drafts_unsupported', 'true')
-            return
-          }
-          if (response.ok) {
-            const data = await response.json()
-            const pendingDrafts = (data.data || data || []).filter(
-              (d: any) => d.status === 'DRAFT' || d.status === 'UPLOADING' || d.status === 'FAILED'
-            )
-            if (pendingDrafts.length > 0) {
-              setShowDraftModal(true)
-            }
-          }
-        }
-      } catch {
-        // Endpoint brouillons optionnel: ne pas bloquer le rendu du module Pro
-      }
-    }
-
     checkUploading()
     checkVideoPlayer()
-    checkDrafts()
 
     // Listen for storage changes
     const handleStorageChange = () => {
@@ -193,8 +166,6 @@ function App(): JSX.Element {
 
     window.addEventListener('storage', handleStorageChange)
 
-    // Poll localStorage every 1 SECOND (reduced from 100ms) to detect changes from same window
-    // Note: This is still not ideal, consider using a custom event or state management instead
     const interval = setInterval(() => {
       checkUploading()
       checkVideoPlayer()
@@ -213,19 +184,15 @@ function App(): JSX.Element {
       {/* Always show main header for module navigation between Pro and Social */}
       {showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <Header />}
 
-      {/* Sidebar parèt sèlman si se yon wout Pro epi li pa nan yon Live epi li pa nan upload video epi li pa nan paj san header epi li pa nan video player */}
-      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoHeaderPage && !isVideoPlayerActive && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <ProSidebar />}
+      {/* ProSidebar parèt toujou sou wout Pro, y konpri sou Demandes */}
+      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage && !isVideoPlayerActive && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <ProSidebar />}
 
       {/* SocialSidebar parèt sèlman si se yon wout Social epi li pa nan mobile search */}
       {isSocialRoute && !isLiveRoom && <SocialSidebar />}
 
-      {/* SubHeader parèt sèlman si se yon wout Pro epi li pa nan yon Live epi li pa nan upload video epi li pa nan paj san header epi li pa nan video player epi li pa nan paj san SubHeader epi li pa nan page détails vidéo sur mobile */}
-      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoHeaderPage && !isVideoPlayerActive && !isNoSubHeaderPage && !shouldHideSubHeaderOnVideoDetail && <ProSubHeader />}
-
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto">
-          {/* Ajiste padding yo sèlman si nou nan wout Pro regilye epi li pa nan upload video epi li pa nan paj san header */}
-          <div className={isProRoute && !isLiveRoom && !isUploadingVideo && !isNoHeaderPage ? 'pt-0 pb-24 md:pb-0' : isSocialRoute ? 'pt-0 md:pl-64' : ''}>
+        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+          <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage ? 'pb-16 md:pb-0' : isSocialRoute ? 'md:pl-64' : ''}`}>
             <Suspense fallback={<PageLoading />}>
               <Routes>
                 {/* Public Routes */}
@@ -240,28 +207,33 @@ function App(): JSX.Element {
                 {/* Module Professional - with caching */}
                 <Route path="/pro" element={<ProLayout />}>
                   <Route index element={<VideoFeed />} />
-                  <Route path="profile" element={<Profile />} />
+                  <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="profile/:id" element={<PublicProfile />} />
-                  <Route path="settings" element={<Settings />} />
-                  <Route path="settings/privacy" element={<PrivacySettings />} />
-                  <Route path="requests" element={<Requests />} />
-                  <Route path="conversations" element={<Conversations />} />
-                  <Route path="conversations/:id" element={<ConversationPage />} />
-                  <Route path="blocked-users" element={<BlockedUsers />} />
-                  <Route path="important-messages" element={<ImportantMessages />} />
-                  <Route path="my-videos" element={<MyVideos />} />
-                  <Route path="drafts" element={<MyDrafts />} />
-                  <Route path="subscribers" element={<Subscribers />} />
-                  <Route path="statistics" element={<Statistics />} />
-                  <Route path="calendar" element={<Calendar />} />
-                  <Route path="subscriptions" element={<Subscriptions />} />
+                  <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                  <Route path="settings/privacy" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
+                  <Route path="requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+                  <Route path="conversations" element={<ProtectedRoute><Conversations /></ProtectedRoute>} />
+                  <Route path="conversations/:id" element={<ProtectedRoute><ConversationPage /></ProtectedRoute>} />
+                  <Route path="blocked-users" element={<ProtectedRoute><BlockedUsers /></ProtectedRoute>} />
+                  <Route path="important-messages" element={<ProtectedRoute><ImportantMessages /></ProtectedRoute>} />
+                  <Route path="my-videos" element={<ProtectedRoute><MyVideos /></ProtectedRoute>} />
+                  <Route path="drafts" element={<ProtectedRoute><MyDrafts /></ProtectedRoute>} />
+                  <Route path="subscribers" element={<ProtectedRoute><Subscribers /></ProtectedRoute>} />
+                  <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
+                  <Route path="calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+                  <Route path="subscriptions" element={<ProtectedRoute><Subscriptions /></ProtectedRoute>} />
                   <Route path="events" element={<EventsPro />} />
                   <Route path="events/:eventId/preview" element={<EventPreview />} />
                   <Route path="events/:eventId/live" element={<LiveRoom />} />
-                  <Route path="ads" element={<AdDashboard />} />
+                  <Route path="ads" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />
                   <Route path="video/:videoId" element={<VideoPage />} />
                 </Route>
                 
+                {/* Module PUB (Sécurisé) */}
+                <Route path="/pub" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />
+                <Route path="/pub/d4sh-m4n4g3r_adm!n99" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />
+                <Route path="/pub/ads" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />
+
                 {/* Module Social */}
                 <Route path="/social" element={<SocialFeed />} />
                 <Route path="/social/events" element={<SocialEvents />} />

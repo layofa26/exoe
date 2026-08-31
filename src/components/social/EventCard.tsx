@@ -56,7 +56,7 @@ export const EventCard = ({ event, onRegister, onShare, onJoinLive, onReaction, 
   const participants = event.participantsCount ?? event.stats.registrations
   const maxParticipants = event.maxParticipants ?? event.capacity
   const isFull = participants >= maxParticipants
-  const canJoinLive = isAuthenticated && isLive && !!event.jitsiRoom
+  const canJoinLive = isAuthenticated && isLive
   const showJoinButton = isLive
   const showRegisterButton = isAtComing && !isFull
   const showFullBadge = isFull && !event.isRegistered
@@ -179,7 +179,7 @@ export const EventCard = ({ event, onRegister, onShare, onJoinLive, onReaction, 
             } w-full sm:w-auto`}
           >
             <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            Rejoindre le Live (Jitsi)
+            Rejoindre le Live
           </button>
         )}
         {showRegisterButton && (

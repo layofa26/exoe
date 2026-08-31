@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
 import { videoApi, mapApiVideo } from '../services/videoApi';
 import type { Video } from '../types/video';
+import { useQuery } from './useQuery';
 
 /**
  * Vidéos publiques d'un professionnel donné (par identifiant utilisateur).
@@ -12,57 +12,45 @@ export const useProfessionalVideos = (
   initialLimit: number = 20,
   mine: boolean = false
 ) => {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
   const limit = initialLimit;
 
-  const loadVideos = useCallback(async () => {
-    if (!mine && !professionalId) {
-      setError('ID de professionnel manquant');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
+  const {
+    data: cachedVideos,
+    isLoading: loading,
+    error: queryError,
+    refetch: refresh
+  } = useQuery<Video[]>(
+    async () => {
+      if (!mine && !professionalId) return [];
 
       const result = mine
         ? await videoApi.getMyVideos()
         : await videoApi.getVideos(undefined, { owner: professionalId });
 
       if (result.success && result.data) {
-        const mapped = result.data.map(mapApiVideo);
-        setVideos(mapped);
-        setTotal(mapped.length);
-      } else {
-        setVideos([]);
-        setError(result.error || 'Impossible de charger les vidéos');
+        return result.data.map(mapApiVideo);
       }
-    } catch (err) {
-      console.error('Error loading professional videos:', err);
-      setVideos([]);
-      setError('Impossible de charger les vidéos');
-    } finally {
-      setLoading(false);
+      return [];
+    },
+    {
+      cacheKey: mine ? 'pro:videos:my' : `pro:videos:user:${professionalId}`,
+      cacheTime: 3 * 60 * 1000,
+      enabled: mine || !!professionalId,
+      initialData: []
     }
-  }, [professionalId, mine]);
+  );
 
-  useEffect(() => {
-    loadVideos();
-  }, [loadVideos]);
+  const videos = cachedVideos || [];
 
   return {
     videos,
     loading,
-    error,
+    error: queryError ? queryError.message : null,
     loadMore: () => undefined,
     hasMore: false,
-    total,
+    total: videos.length,
     limit,
     page: initialPage,
-    refresh: loadVideos,
+    refresh,
   };
 };

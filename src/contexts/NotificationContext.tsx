@@ -158,14 +158,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   }, [addNotification])
 
   const showLogoutSuccess = useCallback(() => {
-    addNotification({
-      type: 'info',
-      title: 'Déconnexion réussie',
-      message: 'Vous avez été déconnecté avec succès.',
-      duration: 3000,
-      icon: <CheckCircle className="w-5 h-5" />
-    })
-  }, [addNotification])
+    // Intentionnellement vide pour ne pas afficher de notification intrusive
+  }, [])
 
   const value: NotificationContextType = {
     notifications,

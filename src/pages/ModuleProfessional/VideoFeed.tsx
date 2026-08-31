@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Video } from '../../types/video';
 import { VideoPlayerPage } from '../../components/video/VideoPlayerPage';
-import { VideoPlayer } from '../../components/video/VideoPlayer';
 import SectionPub from '../../pages/PUB/SectionPub';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,11 +8,33 @@ import { useAccueilAlgo } from '../../algoPro/signals/useAccueilAlgo';
 import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
 import { useRequestsAlgo } from '../../algoPro/signals/useRequestsAlgo';
 import { useSearch } from '../../hooks/useSearch';
+import { useQuery } from '../../hooks/useQuery';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, WifiOff, Wifi, RefreshCw, AlertCircle, Sparkles, Plus, Play, ArrowRight } from 'lucide-react';
 import { ContactModal } from '../../components/modals/ContactModal';
-import EntrepriseEnVedette from '../../pages/PUB/EntrepriseEnVedette';
-import { VideoPoster } from '../../components/video/VideoPoster';
+import { UploadVideo } from '../../components/video/UploadVideo';
+import { FeedVideoCard } from '../../components/video/FeedVideoCard';
+
+// Composant Skeleton Loader haute performance façon YouTube
+const VideoSkeleton = ({ resolvedTheme }: { resolvedTheme: string }) => {
+  const isDark = resolvedTheme === 'dark'
+  return (
+    <div className={`rounded-xl overflow-hidden ${isDark ? 'bg-zinc-800/60' : 'bg-gray-100'} animate-pulse flex flex-col`}>
+      {/* Thumbnail aspect ratio 16:9 */}
+      <div className={`w-full aspect-video ${isDark ? 'bg-zinc-700/50' : 'bg-gray-200'} relative`}>
+        <div className="absolute bottom-2 right-2 w-10 h-4 rounded bg-black/40" />
+      </div>
+      {/* Video info skeleton */}
+      <div className="p-3 flex gap-3">
+        <div className={`w-10 h-10 rounded-full flex-shrink-0 ${isDark ? 'bg-zinc-700/70' : 'bg-gray-300'}`} />
+        <div className="flex-1 space-y-2 py-1">
+          <div className={`h-4 rounded w-5/6 ${isDark ? 'bg-zinc-700/70' : 'bg-gray-300'}`} />
+          <div className={`h-3 rounded w-1/2 ${isDark ? 'bg-zinc-700/50' : 'bg-gray-200'}`} />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function VideoFeed() {
   const { resolvedTheme } = useTheme()
@@ -21,6 +42,27 @@ export default function VideoFeed() {
   const { isAuthenticated, user } = useAuth()
   const [activeVideo, setActiveVideo] = useState<Video | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [isOnline, setIsOnline] = useState<boolean>(() => typeof navigator !== 'undefined' ? navigator.onLine : true)
+  const [isReconnecting, setIsReconnecting] = useState(false)
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
+
+  // Détection de la connexion réseau en temps réel
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      loadVideos()
+    }
+    const handleOffline = () => {
+      setIsOnline(false)
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   // Détecter la taille de l'écran
   useEffect(() => {
@@ -31,9 +73,7 @@ export default function VideoFeed() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, []);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
   const [showContactModal, setShowContactModal] = useState(false);
   const [selectedVideoForContact, setSelectedVideoForContact] = useState<Video | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -50,60 +90,55 @@ export default function VideoFeed() {
   const subsAlgo = useSubsAlgo(userId)
   const requestsAlgo = useRequestsAlgo(userId)
 
-  // Chaje videyo depi API
-  const loadVideos = async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  // Hook SWR avec revalidation pour toujours obtenir des URLs fraîches
+  const {
+    data: cachedVideos,
+    isLoading: loading,
+    error: queryError,
+    refetch: loadVideos,
+    setData: setVideos
+  } = useQuery<Video[]>(
+    async () => {
       const { videoApi, mapApiVideo } = await import('../../services/videoApi')
       const result = await videoApi.getVideos()
-
-      if (result.success && result.data) {
-        console.log('Raw API videos:', result.data)
-        const mappedVideos = result.data.map(mapApiVideo)
-        console.log('Mapped videos:', mappedVideos)
-        setVideos(mappedVideos)
-      } else {
-        setVideos([])
-        setError(result.error || 'Erreur lors du chargement des vidéos')
-      }
-    } catch (error) {
-      console.error('Error loading videos:', error)
-      setVideos([]);
-      setError('Erreur lors du chargement des vidéos');
-    } finally {
-      setLoading(false);
+      const backendVideos: Video[] = result.success && result.data ? result.data.map(mapApiVideo) : []
+      return backendVideos
+    },
+    {
+      cacheKey: 'pro:videos:feed:v4',
+      cacheTime: 60 * 1000, // 1 minute pour garder les URLs fraîches
+      refetchOnMount: true,
     }
-  };
+  )
 
-  // Charger les vidéos immédiatement sans attendre useCallback
-  useEffect(() => {
-    loadVideos();
-  }, []);
+  const videos = cachedVideos || []
+  const error = queryError ? queryError.message : null
 
-  // Écouter l'événement de vidéo uploadée
+  const handleRetryConnection = async () => {
+    setIsReconnecting(true)
+    const online = typeof navigator !== 'undefined' ? navigator.onLine : true
+    setIsOnline(online)
+    await loadVideos()
+    setTimeout(() => setIsReconnecting(false), 600)
+  }
+
+  // Écouter l'événement de vidéo uploadée pour rafraîchissement instantané
   useEffect(() => {
     const handleVideoUploaded = () => {
-      console.log('Video uploaded event detected, refreshing feed')
       loadVideos()
     }
 
     window.addEventListener('video-uploaded', handleVideoUploaded)
-    return () => window.removeEventListener('video-uploaded', handleVideoUploaded)
-  }, [])
+    window.addEventListener('video-published', handleVideoUploaded)
+    return () => {
+      window.removeEventListener('video-uploaded', handleVideoUploaded)
+      window.removeEventListener('video-published', handleVideoUploaded)
+    }
+  }, [loadVideos])
 
   const handleOpen = useCallback((video: Video) => {
-    // Comptabiliser la vue côté backend, sans bloquer l'ouverture
-    const numericId = Number(video.id)
-    if (!Number.isNaN(numericId)) {
-      import('../../services/videoApi').then(({ videoApi }) => {
-        videoApi.incrementView(numericId).then((res) => {
-          if (res.success && typeof res.views === 'number') {
-            setVideos(prev => prev.map(v => (v.id === video.id ? { ...v, views: res.views } : v)))
-          }
-        })
-      })
-    }
+    // Arrêter immédiatement toute vidéo en lecture dans le feed
+    window.dispatchEvent(new CustomEvent('exile_feed_play_video', { detail: { videoId: '__stop_all__' } }))
 
     // Tracker le clic sur la vidéo avec useAccueilAlgo
     accueilAlgo.trackVideoClick(video, 0, false, false)
@@ -139,7 +174,6 @@ export default function VideoFeed() {
     }
   }, [navigate, user]);
 
-
   // Cacher body + html scroll quand on est dans le player
   useEffect(() => {
     if (activeVideo) {
@@ -161,7 +195,7 @@ export default function VideoFeed() {
   // Écouter l'événement de publication de vidéo pour rafraîchir le feed
   useEffect(() => {
     const handleVideoPublished = () => {
-      loadVideosCallback()
+      loadVideos()
     }
 
     window.addEventListener('video-published', handleVideoPublished)
@@ -169,7 +203,7 @@ export default function VideoFeed() {
     return () => {
       window.removeEventListener('video-published', handleVideoPublished)
     }
-  }, [loadVideosCallback])
+  }, [])
 
   const related = activeVideo
     ? videos.filter(v => v.id !== activeVideo.id)
@@ -178,105 +212,6 @@ export default function VideoFeed() {
   // Profil utilisateur connecté
   const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
   const currentUserId = userProfile?.id || 'current-user-' + Date.now()
-
-  // Wrapper component pour afficher vidéo avec infos utilisateur - Design selon image de référence
-  const VideoCardWithInfo = ({ video, onClick }: { video: Video; onClick: () => void }) => {
-    // Helper pour obtenir l'URL de miniature avec fallbacks
-    const getThumbnailUrl = () => {
-      if (video.thumbnailUrl && video.thumbnailUrl.trim()) return video.thumbnailUrl
-      if (video.thumbnail && video.thumbnail.trim()) return video.thumbnail
-      return null
-    }
-
-    // Helper pour obtenir l'URL de vidéo avec fallbacks
-    const getVideoUrl = () => {
-      if (video.videoUrl && video.videoUrl.trim()) return video.videoUrl
-      return null
-    }
-
-    const thumbnailUrl = getThumbnailUrl()
-    const videoUrl = getVideoUrl()
-    const isOwnVideo =
-      (userProfile?.username && video.author?.username === userProfile.username) ||
-      (userProfile?.id != null && String(userProfile.id) === video.author?.id)
-
-    return (
-      <div 
-        className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} lg:rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shadow-sm flex flex-col`}
-        onClick={onClick}
-      >
-        {/* Video Thumbnail/Player - toujours en premier avec hauteur cohérente */}
-        <div className="relative w-full aspect-video bg-gray-200 dark:bg-gray-700 overflow-hidden">
-          {thumbnailUrl || videoUrl ? (
-            <VideoPoster thumbnail={thumbnailUrl || undefined} videoUrl={videoUrl || undefined} title={video.title} />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-2xl mb-1">📹</div>
-                <p className="text-gray-500 dark:text-gray-400 text-xs">Traitement en cours</p>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Info Section - Avatar + nom + Contacter + titre + vues toujours sous la vidéo */}
-        <div className="p-3 flex-shrink-0">
-          {/* User Info */}
-          <div className="flex items-center gap-2 mb-2">
-            <div 
-              className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleProfileClick(video.author.id)
-              }}
-            >
-              {video.author.avatarUrl ? (
-                <img src={video.author.avatarUrl} alt={video.author.name} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-white font-bold text-xs">
-                  {video.author.initials || 'U'}
-                </span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p 
-                className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate cursor-pointer`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleProfileClick(video.author.id)
-                }}
-              >
-                {video.author.name || 'Utilisateur'}
-              </p>
-            </div>
-            {!isOwnVideo && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleContact(video)
-              }}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-[10px] font-medium transition-colors flex items-center gap-1 flex-shrink-0"
-            >
-              <MessageCircle className="w-2.5 h-2.5" />
-              <span className="hidden sm:inline">Contacter</span>
-              <span className="sm:hidden">Chat</span>
-            </button>
-            )}
-          </div>
-          
-          {/* Title */}
-          <h4 className={`font-bold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate mb-1`}>
-            {video.title}
-          </h4>
-          
-          {/* Views */}
-          <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-            {video.views || 0} vues
-          </p>
-        </div>
-      </div>
-    )
-  }
 
   // Filtrer videyo yo selon rechèch - Use real search results when searching
   const displayVideos: Video[] = query && results
@@ -442,7 +377,13 @@ export default function VideoFeed() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {results.videos.map((video: Video) => (
-                <VideoCardWithInfo key={`search-video-${video.id}`} video={video} onClick={() => handleOpen(video)} />
+                <FeedVideoCard
+                  key={`search-video-${video.id}`}
+                  video={video}
+                  onClick={() => handleOpen(video)}
+                  onContact={handleContact}
+                  onProfileClick={handleProfileClick}
+                />
               ))}
             </div>
             {results.hasMore && (
@@ -457,20 +398,21 @@ export default function VideoFeed() {
           </div>
         )}
 
-        {/* Mobile/Tablette: Videyo - Design selon l'image de référence */}
+        {/* Mobile/Tablette: Videyo - Design responsive sans espace sous le header */}
         <div className="lg:hidden">
-          <div className="py-4 mt-4">
+          <div className="pt-0 pb-4">
             <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 sm:gap-4 md:grid-cols-2 md:gap-4">
-              {loading ? (
-                <div className="col-span-full py-12 text-center">
-                  <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
-                  <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-sm`}>Chargement des vidéos...</p>
-                </div>
-              ) : error ? (
+              {loading && displayVideos.length === 0 ? (
+                <>
+                  {[1, 2, 3, 4].map(i => (
+                    <VideoSkeleton key={`mob-skel-${i}`} resolvedTheme={resolvedTheme} />
+                  ))}
+                </>
+              ) : error && displayVideos.length === 0 ? (
                 <div className="col-span-full py-12 text-center">
                   <p className={`${resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600'} text-sm`}>{error}</p>
                   <button
-                    onClick={() => loadVideosCallback()}
+                    onClick={() => loadVideos()}
                     className={`mt-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} text-sm hover:underline`}
                   >
                     Réessayer
@@ -478,31 +420,28 @@ export default function VideoFeed() {
                 </div>
               ) : displayVideos.length > 0 ? (
                 <>
-                  {displayVideos.map((video, index) => (
+                  {displayVideos.map((video, idx) => (
                     <React.Fragment key={`video-${video.id}`}>
-                      <VideoCardWithInfo video={video} onClick={() => handleOpen(video)} />
-                      {/* Entreprise en vedette - Après la 2ème vidéo */}
-                      {index === 1 && (
-                        <div className="col-span-full">
-                          <EntrepriseEnVedette />
+                      <FeedVideoCard
+                        video={video}
+                        onClick={() => handleOpen(video)}
+                        onContact={handleContact}
+                        onProfileClick={handleProfileClick}
+                      />
+                      {/* SectionPub après 2 vidéos sur Mobile/Tablette */}
+                      {idx === 1 && (
+                        <div className="col-span-full py-2">
+                          <SectionPub />
                         </div>
                       )}
                     </React.Fragment>
                   ))}
                 </>
               ) : (
-                <div className="col-span-full py-12 text-center">
-                  <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-sm`}>
-                    {query ? 'Aucun résultat trouvé' : 'Aucune vidéo trouvée'}
+                <div className="col-span-full py-16 px-4 text-center">
+                  <p className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
+                    {query ? 'Aucun résultat trouvé pour votre recherche' : 'Aucune vidéo disponible pour le moment'}
                   </p>
-                  {query && (
-                    <button
-                      onClick={() => { setQuery(''); reset(); }}
-                      className={`mt-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} text-sm hover:underline`}
-                    >
-                      Effacer la recherche
-                    </button>
-                  )}
                 </div>
               )}
             </div>
@@ -514,19 +453,20 @@ export default function VideoFeed() {
           {/* Kolon GOUCH - Videyo yo (Desktop) */}
           <div className="flex-1 min-w-0 pr-80">
             {/* Kontenè videyo a - kole pi pre header la */}
-            <div className="px-4 md:px-6 lg:px-8 pb-6 mt-4">
+            <div className="px-4 md:px-6 lg:px-8 pb-6 pt-2">
               {/* Grid videyo - Desktop: 3 cols */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
-                {loading ? (
-                  <div className="col-span-full py-12 text-center">
-                    <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
-                    <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Chargement des vidéos...</p>
-                  </div>
-                ) : error ? (
+                {loading && displayVideos.length === 0 ? (
+                  <>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <VideoSkeleton key={`desk-skel-${i}`} resolvedTheme={resolvedTheme} />
+                    ))}
+                  </>
+                ) : error && displayVideos.length === 0 ? (
                   <div className="col-span-full py-12 text-center">
                     <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
                     <button
-                      onClick={() => loadVideosCallback()}
+                      onClick={() => loadVideos()}
                       className={`mt-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} text-sm hover:underline`}
                     >
                       Réessayer
@@ -534,21 +474,19 @@ export default function VideoFeed() {
                   </div>
                 ) : displayVideos.length > 0 ? (
                   displayVideos.map((video) => (
-                    <VideoCardWithInfo key={`video-${video.id}`} video={video} onClick={() => handleOpen(video)} />
+                    <FeedVideoCard
+                      key={`video-${video.id}`}
+                      video={video}
+                      onClick={() => handleOpen(video)}
+                      onContact={handleContact}
+                      onProfileClick={handleProfileClick}
+                    />
                   ))
                 ) : (
-                  <div className="col-span-full py-12 text-center">
-                    <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                      {query ? 'Aucun résultat trouvé' : 'Aucune vidéo trouvée'}
+                  <div className="col-span-full py-20 px-4 text-center">
+                    <p className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
+                      {query ? 'Aucun résultat trouvé pour votre recherche' : 'Aucune vidéo disponible pour le moment'}
                     </p>
-                    {query && (
-                      <button
-                        onClick={() => { setQuery(''); reset(); }}
-                        className={`mt-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} text-sm hover:underline`}
-                      >
-                        Effacer la recherche
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -594,6 +532,14 @@ export default function VideoFeed() {
             avatar: userProfile?.photo || null,
             profession: userProfile?.profession || 'Utilisateur'
           }}
+        />
+      )}
+
+      {/* Video Upload Modal */}
+      {isUploadOpen && (
+        <UploadVideo
+          isOpen={isUploadOpen}
+          onClose={() => setIsUploadOpen(false)}
         />
       )}
     </div>

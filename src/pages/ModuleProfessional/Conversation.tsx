@@ -1,817 +1,1296 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
-  Send,
-  MoreVertical,
-  Check,
-  CheckCheck,
-  Pin,
-  Archive,
-  Search,
-  X,
-  Paperclip,
-  Image as ImageIcon,
-  Mic,
-  Smile
+  ArrowLeft, Send, MoreVertical, Search, X, Paperclip,
+  Reply, CheckCheck, Check, Pin, Archive, Shield, Phone,
+  Video, Star, Wifi, WifiOff, Loader2, Edit2, Trash2, Flag, Forward
 } from 'lucide-react'
-import type { Attachment } from '../../types/requests'
-import { TYPING_TIMEOUT_MS } from '../../types/requests'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useWebSocket, WSMessage } from '../../hooks/useWebSocket'
+import { TypingIndicator } from '../../components/TypingIndicator'
+import { MessageBubble, MessageBubbleData } from '../../components/MessageBubble'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
-export const ConversationPage = (): JSX.Element => {
-  const { resolvedTheme } = useTheme()
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  
-  const [conversation, setConversation] = useState<any>(null)
-  const [newMessage, setNewMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  
-  // Nouvo state
-  const [isTyping, setIsTyping] = useState(false)
-  const [otherUserTyping] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showSearch, setShowSearch] = useState(false)
-  const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
-  const [showConfirmDialog, setShowConfirmDialog] = useState<{ type: 'block' | 'restore' | 'delete' | null }>({ type: null })
-  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
-  const [hasDraft, setHasDraft] = useState(false)
-  const [messages, setMessages] = useState<any[]>([])
-  const [hasMore, setHasMore] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
+interface ReplyContext {
+  id: string
+  senderName: string
+  content: string
+}
 
-  // Auto-draft functionality
-  useEffect(() => {
-    const draftKey = `draft_${id}`
-    
-    // Load draft on mount
-    const savedDraft = localStorage.getItem(draftKey)
-    if (savedDraft) {
-      setNewMessage(savedDraft)
-      setHasDraft(true)
-    }
+function getCurrentUserId(): string | null {
+  try {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return null
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return String(payload.user_id)
+  } catch {
+    return null
+  }
+}
 
-    // Save draft on change
-    const handleBeforeUnload = () => {
-      if (newMessage.trim()) {
-        localStorage.setItem(draftKey, newMessage)
+async function apiFetch(path: string, options?: RequestInit) {
+  let token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options?.headers as Record<string, string> || {}),
+  }
+
+  try {
+    let res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+    if (res.status === 401) {
+      const refresh = localStorage.getItem('refreshToken') || localStorage.getItem('refresh_token')
+      if (refresh) {
+        try {
+          const refreshRes = await fetch(`${API_BASE_URL}/token/refresh/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh }),
+          })
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json()
+            if (refreshData.access) {
+              localStorage.setItem('accessToken', refreshData.access)
+              headers['Authorization'] = `Bearer ${refreshData.access}`
+              res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+            }
+          }
+        } catch {}
       }
     }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
+    if (!res.ok && API_BASE_URL.includes('onrender.com')) {
+      try {
+        const localRes = await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
+        if (localRes.ok) return localRes
+      } catch {}
     }
+    return res
+  } catch (err) {
+    if (API_BASE_URL.includes('onrender.com')) {
+      try {
+        return await fetch(`http://localhost:8000/api/v1${path}`, { ...options, headers })
+      } catch {}
+    }
+    throw err
+  }
+}
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    const now = new Date()
+    const diff = (now.getTime() - d.getTime()) / 1000
+    if (diff < 60) return "À l'instant"
+    if (diff < 3600) return `${Math.floor(diff / 60)} min`
+    if (diff < 86400) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  } catch { return '' }
+}
+
+export interface ConversationViewProps {
+  conversationId?: string | number | null
+  partnerId?: string | number | null
+  partnerUsername?: string | null
+  partnerAvatar?: string | null
+  initialMessage?: string | null
+  onClose?: () => void
+}
+
+export const ConversationView = ({
+  conversationId,
+  partnerId,
+  partnerUsername,
+  partnerAvatar,
+  initialMessage,
+  onClose,
+}: ConversationViewProps): JSX.Element => {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+  const params = useParams<{ id: string }>()
+  const [activeConvId, setActiveConvId] = useState<string | null>(() => {
+    if (conversationId) return String(conversationId)
+    if (params.id) return String(params.id)
+    return null
+  })
+
+  const id = activeConvId || (conversationId ? String(conversationId) : params.id)
+  const navigate = useNavigate()
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const currentUserId = useRef<string | null>(getCurrentUserId()).current
+
+  // ─── State ──────────────────────────────────────────────────────────────────
+  const [conversation, setConversation] = useState<any>(() => {
+    if (partnerUsername || partnerId) {
+      return {
+        id: conversationId || 'temp',
+        participants: [
+          { id: partnerId || 'other', username: partnerUsername || 'Utilisateur', avatar_url: partnerAvatar }
+        ]
+      }
+    }
+    return null
+  })
+  const [messages, setMessages] = useState<MessageBubbleData[]>(() => {
+    if (initialMessage) {
+      return [{
+        id: 'init-msg',
+        content: initialMessage,
+        senderId: String(partnerId || ''),
+        senderName: partnerUsername || 'Utilisateur',
+        senderUsername: partnerUsername || '',
+        senderAvatar: partnerAvatar || undefined,
+        createdAt: new Date().toISOString(),
+        read: true,
+        isImportant: false,
+        isEdited: false
+      }]
+    }
+    return []
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [newMessage, setNewMessage] = useState('')
+  const [hasDraft, setHasDraft] = useState(false)
+
+  // UI state
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showMenu, setShowMenu] = useState(false)
+  const [showConfirm, setShowConfirm] = useState<{ type: 'block' | 'delete' | null }>({ type: null })
+  const [toast, setToast] = useState<string | null>(null)
+
+  // Messaging features
+  const [replyingTo, setReplyingTo] = useState<ReplyContext | null>(null)
+  const [editingMessage, setEditingMessage] = useState<{ id: string; content: string } | null>(null)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set())
+  const [forwardModal, setForwardModal] = useState<MessageBubbleData | null>(null)
+  const [reportModal, setReportModal] = useState<{ id: string } | null>(null)
+  const [reportReason, setReportReason] = useState('Contenu inapproprié ou spam')
+
+  // WebSocket state
+  const [typingUser, setTypingUser] = useState<{ userId: string; username: string } | null>(null)
+  const [onlineUserId, setOnlineUserId] = useState<string | null>(null)
+  const [wsError, setWsError] = useState(false)
+
+  // ─── Show toast ─────────────────────────────────────────────────────────────
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
+  }, [])
+
+  // ─── Draft auto-save ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!id) return
+    const saved = localStorage.getItem(`draft_${id}`)
+    if (saved) { setNewMessage(saved); setHasDraft(true) }
   }, [id])
 
   useEffect(() => {
-    const draftKey = `draft_${id}`
+    if (!id) return
     if (newMessage.trim()) {
-      localStorage.setItem(draftKey, newMessage)
+      localStorage.setItem(`draft_${id}`, newMessage)
       setHasDraft(true)
     } else {
-      localStorage.removeItem(draftKey)
+      localStorage.removeItem(`draft_${id}`)
       setHasDraft(false)
     }
   }, [newMessage, id])
 
-  const clearDraft = () => {
-    const draftKey = `draft_${id}`
-    localStorage.removeItem(draftKey)
-    setNewMessage('')
-    setHasDraft(false)
-  }
-
-  // Charger conversation depuis backend API
+  // ─── Load conversation (REST) ────────────────────────────────────────────────
   useEffect(() => {
-    const loadConversation = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-        
-        if (!id) {
-          setError('ID de conversation manquant')
+    let isMounted = true
+    const load = async () => {
+      setIsLoading(true)
+      setError(null)
+
+      // 1. If we have a conversation ID, try to fetch it
+      if (id && id !== 'temp' && !id.startsWith('demande-')) {
+        try {
+          const res = await apiFetch(`/conversations/${id}/`)
+          if (res.ok && isMounted) {
+            const data = await res.json()
+            setConversation(data)
+            const normalized: MessageBubbleData[] = (data.messages || []).map((m: any) => ({
+              id: String(m.id),
+              content: m.content || '',
+              senderId: String(m.sender?.id || ''),
+              senderName: m.sender?.full_name || m.sender?.username || 'Utilisateur',
+              senderAvatar: m.sender?.avatar_url || undefined,
+              senderUsername: m.sender?.username || '',
+              createdAt: m.created_at || new Date().toISOString(),
+              read: m.read || false,
+              isImportant: m.is_important || false,
+              isEdited: false,
+              replyToId: undefined,
+              replyPreview: undefined,
+            }))
+            setMessages(normalized)
+            apiFetch(`/conversations/${id}/mark_read/`, { method: 'POST' }).catch(() => {})
+            setIsLoading(false)
+            return
+          }
+        } catch {}
+      }
+
+      // 2. If no valid conversation or fetch failed, but we have partnerId: find/start conversation
+      if (partnerId) {
+        try {
+          const startRes = await apiFetch('/conversations/start/', {
+            method: 'POST',
+            body: JSON.stringify({ participant_id: Number(partnerId) })
+          })
+          if (startRes.ok && isMounted) {
+            const startData = await startRes.json()
+            if (startData.id) {
+              setActiveConvId(String(startData.id))
+              setConversation(startData)
+              if (startData.messages && startData.messages.length > 0) {
+                const normalized: MessageBubbleData[] = startData.messages.map((m: any) => ({
+                  id: String(m.id),
+                  content: m.content || '',
+                  senderId: String(m.sender?.id || m.sender_id || ''),
+                  senderName: m.sender?.full_name || m.sender?.username || m.sender_name || 'Utilisateur',
+                  senderAvatar: m.sender?.avatar_url || m.sender_avatar || undefined,
+                  senderUsername: m.sender?.username || m.sender_username || '',
+                  createdAt: m.created_at || new Date().toISOString(),
+                  read: m.read || false,
+                  isImportant: m.is_important || false,
+                  isEdited: false,
+                }))
+                setMessages(normalized)
+              }
+              setIsLoading(false)
+              return
+            }
+          }
+        } catch {}
+      }
+
+      // 3. Fallback: Keep UI active with partner information
+      if (isMounted) {
+        if (partnerUsername || partnerId) {
+          setConversation((prev: any) => prev || {
+            id: id || 'temp',
+            participants: [{ id: partnerId || 'other', username: partnerUsername || 'Utilisateur', avatar_url: partnerAvatar }]
+          })
           setIsLoading(false)
-          return
-        }
-
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          setError('Token non trouvé')
-          return
-        }
-
-        const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setMessages(data.messages || [])
         } else {
           setError('Impossible de charger la conversation')
+          setIsLoading(false)
         }
-      } catch (err) {
-        console.error('Error loading conversation:', err)
-      } finally {
-        setIsLoading(false)
       }
     }
-    
-    loadConversation()
-  }, [id])
 
-  // Load more messages (infinite scroll)
-  const loadMoreMessages = async () => {
-    if (!id || loadingMore || !hasMore) return
+    load()
+    return () => { isMounted = false }
+  }, [id, partnerId, partnerUsername, partnerAvatar, initialMessage])
 
-    try {
-      setLoadingMore(true)
-      const offset = messages.length
-
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        setHasMore(false)
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/messages/?offset=${offset}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setMessages([...messages, ...(data.messages || [])])
-        setHasMore(data.has_more || false)
-      } else {
-        setHasMore(false)
-      }
-    } catch (err) {
-      console.error('Error loading more messages:', err)
-    } finally {
-      setLoadingMore(false)
+  // ─── Scroll to bottom ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isLoading && !searchQuery) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
+  }, [messages.length, isLoading, searchQuery])
+
+  // ─── WebSocket message handler ───────────────────────────────────────────────
+  const handleWSMessage = useCallback((msg: WSMessage) => {
+    switch (msg.type) {
+
+      case 'chat.message': {
+        const incoming: MessageBubbleData = {
+          id: String(msg.message_id as string),
+          content: msg.content as string,
+          senderId: String(msg.sender_id as string),
+          senderName: msg.sender_name as string || 'Utilisateur',
+          senderAvatar: msg.sender_avatar as string || undefined,
+          senderUsername: msg.sender_username as string || '',
+          createdAt: msg.created_at as string || new Date().toISOString(),
+          read: false,
+          isImportant: false,
+          isEdited: false,
+          replyToId: msg.reply_to_id as string | undefined,
+        }
+        setMessages(prev => {
+          // Remove optimistic duplicate if exists
+          const filtered = prev.filter(m => !m.id.startsWith('temp_'))
+          if (filtered.some(m => m.id === incoming.id)) return prev
+          return [...filtered, incoming]
+        })
+        // If the sender is the other user, mark as read via WS
+        if (String(msg.sender_id) !== currentUserId) {
+          wsSend({ type: 'chat.read' })
+        }
+        break
+      }
+
+      case 'chat.typing': {
+        const uid = String(msg.user_id)
+        if (uid !== currentUserId) {
+          if (msg.is_typing) {
+            setTypingUser({ userId: uid, username: msg.username as string })
+          } else {
+            setTypingUser(prev => (prev?.userId === uid ? null : prev))
+          }
+        }
+        break
+      }
+
+      case 'chat.read': {
+        const readerId = String(msg.user_id)
+        if (readerId !== currentUserId) {
+          // Mark all my sent messages as read
+          setMessages(prev => prev.map(m =>
+            m.senderId === currentUserId ? { ...m, read: true } : m
+          ))
+        }
+        break
+      }
+
+      case 'chat.edit': {
+        const { message_id, content } = msg as { message_id: string; content: string }
+        setMessages(prev => prev.map(m =>
+          String(m.id) === String(message_id)
+            ? { ...m, content, isEdited: true }
+            : m
+        ))
+        break
+      }
+
+      case 'chat.delete': {
+        const { message_id, delete_for_all } = msg as { message_id: string; delete_for_all: boolean }
+        if (delete_for_all) {
+          setMessages(prev => prev.filter(m => String(m.id) !== String(message_id)))
+        }
+        break
+      }
+
+      case 'user.presence': {
+        const uid = String(msg.user_id)
+        if (uid !== currentUserId) {
+          setOnlineUserId(msg.status === 'online' ? uid : null)
+        }
+        break
+      }
+
+      case 'chat.request_accepted': {
+        showToast(`🎉 Demande acceptée ! Conversation débloquée.`)
+        break
+      }
+    }
+  }, [currentUserId, showToast])
+
+  const { send: wsSend, connectionState, isConnected } = useWebSocket({
+    conversationId: id || '',
+    onMessage: handleWSMessage,
+    enabled: !!id && !isLoading,
+  })
+
+  // WS error tracking
+  useEffect(() => {
+    setWsError(connectionState === 'error')
+  }, [connectionState])
+
+  // ─── Pro Modal & File Upload States ──────────────────────────────────────────
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [showProOfferModal, setShowProOfferModal] = useState(false)
+  const [offerTitle, setOfferTitle] = useState('')
+  const [offerAmount, setOfferAmount] = useState('')
+  const [offerCurrency, setOfferCurrency] = useState('$ USD')
+  const [offerDuration, setOfferDuration] = useState('3 jours')
+  const [offerPaymentTerms, setOfferPaymentTerms] = useState('100% à la livraison')
+  const [offerDesc, setOfferDesc] = useState('')
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
+  const attachMenuRef = useRef<HTMLDivElement>(null)
+
+  // ─── Typing indicator ────────────────────────────────────────────────────────
+  const handleInputChange = (val: string) => {
+    setNewMessage(val)
+    wsSend({ type: 'chat.typing', is_typing: true })
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = setTimeout(() => {
+      wsSend({ type: 'chat.typing', is_typing: false })
+    }, 2000)
   }
 
-  // Scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  // ─── Send message (Direct or from input) ──────────────────────────────────────
+  const sendDirectMessage = useCallback(async (textToSend?: string) => {
+    const content = (textToSend !== undefined ? textToSend : newMessage).trim()
+    if (!content) return
 
-  // Infinite scroll trigger
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
-  
-  useEffect(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
+    // Stop typing indicator
+    wsSend({ type: 'chat.typing', is_typing: false })
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (scrollHeight - scrollTop - clientHeight < 100 && hasMore && !loadingMore) {
-        loadMoreMessages()
-      }
+    // Optimistic UI
+    const optimisticId = `temp_${Date.now()}`
+    const optimisticMsg: MessageBubbleData = {
+      id: optimisticId,
+      content,
+      senderId: currentUserId || '',
+      senderName: 'Moi',
+      createdAt: new Date().toISOString(),
+      read: false,
+      isImportant: false,
+      isEdited: false,
+      replyToId: replyingTo?.id,
+      replyPreview: replyingTo
+        ? { senderName: replyingTo.senderName, content: replyingTo.content }
+        : undefined,
     }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [hasMore, loadingMore, messages.length])
-
-  // Envoyer message
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !conversation || !id) return
-
-    try {
-      const token = localStorage.getItem('accessToken')
-      const sendResponse = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/messages/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: newMessage.trim(), is_important: false })
-      })
-
-      if (!sendResponse.ok) {
-        throw new Error('Envoi impossible')
-      }
-
-      // Clear draft after sending
-      clearDraft()
-
-      // Reload conversation to get updated messages
-      const convResponse = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      if (convResponse.ok) {
-        const data = await convResponse.json()
-        setConversation(data)
-        setMessages(data.messages || [])
-      }
-
+    setMessages(prev => [...prev, optimisticMsg])
+    if (textToSend === undefined) {
       setNewMessage('')
-    } catch (err) {
-      console.error('Error sending message:', err)
+      if (id) localStorage.removeItem(`draft_${id}`)
+      setHasDraft(false)
+    }
+    setReplyingTo(null)
+
+    // Check if we have a real numeric ID or need to create conversation
+    let realConvId = activeConvId || (id && /^\d+$/.test(String(id)) ? id : null)
+
+    if (!realConvId && partnerId) {
+      try {
+        const startRes = await apiFetch('/conversations/start/', {
+          method: 'POST',
+          body: JSON.stringify({ participant_id: Number(partnerId) }),
+        })
+        if (startRes.ok) {
+          const startData = await startRes.json()
+          if (startData.id) {
+            realConvId = String(startData.id)
+            setActiveConvId(realConvId)
+          }
+        }
+      } catch {}
+    }
+
+    // Persist via REST to guarantee DB storage
+    if (realConvId) {
+      try {
+        const postRes = await apiFetch('/conversations/messages/', {
+          method: 'POST',
+          body: JSON.stringify({ content, conversation: Number(realConvId) }),
+        })
+        if (postRes.ok) {
+          const savedMsg = await postRes.json()
+          setMessages(prev => prev.map(m => m.id === optimisticId ? {
+            ...m,
+            id: String(savedMsg.id),
+            createdAt: savedMsg.created_at || m.createdAt
+          } : m))
+        }
+      } catch {
+        if (!isConnected) {
+          showToast('Erreur lors de l\'envoi. Vérifiez votre connexion.')
+        }
+      }
+    }
+
+    // Send via WebSocket for instant live broadcast
+    if (isConnected) {
+      wsSend({
+        type: 'chat.message',
+        content,
+        reply_to_id: replyingTo?.id || null,
+      })
+    }
+  }, [newMessage, id, activeConvId, partnerId, replyingTo, isConnected, currentUserId, wsSend, showToast])
+
+  const sendMessage = () => sendDirectMessage()
+
+  // ─── Image Upload Handler ─────────────────────────────────────────────────────
+  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('Image trop volumineuse (max 8 Mo)', 'error')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      if (dataUrl) {
+        sendDirectMessage(`[image:${dataUrl}]`)
+        showToast('Image envoyée !')
+      }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  // ─── Document Upload Handler ──────────────────────────────────────────────────
+  const handleDocSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 25 * 1024 * 1024) {
+      showToast('Document trop volumineux (max 25 Mo)', 'error')
+      return
+    }
+
+    const sizeStr = file.size > 1024 * 1024
+      ? `${(file.size / (1024 * 1024)).toFixed(1)} Mo`
+      : `${(file.size / 1024).toFixed(0)} Ko`
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      if (dataUrl) {
+        sendDirectMessage(`[document:${file.name}|${sizeStr}|${dataUrl}]`)
+        showToast('Document envoyé !')
+      }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  // ─── Submit Pro Proposal ──────────────────────────────────────────────────────
+  const handleSendProProposal = () => {
+    if (!offerTitle.trim() || !offerAmount.trim()) {
+      showToast('Veuillez remplir au moins le titre et le montant', 'error')
+      return
+    }
+    const amountFormatted = `${offerAmount.trim()} ${offerCurrency}`
+    const payload = `[pro_proposal:${offerTitle.trim()}|${amountFormatted}|${offerDuration.trim()}|${offerPaymentTerms.trim()}|${(offerDesc.trim() || 'Prestation professionnelle validée')}]`
+    sendDirectMessage(payload)
+    setShowProOfferModal(false)
+    setOfferTitle('')
+    setOfferAmount('')
+    setOfferDesc('')
+    showToast('💼 Proposition & Devis Pro envoyé !')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
     }
   }
 
-  // Format heure exacte
-  const formatExactTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
+  // ─── Edit message ─────────────────────────────────────────────────────────────
+  const submitEdit = useCallback(async () => {
+    if (!editingMessage || !editingMessage.content.trim()) return
+    const { id: msgId, content } = editingMessage
 
-    if (diffMins < 1) return 'À l\'instant'
-    if (diffMins < 60) return `Il y a ${diffMins} min`
-    if (diffHours < 24) return `Il y a ${diffHours} h`
-    if (diffDays < 7) return `Il y a ${diffDays} j`
-    
-    return date.toLocaleDateString('fr-FR', { 
-      day: '2-digit', 
-      month: '2-digit',
-      year: date.getFullYear() !== now.getFullYear() ? '2-digit' : undefined
-    }) + ' ' + date.toLocaleTimeString('fr-FR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    if (isConnected) {
+      wsSend({ type: 'chat.edit', message_id: msgId, content })
+    } else {
+      await apiFetch(`/conversations/messages/${msgId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+      })
+    }
+    setMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, content, isEdited: true } : m
+    ))
+    setEditingMessage(null)
+    showToast('Message modifié')
+  }, [editingMessage, isConnected, wsSend, showToast])
+
+  // ─── Delete ──────────────────────────────────────────────────────────────────
+  const deleteForMe = useCallback((msgId: string) => {
+    setMessages(prev => prev.filter(m => m.id !== msgId))
+  }, [])
+
+  const deleteForAll = useCallback(async (msgId: string) => {
+    if (isConnected) {
+      wsSend({ type: 'chat.delete', message_id: msgId, delete_for_all: true })
+    } else {
+      await apiFetch(`/conversations/messages/${msgId}/`, { method: 'DELETE' })
+    }
+    setMessages(prev => prev.filter(m => m.id !== msgId))
+    showToast('Message supprimé pour tous')
+  }, [isConnected, wsSend, showToast])
+
+  // ─── Toggle important ─────────────────────────────────────────────────────────
+  const toggleImportant = useCallback(async (msgId: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, isImportant: !m.isImportant } : m
+    ))
+    await apiFetch(`/conversations/messages/${msgId}/mark_important/`, { method: 'POST' })
+    showToast('Marqué comme important ⭐')
+  }, [showToast])
+
+  // ─── Copy ────────────────────────────────────────────────────────────────────
+  const copyMessage = useCallback((content: string) => {
+    navigator.clipboard.writeText(content).then(() => showToast('Copié !')).catch(() => {})
+  }, [showToast])
+
+  // ─── Selection ───────────────────────────────────────────────────────────────
+  const toggleSelect = useCallback((msgId: string) => {
+    setSelectedMessageIds(prev => {
+      const next = new Set(prev)
+      next.has(msgId) ? next.delete(msgId) : next.add(msgId)
+      return next
     })
-  }
+  }, [])
 
-  // Format heure courte
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('fr-FR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    })
-  }
+  const batchDelete = useCallback(() => {
+    selectedMessageIds.forEach(msgId => deleteForAll(msgId))
+    setSelectedMessageIds(new Set())
+    setIsSelectionMode(false)
+  }, [selectedMessageIds, deleteForAll])
 
-  // Obtenir l'autre participant
-  const getOtherParticipant = () => {
-    if (!conversation || !currentUserId) return null
-    const participants = conversation.participants || []
-    const other = participants.find((p: any) => p.userId !== currentUserId)
-    if (!other) return null
-    return {
-      id: other.userId,
-      name: other.user?.fullName || other.user?.username || 'Inconnu',
-      avatar: other.user?.avatarUrl
-    }
-  }
+  const batchCopy = useCallback(() => {
+    const text = messages
+      .filter(m => selectedMessageIds.has(m.id))
+      .map(m => m.content).join('\n')
+    navigator.clipboard.writeText(text).then(() => showToast('Messages copiés !')).catch(() => {})
+    setIsSelectionMode(false)
+  }, [messages, selectedMessageIds, showToast])
 
-  // Toggle pin conversation
-  const togglePin = async () => {
-    if (!id) return
-    try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
+  // ─── Derived data ─────────────────────────────────────────────────────────────
+  const otherParticipant = useMemo(() => {
+    if (!conversation) return null
+    // ConversationSerializer returns:
+    // participants: [{id, username, full_name, avatar_url}]
+    // participant_info: [{id, user: {id, username, full_name, avatar_url}, last_read_at}]
+    const parts: any[] = conversation.participants || []
+    return parts.find((p: any) => String(p.id) !== currentUserId) || null
+  }, [conversation, currentUserId])
 
-      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/pin/`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+  const isOtherOnline = useMemo(() => {
+    if (!otherParticipant) return false
+    return onlineUserId === String(otherParticipant.id)
+  }, [onlineUserId, otherParticipant])
 
-      if (response.ok) {
-        alert('Conversation épinglée avec succès')
-      } else {
-        throw new Error('Erreur lors de l\'épinglage')
-      }
-    } catch (err) {
-      console.error('Error toggling pin:', err)
-    }
-  }
-
-  // Toggle archive conversation
-  const toggleArchive = async () => {
-    if (!id) return
-    try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/archive/`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      if (response.ok) {
-        alert('Conversation archivée avec succès')
-      } else {
-        throw new Error('Erreur lors de l\'archivage')
-      }
-    } catch (err) {
-      console.error('Error toggling archive:', err)
-    }
-  }
-
-  // Block user
-  const handleBlock = async () => {
-    if (!conversation || !currentUserId) return
-    const otherParticipant = getOtherParticipant()
-    if (!otherParticipant) return
-
-    try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ blocked_user: otherParticipant.id })
-      })
-
-      if (response.ok) {
-        alert('Utilisateur bloqué avec succès')
-      } else {
-        throw new Error('Erreur lors du blocage')
-      }
-    } catch (err) {
-      console.error('Error blocking user:', err)
-    }
-  }
-
-  // Restore conversation (placeholder)
-  const handleRestore = () => {
-    // TODO: Implement restore via backend API
-    console.log('Restore - to be implemented')
-    setShowConfirmDialog({ type: null })
-    setShowMenu(false)
-  }
-
-  // Delete conversation definitively
-  const handleDelete = async () => {
-    if (!id) return
-
-    try {
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/conversations/conversations/${id}/`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      if (response.ok) {
-        alert('Conversation supprimée avec succès')
-        navigate('/conversations')
-      } else {
-        throw new Error('Erreur lors de la suppression')
-      }
-    } catch (err) {
-      console.error('Error deleting conversation:', err)
-    }
-  }
-
-  // Handle typing indicator
-  const handleTyping = () => {
-    if (!isTyping) {
-      setIsTyping(true)
-      // In real app, send typing event to other user via WebSocket
-      setTimeout(() => setIsTyping(false), TYPING_TIMEOUT_MS)
-    }
-  }
-
-  // Filter messages by search
-  const filteredMessages = searchQuery && conversation
-    ? (conversation.messages || []).filter((m: any) => 
-        m.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.sender?.fullName?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : conversation?.messages || []
-
-  if (isLoading) {
-    return (
-      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex items-center justify-center`}>
-        <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-      </div>
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery.trim()) return messages
+    return messages.filter(m =>
+      m.content.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  }
+  }, [messages, searchQuery])
 
-  if (!conversation) {
+  // ─── Render ────────────────────────────────────────────────────────────────────
+
+  if (error) {
     return (
-      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex items-center justify-center`}>
-        <div className="text-center">
-          <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Conversation non trouvée</p>
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-[#0f0f13]' : 'bg-slate-50'}`}>
+        <div className="text-center space-y-4 p-8">
+          <div className="text-6xl">💬</div>
+          <p className={`text-lg ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{error}</p>
           <button
-            onClick={() => navigate('/pro/requests')}
-            className={`mt-4 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} hover:underline`}
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1)
+              } else {
+                navigate('/pro/conversations')
+              }
+            }}
+            className="px-6 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 transition-colors"
           >
-            Retour aux demandes
+            ← Retour
           </button>
         </div>
       </div>
     )
   }
 
-  const otherUser = getOtherParticipant()
-
-  // Toggle message expansion
-  const toggleMessageExpansion = (messageId: string) => {
-    setExpandedMessages(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(messageId)) {
-        newSet.delete(messageId)
-      } else {
-        newSet.add(messageId)
-      }
-      return newSet
-    })
-  }
-
-  // Check if message should be truncated
-  const shouldTruncate = (content: string) => {
-    return content.length > 150 || content.split('\n').length > 3
-  }
-
   return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex flex-col h-screen`}>
-      {/* Header */}
-      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-10`}>
-        <div className="w-full px-3 sm:px-4">
-          <div className="flex items-center justify-between py-2.5 sm:py-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                onClick={() => navigate('/pro/requests')}
-                className={`p-2 ${resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800' : 'text-gray-600 hover:bg-gray-100'} rounded-full transition-colors`}
-              >
-                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
+    <div className={`flex flex-col h-screen max-h-screen overflow-hidden ${isDark ? 'bg-[#0f0f13]' : 'bg-[#f0f4f8]'}`}>
 
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base">
-                  {otherUser?.name.charAt(0).toUpperCase() || '?'}
-                </div>
-                <div>
-                  <p className={`font-semibold text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{otherUser?.name}</p>
-                  <p className="text-[10px] sm:text-xs text-green-600">En ligne</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Search */}
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className={`p-1.5 sm:p-2 rounded-full transition-colors ${showSearch ? `${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-600'}` : resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800' : 'text-gray-600 hover:bg-gray-100'}`}
-              >
-                <Search className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-
-              {/* Pin */}
-              <button
-                onClick={togglePin}
-                className={`p-1.5 sm:p-2 rounded-full transition-colors ${conversation?.isPinned ? `${resolvedTheme === 'dark' ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-600'}` : resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800' : 'text-gray-600 hover:bg-gray-100'}`}
-                title={conversation?.isPinned ? 'Désépingler' : 'Épingler'}
-              >
-                <Pin className={`w-4 h-4 sm:w-5 sm:h-5 ${conversation?.isPinned ? 'fill-current' : ''}`} />
-              </button>
-
-              {/* Archive */}
-              <button
-                onClick={toggleArchive}
-                className={`p-1.5 sm:p-2 rounded-full transition-colors ${conversation?.isArchived ? `${resolvedTheme === 'dark' ? 'bg-purple-900/30 text-purple-400' : 'bg-purple-100 text-purple-600'}` : resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800' : 'text-gray-600 hover:bg-gray-100'}`}
-                title={conversation?.isArchived ? 'Désarchiver' : 'Archiver'}
-              >
-                <Archive className={`w-4 h-4 sm:w-5 sm:h-5 ${conversation?.isArchived ? 'fill-current' : ''}`} />
-              </button>
-
-              <div className="relative">
-                <button 
-                  onClick={() => setShowMenu(!showMenu)}
-                  className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800' : 'text-gray-600 hover:bg-gray-100'} rounded-full transition-colors`}
-                >
-                  <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                
-                {/* Dropdown Menu */}
-                {showMenu && (
-                  <div className={`absolute right-0 top-10 sm:top-12 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg shadow-xl py-2 w-44 sm:w-48 z-50`}>
-                    {true ? (
-                      <button
-                        onClick={() => setShowConfirmDialog({ type: 'block' })}
-                        className="w-full px-3 sm:px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2 sm:gap-3 text-xs sm:text-sm"
-                      >
-                        <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
-                        <span className={resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}>Bloquer</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setShowConfirmDialog({ type: 'restore' })}
-                        className="w-full px-3 sm:px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2 sm:gap-3 text-xs sm:text-sm"
-                      >
-                        <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
-                        <span className={resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}>Restaurer</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setShowConfirmDialog({ type: 'delete' })}
-                      className="w-full px-3 sm:px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2 sm:gap-3 text-xs sm:text-sm"
-                    >
-                      <Archive className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
-                      <span className={resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}>Supprimer définitivement</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Confirmation Dialog */}
-      {showConfirmDialog.type && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-lg p-4 sm:p-6 max-w-sm w-full mx-4`}>
-            <h3 className={`text-base sm:text-lg font-semibold mb-2 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              {showConfirmDialog.type === 'block' && 'Bloquer cette conversation ?'}
-              {showConfirmDialog.type === 'restore' && 'Restaurer cette conversation ?'}
-              {showConfirmDialog.type === 'delete' && 'Supprimer définitivement cette conversation ?'}
-            </h3>
-            <p className={`text-xs sm:text-sm mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
-              {showConfirmDialog.type === 'block' && 'Vous ne pourrez plus envoyer de messages à cet utilisateur.'}
-              {showConfirmDialog.type === 'restore' && 'La conversation sera restaurée et vous pourrez envoyer des messages.'}
-              {showConfirmDialog.type === 'delete' && 'Cette action est irréversible. Tous les messages seront supprimés.'}
-            </p>
-            <div className="flex gap-2 sm:gap-3">
-              <button
-                onClick={() => setShowConfirmDialog({ type: null })}
-                className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'} hover:opacity-80 transition-opacity`}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => {
-                  if (showConfirmDialog.type === 'block') handleBlock()
-                  else if (showConfirmDialog.type === 'restore') handleRestore()
-                  else if (showConfirmDialog.type === 'delete') handleDelete()
-                }}
-                className={`flex-1 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm ${showConfirmDialog.type === 'delete' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-600 text-white hover:bg-blue-700'} transition-colors`}
-              >
-                OK
-              </button>
-            </div>
-          </div>
+      {/* ── Toast ── */}
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[999] px-5 py-2.5 rounded-xl shadow-2xl text-sm font-medium
+          bg-gradient-to-r from-violet-700 to-purple-700 text-white
+          animate-[slideUp_0.2s_ease-out]">
+          {toast}
         </div>
       )}
 
-      {/* Search Bar */}
-      {showSearch && (
-        <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border-b p-2 sm:p-3`}>
-          <div className="max-w-4xl mx-auto relative">
-            <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher dans la conversation..."
-              className={`w-full pl-9 sm:pl-10 pr-9 sm:pr-10 py-2 text-sm sm:text-base ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-100'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none`}
-              autoFocus
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-              >
-                <X className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-              </button>
+      {/* ── Header ── */}
+      <div className={`flex-shrink-0 flex items-center gap-3 px-3 sm:px-5 py-3
+        backdrop-blur-xl border-b z-30
+        ${isDark
+          ? 'bg-black/60 border-white/5 text-white'
+          : 'bg-white/80 border-slate-200 text-slate-900 shadow-sm'}`}>
+
+        <button
+          onClick={() => {
+            if (onClose) {
+              onClose()
+            } else if (window.history.length > 1) {
+              navigate(-1)
+            } else {
+              navigate('/pro/conversations')
+            }
+          }}
+          className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+        >
+          <ArrowLeft size={20} />
+        </button>
+
+        {/* Avatar + info */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="relative flex-shrink-0">
+            {otherParticipant?.avatar_url ? (
+              <img
+                src={otherParticipant.avatar_url.startsWith('http') || otherParticipant.avatar_url.startsWith('data:')
+                  ? otherParticipant.avatar_url
+                  : `${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace('/api/v1', '')}${otherParticipant.avatar_url.startsWith('/') ? '' : '/'}${otherParticipant.avatar_url}`}
+                alt=""
+                onError={(e) => { (e.target as HTMLElement).style.display = 'none' }}
+                className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-500/30"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-bold">
+                {((otherParticipant?.username || otherParticipant?.full_name || 'U')).replace(/^@/, '').charAt(0).toUpperCase()}
+              </div>
             )}
+            {/* Online dot */}
+            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 transition-colors
+              ${isDark ? 'border-black' : 'border-white'}
+              ${isOtherOnline ? 'bg-emerald-400' : 'bg-slate-400'}`} />
           </div>
-          {searchQuery && (
-            <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} mt-1.5 sm:mt-2 text-center`}>
-              {filteredMessages.length} résultat{filteredMessages.length !== 1 ? 's' : ''} trouvé{filteredMessages.length !== 1 ? 's' : ''}
+
+          <div className="min-w-0">
+            <h2 className="font-semibold text-sm truncate">
+              @{((otherParticipant?.username || otherParticipant?.full_name || 'Utilisateur')).replace(/^@/, '')}
+            </h2>
+            <p className={`text-xs truncate ${isOtherOnline ? 'text-emerald-400' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
+              {isOtherOnline ? 'En ligne' : 'Hors ligne'}
             </p>
-          )}
+          </div>
         </div>
-      )}
 
-      {/* Messages */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4">
-        <div className="w-full space-y-3 sm:space-y-4">
-          {(!messages || messages.length === 0) ? (
-            <div className="text-center py-8 sm:py-12">
-              <div className={`w-12 h-12 sm:w-16 sm:h-16 ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-100'} rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4`}>
-                <Send className={`w-6 h-6 sm:w-8 sm:h-8 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-              </div>
-              <p className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Aucun message encore</p>
-              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>Commencez la conversation !</p>
-            </div>
-          ) : (
-            messages.map((message: any, index: number) => {
-              const isMe = message.senderId === currentUserId
-              const showAvatar = index === 0 || 
-                messages[index - 1].senderId !== message.senderId
-              const senderName = message.sender?.fullName || message.sender?.username || 'Inconnu'
+        {/* Header actions */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* WS connection indicator */}
+          <div title={isConnected ? 'Temps réel actif' : connectionState}>
+            {isConnected
+              ? <Wifi size={15} className="text-emerald-400" />
+              : <WifiOff size={15} className={isDark ? 'text-slate-500' : 'text-slate-400'} />}
+          </div>
 
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+          <button
+            onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
+            className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+            title="Rechercher"
+          >
+            <Search size={18} />
+          </button>
+
+          <button
+            onClick={() => setShowMenu(v => !v)}
+            className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+          >
+            <MoreVertical size={18} />
+          </button>
+        </div>
+
+        {/* Header dropdown */}
+        {showMenu && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+            <div className={`absolute top-16 right-3 z-50 w-52 rounded-2xl shadow-2xl border overflow-hidden
+              ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+              {[
+                { icon: Pin, label: 'Épingler', action: () => { apiFetch(`/conversations/${id}/toggle_pin/`, { method: 'POST' }); setShowMenu(false) } },
+                { icon: Archive, label: 'Archiver', action: () => { setShowMenu(false) } },
+                { icon: CheckCheck, label: 'Sélection multiple', action: () => { setIsSelectionMode(true); setShowMenu(false) } },
+                { icon: Shield, label: 'Bloquer', action: () => { setShowConfirm({ type: 'block' }); setShowMenu(false) }, danger: true },
+                { icon: Trash2, label: 'Supprimer la conv.', action: () => { setShowConfirm({ type: 'delete' }); setShowMenu(false) }, danger: true },
+              ].map((item, i) => (
+                <button
+                  key={i}
+                  onClick={item.action}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors
+                    ${'danger' in item && item.danger
+                      ? isDark ? 'text-red-400 hover:bg-red-900/20' : 'text-red-500 hover:bg-red-50'
+                      : isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}
                 >
-                  <div className={`flex items-end gap-1.5 sm:gap-2 max-w-[85%] sm:max-w-[80%] ${isMe ? 'flex-row-reverse' : ''}`}>
-                    {!isMe && showAvatar && (
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white text-[10px] sm:text-sm font-bold flex-shrink-0">
-                        {senderName.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    {!isMe && !showAvatar && <div className="w-6 sm:w-8" />}
-
-                    <div
-                      className={`px-3 sm:px-4 py-2 rounded-2xl ${
-                        isMe
-                          ? 'bg-blue-600 text-white rounded-br-md'
-                          : resolvedTheme === 'dark' 
-                            ? 'bg-zinc-800 border-zinc-700 text-white rounded-bl-md'
-                            : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'
-                      }`}
-                    >
-                      <p className={`break-words text-xs sm:text-sm ${!expandedMessages.has(message.id) && shouldTruncate(message.content) ? 'line-clamp-3' : ''}`}>
-                        {message.content}
-                      </p>
-                      {shouldTruncate(message.content) && (
-                        <button
-                          onClick={() => toggleMessageExpansion(message.id)}
-                          className={`text-[10px] sm:text-xs mt-1 ${isMe ? 'text-blue-200 hover:text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-500 hover:text-zinc-400' : 'text-gray-400 hover:text-gray-500'}`}
-                        >
-                          {expandedMessages.has(message.id) ? 'Voir moins' : 'Voir plus'}
-                        </button>
-                      )}
-                      <div className={`flex items-center gap-1 mt-1 ${isMe ? 'text-blue-200' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                        <span className="text-[10px] sm:text-xs" title={new Date(message.createdAt).toLocaleString('fr-FR')}>
-                          {formatExactTime(message.createdAt)}
-                        </span>
-                        {isMe && (
-                          message.read ? (
-                            <CheckCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                          ) : (
-                            <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })
-          )}
-          
-          {/* Load more indicator */}
-          {loadingMore && (
-            <div className="text-center py-2">
-              <div className={`inline-block w-4 h-4 sm:w-5 sm:h-5 border-2 ${resolvedTheme === 'dark' ? 'border-zinc-500 border-t-blue-500' : 'border-gray-400 border-t-blue-600'} rounded-full animate-spin`} />
-            </div>
-          )}
-          
-          {/* Typing Indicator */}
-          {otherUserTyping && (
-            <div className="flex justify-start">
-              <div className="flex items-end gap-1.5 sm:gap-2 max-w-[85%] sm:max-w-[80%]">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white text-[10px] sm:text-sm font-bold flex-shrink-0">
-                  {getOtherParticipant()?.name.charAt(0).toUpperCase()}
-                </div>
-                <div className={`px-3 sm:px-4 py-2 sm:py-3 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl rounded-bl-md`}>
-                  <div className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Input */}
-      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border-t p-3 sm:p-4`}>
-        <div className="w-full">
-          {/* Attachment Preview */}
-          {attachments.length > 0 && (
-            <div className="flex gap-2 mb-2 sm:mb-3 overflow-x-auto pb-2">
-              {attachments.map((att, index) => (
-                <div key={att.id} className="relative flex-shrink-0">
-                  {att.type === 'image' ? (
-                    <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'} flex items-center justify-center`}>
-                      <ImageIcon className={`w-6 h-6 sm:w-8 sm:h-8 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                    </div>
-                  ) : (
-                    <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-100'} flex flex-col items-center justify-center p-1.5 sm:p-2`}>
-                      <Paperclip className={`w-4 h-4 sm:w-6 sm:h-6 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`} />
-                      <span className={`text-[8px] sm:text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} truncate w-full text-center`}>{att.name}</span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}
-                    className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] sm:text-xs"
-                  >
-                    ×
-                  </button>
-                </div>
+                  <item.icon size={15} /> {item.label}
+                </button>
               ))}
             </div>
-          )}
-          
-          {conversation.isBlocked ? (
-            <div className={`text-center py-3 sm:py-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-              <p className="text-sm sm:text-base">Conversation bloquée</p>
-              <p className="text-xs sm:text-sm">Vous ne pouvez plus envoyer de messages</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* Clear Draft Button */}
-              {hasDraft && (
-                <button
-                  onClick={clearDraft}
-                  className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'text-amber-400 hover:bg-zinc-700' : 'text-amber-600 hover:bg-gray-100'} rounded-full transition-colors`}
-                  title="Effacer le brouillon"
-                >
-                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              )}
-
-              {/* Attachment Button */}
-              <button 
-                className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-700' : 'text-gray-500 hover:bg-gray-100'} rounded-full transition-colors hidden sm:block`}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-              
-              {/* Image Button */}
-              <button 
-                className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-700' : 'text-gray-500 hover:bg-gray-100'} rounded-full transition-colors hidden sm:block`}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-              
-              {/* Input */}
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => {
-                  setNewMessage(e.target.value)
-                  handleTyping()
-                }}
-                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Écrivez votre message..."
-                className={`flex-1 px-3 py-2 sm:px-4 sm:py-3 ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white placeholder-zinc-500 focus:bg-zinc-600' : 'bg-gray-100 text-gray-900 placeholder-gray-500 focus:bg-white'} border-0 rounded-full focus:ring-2 focus:ring-blue-500 transition-all text-xs sm:text-sm`}
-              />
-              
-              {/* Emoji Button */}
-              <button 
-                className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-700' : 'text-gray-500 hover:bg-gray-100'} rounded-full transition-colors hidden sm:block`}
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              >
-                <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-              
-              {/* Voice Button */}
-              <button 
-                className={`p-1.5 sm:p-2 rounded-full transition-colors ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-700' : 'text-gray-500 hover:bg-gray-100'} hidden sm:block`}
-                onClick={() => setIsRecording(!isRecording)}
-              >
-                <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-              
-              {/* Send Button */}
-              <button
-                onClick={sendMessage}
-                disabled={!newMessage.trim() && attachments.length === 0}
-                className="p-1.5 sm:p-2 sm:p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send className="w-3.5 h-3.5 sm:w-4 sm:w-5 sm:h-5" />
-              </button>
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
+
+      {/* ── Search Bar ── */}
+      {showSearch && (
+        <div className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b
+          ${isDark ? 'bg-slate-900/80 border-white/5' : 'bg-white/90 border-slate-200'}`}>
+          <Search size={16} className={isDark ? 'text-slate-400' : 'text-slate-400'} />
+          <input
+            autoFocus
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Rechercher dans la conversation..."
+            className={`flex-1 bg-transparent outline-none text-sm ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+          />
+          {searchQuery && (
+            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {filteredMessages.length} résultat{filteredMessages.length !== 1 ? 's' : ''}
+            </span>
+          )}
+          <button onClick={() => { setShowSearch(false); setSearchQuery('') }}>
+            <X size={16} className={isDark ? 'text-slate-400' : 'text-slate-400'} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Selection Mode Bar ── */}
+      {isSelectionMode && (
+        <div className={`flex-shrink-0 flex items-center justify-between px-4 py-2 border-b
+          ${isDark ? 'bg-violet-900/30 border-violet-800' : 'bg-violet-50 border-violet-200'}`}>
+          <span className="text-sm font-medium text-violet-400">
+            {selectedMessageIds.size} sélectionné{selectedMessageIds.size > 1 ? 's' : ''}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={batchCopy} className="px-3 py-1 rounded-lg bg-violet-600/20 text-violet-400 text-xs hover:bg-violet-600/30">Copier</button>
+            <button onClick={batchDelete} className="px-3 py-1 rounded-lg bg-red-600/20 text-red-400 text-xs hover:bg-red-600/30">Supprimer</button>
+            <button onClick={() => { setIsSelectionMode(false); setSelectedMessageIds(new Set()) }} className={`px-3 py-1 rounded-lg text-xs ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Messages Area ── */}
+      <div className="flex-1 overflow-y-auto py-4 space-y-0.5 scroll-smooth" id="messages-container">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 size={32} className="animate-spin text-violet-500" />
+          </div>
+        ) : filteredMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 opacity-60">
+            <div className="text-5xl">💬</div>
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {searchQuery ? 'Aucun message trouvé' : 'Aucun message. Soyez le premier !'}
+            </p>
+          </div>
+        ) : (
+          <>
+            {filteredMessages.map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                isMine={msg.senderId === currentUserId}
+                theme={resolvedTheme as 'dark' | 'light'}
+                isSelected={selectedMessageIds.has(msg.id)}
+                isSelectionMode={isSelectionMode}
+                searchQuery={searchQuery}
+                onReply={(m) => setReplyingTo({ id: m.id, senderName: m.senderName, content: m.content })}
+                onCopy={copyMessage}
+                onEdit={(m) => setEditingMessage({ id: m.id, content: m.content })}
+                onDeleteForMe={deleteForMe}
+                onDeleteForAll={deleteForAll}
+                onToggleImportant={toggleImportant}
+                onForward={(m) => setForwardModal(m)}
+                onReport={(msgId) => setReportModal({ id: msgId })}
+                onSelect={toggleSelect}
+              />
+            ))}
+            {/* Typing indicator */}
+            {typingUser && (
+              <TypingIndicator
+                username={typingUser.username}
+                theme={resolvedTheme as 'dark' | 'light'}
+              />
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        )}
+      </div>
+
+      {/* ── Reply Banner ── */}
+      {replyingTo && (
+        <div className={`flex-shrink-0 flex items-center gap-3 px-4 py-2 border-t border-l-4 border-l-violet-500
+          ${isDark ? 'bg-slate-900/80 border-white/5' : 'bg-violet-50 border-violet-100'}`}>
+          <Reply size={14} className="text-violet-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-violet-400">{replyingTo.senderName}</span>
+            <p className={`text-xs truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {replyingTo.content.substring(0, 80)}
+            </p>
+          </div>
+          <button onClick={() => setReplyingTo(null)}>
+            <X size={14} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Draft indicator ── */}
+      {hasDraft && !newMessage && (
+        <div className={`flex-shrink-0 flex items-center justify-between px-4 py-1.5 border-t text-xs
+          ${isDark ? 'bg-amber-900/20 border-amber-800/30 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
+          <span>📝 Brouillon enregistré</span>
+          <button
+            onClick={() => { localStorage.removeItem(`draft_${id}`); setHasDraft(false) }}
+            className="underline hover:no-underline"
+          >Effacer</button>
+        </div>
+      )}
+
+      {/* ── Input Area ── */}
+      <div className={`flex-shrink-0 px-3 py-2.5 border-t relative
+        ${isDark ? 'bg-black/50 border-white/5 backdrop-blur-xl' : 'bg-white/80 border-slate-200 backdrop-blur-xl shadow-lg'}`}>
+
+        {/* Hidden inputs */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageSelected}
+        />
+        <input
+          ref={docInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+          className="hidden"
+          onChange={handleDocSelected}
+        />
+
+        {/* Attachment Options Popover */}
+        {showAttachMenu && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowAttachMenu(false)} />
+            <div
+              ref={attachMenuRef}
+              className={`absolute bottom-full left-4 mb-2 z-50 w-56 rounded-2xl shadow-2xl border p-1.5 animate-[slideUp_0.15s_ease-out]
+                ${isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+            >
+              <button
+                onClick={() => {
+                  setShowAttachMenu(false)
+                  fileInputRef.current?.click()
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors
+                  ${isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                  🖼️
+                </div>
+                <div className="text-left">
+                  <p>Photo / Image</p>
+                  <p className="text-[10px] text-slate-400 font-normal">PNG, JPG, WebP</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowAttachMenu(false)
+                  docInputRef.current?.click()
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors
+                  ${isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-violet-500/20 text-violet-400 flex items-center justify-center font-bold text-sm">
+                  📄
+                </div>
+                <div className="text-left">
+                  <p>Document / Fichier</p>
+                  <p className="text-[10px] text-slate-400 font-normal">PDF, DOCX, ZIP</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowAttachMenu(false)
+                  setShowProOfferModal(true)
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors
+                  ${isDark ? 'hover:bg-slate-800 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'}`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                  💼
+                </div>
+                <div className="text-left">
+                  <p>Devis / Proposition Pro</p>
+                  <p className="text-[10px] text-slate-400 font-normal">Offre & contrat chiffré</p>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+
+        <div className={`flex items-end gap-1.5 sm:gap-2 rounded-2xl px-3 py-1.5
+          ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-slate-100 border border-slate-200'}`}>
+
+          {/* Attachment button */}
+          <button
+            onClick={() => setShowAttachMenu(v => !v)}
+            title="Partager un fichier, image ou devis pro"
+            className={`p-1.5 rounded-xl transition-colors mb-0.5 ${showAttachMenu ? 'bg-emerald-500/20 text-emerald-400' : isDark ? 'text-slate-400 hover:text-emerald-400 hover:bg-slate-700' : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-200'}`}
+          >
+            <Paperclip size={18} />
+          </button>
+
+          {/* Quick Devis Pro button */}
+          <button
+            onClick={() => setShowProOfferModal(true)}
+            title="Créer un Devis / Proposition Professionnelle"
+            className="p-1.5 rounded-xl transition-colors mb-0.5 text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1 font-bold text-xs"
+          >
+            <span>💼</span>
+            <span className="hidden sm:inline text-[11px]">Devis Pro</span>
+          </button>
+
+          {/* Textarea */}
+          <textarea
+            ref={inputRef}
+            value={newMessage}
+            onChange={e => handleInputChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Écrivez un message..."
+            rows={1}
+            style={{ resize: 'none', minHeight: 36, maxHeight: 120 }}
+            className={`flex-1 bg-transparent outline-none text-sm leading-relaxed py-1
+              ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+            onInput={e => {
+              const t = e.target as HTMLTextAreaElement
+              t.style.height = 'auto'
+              t.style.height = Math.min(t.scrollHeight, 120) + 'px'
+            }}
+          />
+
+          {/* Send button */}
+          <button
+            onClick={sendMessage}
+            disabled={!newMessage.trim()}
+            className={`p-2 rounded-xl transition-all mb-0.5 flex-shrink-0
+              ${newMessage.trim()
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/30 hover:scale-105'
+                : isDark ? 'text-slate-600' : 'text-slate-300'}`}
+          >
+            <Send size={16} />
+          </button>
+        </div>
+
+        {/* Hint */}
+        <p className={`text-center text-[10px] mt-1 ${isDark ? 'text-slate-700' : 'text-slate-300'}`}>
+          Entrée pour envoyer · Maj+Entrée pour nouvelle ligne
+        </p>
+      </div>
+
+      {/* ── Modal Proposition Professionnelle (Devis Pro) ── */}
+      {showProOfferModal && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowProOfferModal(false)}>
+          <div
+            className={`w-full max-w-md rounded-2xl p-5 shadow-2xl border ${isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3 border-b pb-2 border-white/10">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                💼 Créer une Proposition & Devis Pro
+              </h3>
+              <button onClick={() => setShowProOfferModal(false)}><X size={18} /></button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">Intitulé de la prestation / projet</label>
+                <input
+                  value={offerTitle}
+                  onChange={e => setOfferTitle(e.target.value)}
+                  placeholder="ex: Développement site web e-commerce"
+                  className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">Montant chiffré</label>
+                  <input
+                    value={offerAmount}
+                    onChange={e => setOfferAmount(e.target.value)}
+                    placeholder="ex: 450"
+                    className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">Devise</label>
+                  <select
+                    value={offerCurrency}
+                    onChange={e => setOfferCurrency(e.target.value)}
+                    className={`w-full px-2.5 py-2 rounded-xl text-xs sm:text-sm border outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                  >
+                    <option value="$ USD">$ USD</option>
+                    <option value="€ EUR">€ EUR</option>
+                    <option value="HTG">HTG (Gourdes)</option>
+                    <option value="CAD">CAD</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">Délai estimé</label>
+                  <select
+                    value={offerDuration}
+                    onChange={e => setOfferDuration(e.target.value)}
+                    className={`w-full px-2.5 py-2 rounded-xl text-xs sm:text-sm border outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                  >
+                    <option value="24 heures">24 heures</option>
+                    <option value="3 jours">3 jours</option>
+                    <option value="1 semaine">1 semaine</option>
+                    <option value="15 jours">15 jours</option>
+                    <option value="1 mois">1 mois</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">Conditions de paiement</label>
+                  <select
+                    value={offerPaymentTerms}
+                    onChange={e => setOfferPaymentTerms(e.target.value)}
+                    className={`w-full px-2.5 py-2 rounded-xl text-xs sm:text-sm border outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                  >
+                    <option value="100% à la livraison">100% à la livraison</option>
+                    <option value="50% acompte + 50% solde">50% acompte + solde</option>
+                    <option value="30% acompte + 70% solde">30% acompte + solde</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">Détails et livrables inclus</label>
+                <textarea
+                  value={offerDesc}
+                  onChange={e => setOfferDesc(e.target.value)}
+                  rows={3}
+                  placeholder="Décrivez les livrables clés inclus dans cette offre (ex: Code source, Design Figma, 3 révisions)..."
+                  className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border outline-none resize-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button onClick={() => setShowProOfferModal(false)} className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700">Annuler</button>
+                <button
+                  onClick={handleSendProProposal}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md hover:scale-105 transition-all"
+                >
+                  Envoyer la proposition
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Modal ── */}
+      {editingMessage && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-lg rounded-2xl p-5 shadow-2xl
+            ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>Modifier le message</h3>
+            <textarea
+              autoFocus
+              value={editingMessage.content}
+              onChange={e => setEditingMessage(prev => prev ? { ...prev, content: e.target.value } : null)}
+              rows={3}
+              className={`w-full rounded-xl p-3 text-sm outline-none resize-none border
+                ${isDark ? 'bg-slate-800 text-white border-slate-600 focus:border-violet-500' : 'bg-slate-50 text-slate-900 border-slate-300 focus:border-violet-500'}`}
+            />
+            <div className="flex gap-2 mt-3 justify-end">
+              <button onClick={() => setEditingMessage(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
+              <button onClick={submitEdit} className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm hover:bg-violet-700">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Forward Modal ── */}
+      {forwardModal && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-md rounded-2xl p-5 shadow-2xl
+            ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>Transférer le message</h3>
+            <div className={`p-3 rounded-xl text-sm mb-4 ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
+              {forwardModal.content}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setForwardModal(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Fermer</button>
+              <button
+                onClick={() => { copyMessage(forwardModal.content); setForwardModal(null); showToast('Contenu copié — collez dans une autre conversation') }}
+                className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm hover:bg-violet-700"
+              >Copier & Transférer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Report Modal ── */}
+      {reportModal && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-md rounded-2xl p-5 shadow-2xl
+            ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>🚩 Signaler le message</h3>
+            <select
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              className={`w-full rounded-xl p-3 text-sm outline-none border mb-4
+                ${isDark ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-50 text-slate-900 border-slate-300'}`}
+            >
+              {['Contenu inapproprié ou spam', 'Harcèlement ou intimidation', 'Discours haineux', 'Informations fausses', 'Autre raison'].map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setReportModal(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
+              <button
+                onClick={() => { showToast('Signalement envoyé. Merci.'); setReportModal(null) }}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700"
+              >Signaler</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm Dialog ── */}
+      {showConfirm.type && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-sm rounded-2xl p-5 shadow-2xl
+            ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+            <h3 className={`font-semibold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {showConfirm.type === 'block' ? '🛡️ Bloquer cet utilisateur ?' : '🗑️ Supprimer la conversation ?'}
+            </h3>
+            <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {showConfirm.type === 'block'
+                ? 'Vous ne pourrez plus vous envoyer de messages.'
+                : 'Cette action est irréversible. Tous les messages seront supprimés.'}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowConfirm({ type: null })} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
+              <button
+                onClick={async () => {
+                  if (showConfirm.type === 'delete') {
+                    await apiFetch(`/conversations/${id}/`, { method: 'DELETE' })
+                    navigate('/pro/conversations')
+                  }
+                  setShowConfirm({ type: null })
+                  showToast(showConfirm.type === 'block' ? 'Utilisateur bloqué' : 'Conversation supprimée')
+                }}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700"
+              >Confirmer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }
+
+export const ConversationPage = (): JSX.Element => {
+  return <ConversationView />
+}
+
+export default ConversationPage

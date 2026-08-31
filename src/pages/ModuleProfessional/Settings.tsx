@@ -7,6 +7,7 @@ import {
   User, Camera, MapPin, Briefcase, Plus, X
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { cacheService } from '../../services/cacheService'
 import { 
   syncStoredProfile,
   canModifyProfession,
@@ -45,22 +46,25 @@ const Settings = () => {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  // Lecture instantanée du cache profil
+  const cachedProfile = cacheService.get<any>('pro:profile:data', { allowStale: true }).data
+
   // États pour l'édition du profil
-  const [profileData, setProfileData] = useState({
-    firstName: '',
-    lastName: '',
-    username: '',
-    profession: '',
-    bio: '',
-    city: '',
-    country: '',
-    website: '',
-    skills: [] as string[]
-  })
+  const [profileData, setProfileData] = useState(() => ({
+    firstName: cachedProfile?.fullName?.split(' ')[0] || '',
+    lastName: cachedProfile?.fullName?.split(' ').slice(1).join(' ') || '',
+    username: cachedProfile?.username || '',
+    profession: cachedProfile?.profession || '',
+    bio: cachedProfile?.bio || '',
+    city: cachedProfile?.location?.split(',')[0] || '',
+    country: cachedProfile?.location?.split(',')[1]?.trim() || '',
+    website: cachedProfile?.website || '',
+    skills: cachedProfile?.skills?.map((s: any) => s.name || s) || [] as string[]
+  }))
   const [newSkill, setNewSkill] = useState('')
-  const [lastProfessionUpdate, setLastProfessionUpdate] = useState<string | null>(null)
+  const [lastProfessionUpdate, setLastProfessionUpdate] = useState<string | null>(cachedProfile?.lastProfessionUpdate || null)
   const [uploadedPhoto, setUploadedPhoto] = useState<string>('')
-  const [photoPreview, setPhotoPreview] = useState<string>('')
+  const [photoPreview, setPhotoPreview] = useState<string>(cachedProfile?.avatarUrl || cachedProfile?.photo || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Paramètres de confidentialité

@@ -38,7 +38,7 @@ interface InstitutionProfileType {
     description: string
     thumbnail?: string
     url?: string
-    jitsiRoom?: string
+    liveRoomName?: string
     isPinned: boolean
   }
   faculties?: Faculty[]
@@ -72,7 +72,7 @@ interface Live {
   title: string
   description: string
   thumbnail?: string
-  jitsiRoom: string
+  liveRoomName: string
   views: number
   shares: number
   createdAt: string
@@ -123,7 +123,7 @@ const DEMO_INSTITUTION: InstitutionProfileType = {
     type: 'live',
     title: 'Conférence de Presse: Plan de Vaccination 2024',
     description: 'Direct du Ministère de la Santé pour présenter le plan de vaccination nationale.',
-    jitsiRoom: 'plan-vaccination-2024',
+    liveRoomName: 'plan-vaccination-2024',
     isPinned: true
   },
   faculties: [
@@ -186,7 +186,7 @@ const DEMO_INSTITUTION: InstitutionProfileType = {
       id: 'live-1',
       title: 'Conférence de Presse: Plan de Vaccination 2024',
       description: 'Direct du Ministère de la Santé pour présenter le plan de vaccination nationale.',
-      jitsiRoom: 'plan-vaccination-2024',
+      liveRoomName: 'plan-vaccination-2024',
       views: 12500,
       shares: 678,
       createdAt: 'Il y a 2h',

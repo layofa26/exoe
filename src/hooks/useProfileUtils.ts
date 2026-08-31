@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 interface Skill {
   id: string;
@@ -39,122 +39,67 @@ interface UserProfile {
 }
 
 /**
- * Helper function pour récupérer le profil avec fallback
+ * Helper function pour récupérer le profil avec le vrai endpoint /profil/profils/?user=
  */
 export const getProfileWithFallback = async (token: string) => {
-  console.log('Getting profile...');
-  
-  // Récupérer l'utilisateur connecté depuis l'API
   let currentUserId: string | null = null;
   try {
-    const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (userResponse.ok) {
-      const userData = await userResponse.json();
-      currentUserId = userData.id?.toString();
-      console.log('Current userId from API:', currentUserId);
-    }
-  } catch (error) {
-    console.log('Error fetching user from API, trying localStorage fallback:', error);
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    currentUserId = payload.user_id ? String(payload.user_id) : (payload.id ? String(payload.id) : null);
+  } catch {}
+
+  if (!currentUserId) {
     currentUserId = localStorage.getItem('userId');
-    console.log('Current userId from localStorage fallback:', currentUserId);
   }
-  
-  // Endpoint standard pour récupérer le profil de l'utilisateur connecté
-  try {
-    const meResponse = await fetch(`${API_BASE_URL}/profil/profils/?user=${currentUserId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (meResponse.ok) {
-      const meData = await meResponse.json();
-      console.log('Profile by user ID response:', meData);
-      if (meData.results && meData.results.length > 0) {
-        console.log('Found profile by user ID:', meData.results[0]);
-        return meData.results[0];
-      } else if (Array.isArray(meData) && meData.length > 0) {
-        console.log('Found profile by user ID (array):', meData[0]);
-        return meData[0];
-      } else {
-        console.log('No profile found for user ID, creating one...');
-        // Créer le profil s'il n'existe pas
-        const createResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            bio: '',
-            location: '',
-            website: ''
-          })
-        });
-        if (createResponse.ok) {
-          const createdProfile = await createResponse.json();
-          console.log('Profile created:', createdProfile);
-          return createdProfile;
+
+  const doFetchProfile = async (baseUrl: string) => {
+    // 1. Essayer le endpoint direct /profil/profils/me/
+    try {
+      const meRes = await fetch(`${baseUrl}/profil/profils/me/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
+      });
+      if (meRes.ok) return meRes;
+    } catch {}
+
+    // 2. Fallback par query parameter
+    if (currentUserId) {
+      return await fetch(`${baseUrl}/profil/profils/?user=${currentUserId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    return null;
+  };
+
+  try {
+    let res = await doFetchProfile(API_BASE_URL);
+    if ((!res || !res.ok) && API_BASE_URL.includes('onrender.com')) {
+      try {
+        const localRes = await doFetchProfile('http://localhost:8000/api/v1');
+        if (localRes && localRes.ok) res = localRes;
+      } catch {}
+    }
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (!Array.isArray(data) && data && data.id) {
+        return data;
+      }
+      const list = Array.isArray(data) ? data : (data.results || []);
+      if (list.length > 0) {
+        return list[0];
       }
     }
   } catch (error) {
-    console.log('Error fetching /profil/profils/?user=, trying list endpoint:', error);
+    console.error('Error loading real profile from endpoint:', error);
   }
 
-  // Fallback: liste complète filtrée sur l'utilisateur connecté
-  console.log('Loading from list endpoint');
-  const listResponse = await fetch(`${API_BASE_URL}/profil/profils/`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  });
-
-  console.log('List response status:', listResponse.status);
-  
-  if (!listResponse.ok) {
-    throw new Error(`Erreur HTTP: ${listResponse.status}`);
-  }
-
-  const data = await listResponse.json();
-  console.log('Profile list data received:', data);
-  
-  // Chercher le profil de l'utilisateur connecté
-  if (data.results && data.results.length > 0) {
-    console.log('Data has results array with', data.results.length, 'items');
-    const foundProfile = data.results.find((p: any) => p.user?.toString() === currentUserId);
-    console.log('Found profile by userId:', foundProfile);
-    if (!foundProfile) {
-      console.error('No profile found for current user ID:', currentUserId);
-      console.error('Available profiles:', data.results.map((p: any) => ({ id: p.id, user: p.user, username: p.username })));
-    }
-    return foundProfile;
-  } else if (Array.isArray(data) && data.length > 0) {
-    console.log('Data is array with', data.length, 'items');
-    const foundProfile = data.find((p: any) => p.user?.toString() === currentUserId);
-    console.log('Found profile by userId:', foundProfile);
-    if (!foundProfile) {
-      console.error('No profile found for current user ID:', currentUserId);
-      console.error('Available profiles:', data.map((p: any) => ({ id: p.id, user: p.user, username: p.username })));
-    }
-    return foundProfile;
-  } else if (data.id) {
-    console.log('Data has id:', data.id);
-    // Vérifier que c'est bien le profil de l'utilisateur connecté
-    if (data.user?.toString() !== currentUserId) {
-      console.error('Profile ID does not match current user ID:', { profileUser: data.user, currentUser: currentUserId });
-      return null;
-    }
-    return data;
-  }
-  
-  console.log('No profile found, returning null');
   return null;
 };
 
@@ -162,54 +107,66 @@ export const getProfileWithFallback = async (token: string) => {
  * Mapping unique backend -> UI (évite que des champs restent aux anciennes valeurs)
  */
 export const mapBackendProfile = (data: any): UserProfile => {
-  console.log('mapBackendProfile input FULL:', JSON.stringify(data, null, 2))
-  
-  // Construire l'URL publique pour les images (éviter les URLs signées qui expirent)
   const SUPABASE_URL = 'https://rmbvwaemgiijitumhnys.supabase.co/storage/v1/object/public/Exile_images'
   
-  const getPublicImageUrl = (filename: string | null | undefined): string | undefined => {
-    if (!filename) return undefined
-    console.log('getPublicImageUrl input:', filename)
-    // Si c'est déjà une URL complète, la retourner
-    if (filename.startsWith('http')) {
-      console.log('Already a full URL, returning as-is:', filename)
-      return filename
+  const getPublicImageUrl = (urlOrFilename: string | null | undefined): string | undefined => {
+    if (!urlOrFilename || typeof urlOrFilename !== 'string') return undefined
+    const clean = urlOrFilename.trim()
+    if (!clean || clean === 'null' || clean === 'undefined') return undefined
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('blob:')) {
+      return clean
     }
-    // Sinon, construire l'URL publique
-    const publicUrl = `${SUPABASE_URL}/${filename}`
-    console.log('Constructed public URL:', publicUrl)
-    return publicUrl
+    if (clean.startsWith('/media/') || clean.startsWith('media/')) {
+      return `http://localhost:8000${clean.startsWith('/') ? clean : `/${clean}`}`
+    }
+    return `${SUPABASE_URL}/${clean.replace(/^\/+/, '')}`
+  }
+
+  let photoUrl = getPublicImageUrl(data.photo_url || data.photo || data.avatar)
+  let bannerUrl = getPublicImageUrl(data.banner_url || data.banner || data.cover)
+
+  // Persistance hors-ligne pour la photo et la bannière
+  if (photoUrl) {
+    try { localStorage.setItem('exile_cached_avatar', photoUrl) } catch {}
+  } else {
+    try { photoUrl = localStorage.getItem('exile_cached_avatar') || undefined } catch {}
+  }
+
+  if (bannerUrl) {
+    try { localStorage.setItem('exile_cached_banner', bannerUrl) } catch {}
+  } else {
+    try { bannerUrl = localStorage.getItem('exile_cached_banner') || undefined } catch {}
   }
   
   const mapped: UserProfile = {
     id: data.id,
-    userId: data.user?.toString(),
+    userId: data.user?.toString() || data.userId?.toString(),
     username: data.username,
-    photo: getPublicImageUrl(data.photo || data.photo_url),
-    bio: data.bio,
-    location: data.location,
-    country: data.country,
-    city: data.city,
-    websites: data.website ? [data.website] : [],
-    name: data.full_name || data.username,
-    fullName: data.full_name || data.username,
-    avatarUrl: getPublicImageUrl(data.photo || data.photo_url),
-    // Utiliser l'URL publique pour la bannière
-    banner: getPublicImageUrl(data.banner || data.banner_url),
-    banner_url: data.banner_url,
-    profession: data.profession || data.user_profession,
-    speciality: data.speciality || data.user_speciality,
-    lastProfessionUpdate: data.last_profession_update || data.lastProfessionUpdate,
-    skills: data.skills || [],
-    createdAt: data.date_joined || data.created_at,
-    date_joined: data.date_joined || data.created_at,
-    status: 'online' as const,
-    email: data.email || ''
+    name: data.full_name || data.username || 'Utilisateur',
+    fullName: data.full_name,
+    full_name: data.full_name,
+    email: data.email,
+    photo: photoUrl,
+    avatarUrl: photoUrl,
+    photo_url: photoUrl,
+    banner: bannerUrl,
+    bannerUrl: bannerUrl,
+    banner_url: bannerUrl,
+    cover_url: bannerUrl,
+    bio: data.bio || '',
+    location: data.location || (data.city && data.country ? `${data.city}, ${data.country}` : data.city || data.country || ''),
+    country: data.country || '',
+    city: data.city || '',
+    websites: data.website ? [data.website] : (data.websites || []),
+    profession: data.profession || data.user_profession || '',
+    speciality: data.speciality || data.user_speciality || '',
+    skills: Array.isArray(data.skills) ? data.skills : [],
+    status: 'online',
+    createdAt: data.created_at || data.date_joined,
+    date_joined: data.date_joined,
+    lastProfessionUpdate: data.last_profession_update,
+    last_profession_update: data.last_profession_update,
   }
-  console.log('mapBackendProfile output ID:', mapped.id)
-  console.log('mapBackendProfile output banner:', mapped.banner)
-  console.log('mapBackendProfile output banner_url:', mapped.banner_url)
-  console.log('mapBackendProfile output FULL:', JSON.stringify(mapped, null, 2))
   return mapped
 };
 

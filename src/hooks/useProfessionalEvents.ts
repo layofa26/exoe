@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from './useQuery';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -25,56 +25,47 @@ interface Event {
 }
 
 export const useProfessionalEvents = (professionalId: string) => {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [page, setPage] = useState(1);
+  const {
+    data: cachedEvents,
+    isLoading: loading,
+    error: queryError
+  } = useQuery<Event[]>(
+    async () => {
+      if (!professionalId) return [];
 
-  const loadEvents = async (pageNum: number = 1) => {
-    if (!professionalId) {
-      setError('ID de professionnel manquant');
-      setLoading(false);
-      return;
-    }
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (!token) return [];
 
-    try {
-      setLoading(true);
-      setError(null);
+        const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
 
-      const token = localStorage.getItem('accessToken')
-      if (!token) {
-        setError('Token non trouvé')
-        return
+        if (response.ok) {
+          const data = await response.json();
+          return data.results || data || [];
+        }
+        return [];
+      } catch (err) {
+        console.error('Error loading professional events:', err);
+        return [];
       }
-
-      const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setEvents(data.results || data)
-      } else {
-        setError('Impossible de charger les événements')
-      }
-    } catch (err) {
-      console.error('Error loading professional events:', err);
-      setError('Impossible de charger les événements');
-    } finally {
-      setLoading(false);
+    },
+    {
+      cacheKey: `pro:events:user:${professionalId}`,
+      cacheTime: 5 * 60 * 1000,
+      enabled: !!professionalId,
+      initialData: []
     }
+  );
+
+  const events = cachedEvents || [];
+
+  return {
+    events,
+    loading,
+    error: queryError ? queryError.message : null,
+    loadMore: () => undefined,
+    hasMore: false
   };
-
-  const loadMore = () => {
-    if (hasMore && !loading) {
-      loadEvents(page + 1);
-    }
-  };
-
-  useEffect(() => {
-    loadEvents(1);
-  }, [professionalId]);
-
-  return { events, loading, error, loadMore, hasMore };
 };

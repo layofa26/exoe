@@ -81,62 +81,85 @@ interface UserProfile {
 
 export const authApi = {
   async login(username: string, password: string): Promise<{ success: boolean; error?: string; data?: LoginResponse }> {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+    const cleanUsername = username.trim()
+    const cleanPassword = password
+
+    const doFetch = async (baseUrl: string) => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      try {
+        const response = await fetch(`${baseUrl}/users/login/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
+          signal: controller.signal,
+          credentials: 'include',
+        })
+        clearTimeout(timeoutId)
+        return response
+      } catch (err) {
+        clearTimeout(timeoutId)
+        throw err
+      }
+    }
 
     try {
-      const url = `${FINAL_API_BASE_URL}/users/login/`
-      console.log('Tentative de connexion vers:', url)
+      let response: Response | null = null
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-        signal: controller.signal,
-        credentials: 'include' // Important for httpOnly cookies
-      })
+      // First attempt with configured endpoint
+      try {
+        response = await doFetch(FINAL_API_BASE_URL)
+      } catch (err) {
+        console.warn('Initial login endpoint failed, attempting fallback...', err)
+      }
 
-      clearTimeout(timeoutId)
+      // If remote returned an error or failed, and we are developing locally, try localhost:8000
+      if ((!response || !response.ok) && FINAL_API_BASE_URL.includes('onrender.com')) {
+        try {
+          const localResponse = await doFetch('http://localhost:8000/api/v1')
+          if (localResponse.ok || !response) {
+            response = localResponse
+          }
+        } catch {}
+      }
+
+      if (!response) {
+        return {
+          success: false,
+          error: 'Impossible de joindre le serveur. Vérifiez votre connexion internet.'
+        }
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         console.error('Erreur backend connexion:', {
           status: response.status,
-          statusText: response.statusText,
           errorData
         })
-        
-        // Handle specific error messages from Django
+
+        let errorMsg = 'Identifiants incorrects.'
         if (errorData.detail) {
-          return { success: false, error: errorData.detail }
+          errorMsg = Array.isArray(errorData.detail) ? errorData.detail[0] : errorData.detail
+        } else if (errorData.error) {
+          errorMsg = Array.isArray(errorData.error) ? errorData.error[0] : errorData.error
+        } else if (errorData.non_field_errors) {
+          errorMsg = Array.isArray(errorData.non_field_errors) ? errorData.non_field_errors[0] : errorData.non_field_errors
         }
-        if (errorData.error) {
-          return { success: false, error: errorData.error }
-        }
-        
-        return {
-          success: false,
-          error: 'Identifiants incorrects'
-        }
+
+        return { success: false, error: errorMsg }
       }
 
       const data: LoginResponse = await response.json()
-      console.log('Connexion réussie')
-      
-      // Validate response data with Zod
       const validatedData = LoginResponseSchema.parse(data)
-      
-      // Tokens are now set as httpOnly cookies by the backend
-      // Only store in localStorage as fallback for development
-      setCookie('access_token', validatedData.access, 1) // 1 day
-      setCookie('refresh_token', validatedData.refresh, 7) // 7 days
-      localStorage.setItem('accessToken', validatedData.access) // Fallback
-      
+
+      setCookie('access_token', validatedData.access, 1)
+      setCookie('refresh_token', validatedData.refresh, 7)
+      localStorage.setItem('accessToken', validatedData.access)
+
       return { success: true, data: validatedData }
     } catch (error) {
-      clearTimeout(timeoutId)
       if (error instanceof Error && error.name === 'AbortError') {
         return {
           success: false,
@@ -146,7 +169,7 @@ export const authApi = {
       console.error('Erreur de connexion:', error)
       return {
         success: false,
-        error: 'Erreur de connexion au serveur'
+        error: 'Erreur de connexion au serveur.'
       }
     }
   },

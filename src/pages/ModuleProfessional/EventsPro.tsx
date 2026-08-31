@@ -3,12 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Calendar, Users, Plus, Search,
   Clock, MapPin, Video, BarChart3, Trash2, CheckCircle,
-  Radio, Ticket, X, ArrowLeft
+  Radio, Ticket, X, ArrowLeft, Share2, CalendarPlus, Check, Sparkles
 } from 'lucide-react'
 import TicketModal from '../../components/modals/TicketModal'
 import EventStatsModal from '../../components/modals/EventStatsModal'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { useQuery } from '../../hooks/useQuery'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -33,10 +34,10 @@ interface EventItem {
   price: number
   isLive: boolean
   liveRoomName?: string
-  // Live & Jitsi fields
+  // Live & Streaming fields
   liveStatus?: 'at_coming' | 'live' | 'ended'
   speaker?: { name: string; avatar?: string }
-  jitsiRoom?: string
+  liveRoomName?: string
   participantsCount?: number
   maxParticipants?: number
   reactions?: { thumbs_up: number; clap: number; bulb: number; heart: number }
@@ -47,19 +48,19 @@ interface EventItem {
 const DEMO_EVENTS: EventItem[] = [
   {
     id: 'evt_1',
-    title: 'Conférence: Développement Web Moderne',
+    title: 'Conférence : Développement Web Moderne & Sécurité',
     description: 'Découvrez les dernières tendances en développement web avec React, TypeScript et Node.js',
     startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
     format: 'virtual',
     status: 'published',
-    location: { city: 'Paris', venue: 'Online' },
-    coverImage: '',
+    location: { city: 'En ligne', venue: 'Salon Live' },
+    coverImage: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600',
     category: 'TECHNOLOGY',
     capacity: 100,
     stats: { views: 1250, registrations: 45, attendees: 0, revenue: 0 },
     organizerName: 'Jean Dupont',
-    organizerAvatar: '',
+    organizerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
     createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
     price: 0,
@@ -68,19 +69,19 @@ const DEMO_EVENTS: EventItem[] = [
   },
   {
     id: 'evt_2',
-    title: 'Workshop: Design UI/UX',
-    description: 'Apprenez à créer des interfaces utilisateur modernes et intuitives',
+    title: 'Workshop : Design d’Interface UI/UX & Design Systems',
+    description: 'Apprenez à concevoir des parcours utilisateurs fluides et esthétiques',
     startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000).toISOString(),
     format: 'in-person',
     status: 'published',
     location: { city: 'Lyon', venue: 'Tech Hub' },
-    coverImage: '',
-    category: 'ARTS',
+    coverImage: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=600',
+    category: 'DESIGN',
     capacity: 50,
     stats: { views: 890, registrations: 32, attendees: 0, revenue: 0 },
     organizerName: 'Marie Martin',
-    organizerAvatar: '',
+    organizerAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100',
     createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
     price: 50,
@@ -89,19 +90,19 @@ const DEMO_EVENTS: EventItem[] = [
   },
   {
     id: 'evt_3',
-    title: 'Networking: Entrepreneurs',
-    description: 'Rencontrez d\'autres entrepreneurs et partagez vos expériences',
+    title: 'Rencontre Networking : Dirigeants & Startups 2026',
+    description: 'Échangez avec des experts, investisseurs et développeurs',
     startDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
     endDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
     format: 'hybrid',
     status: 'completed',
     location: { city: 'Marseille', venue: 'Business Center' },
-    coverImage: '',
+    coverImage: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=600',
     category: 'BUSINESS',
     capacity: 200,
     stats: { views: 2100, registrations: 150, attendees: 120, revenue: 7500 },
     organizerName: 'Pierre Durand',
-    organizerAvatar: '',
+    organizerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
     createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     publishedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
     price: 50,
@@ -117,30 +118,82 @@ export default function EventsPro() {
   const { resolvedTheme } = useTheme()
   const { isAuthenticated } = useAuth()
 
-  const [events, setEvents] = useState<EventItem[]>([])
-
-  // Fetch events from API
-  useEffect(() => {
-    const fetchEvents = async () => {
+  // SWR query avec chargement instantané (0ms) depuis le cache
+  const {
+    data: cachedEvents,
+    isLoading: loading,
+    refetch: loadEvents,
+    setData: setEvents
+  } = useQuery<EventItem[]>(
+    async () => {
       try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) return
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+        if (!token) {
+          return DEMO_EVENTS
+        }
 
         const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          setEvents(data.results || data)
+        if (!response.ok) {
+          return DEMO_EVENTS
         }
+
+        const data = await response.json()
+        const rawEvents = Array.isArray(data) ? data : (data.results || [])
+        
+        if (rawEvents.length === 0) return DEMO_EVENTS
+
+        return rawEvents.map((item: any) => ({
+          id: String(item.id),
+          title: item.title || item.name,
+          description: item.description,
+          startDate: item.date_debut || item.start_date,
+          endDate: item.date_fin || item.end_date,
+          format: item.format || 'virtual',
+          status: item.status || 'draft',
+          location: item.location ? { city: item.location, venue: item.venue || '' } : undefined,
+          coverImage: item.cover || item.cover_image,
+          category: item.categorie || item.category || 'OTHER',
+          capacity: item.capacite || item.capacity || 100,
+          stats: { 
+            views: item.views || 0, 
+            registrations: item.registrations || 0, 
+            attendees: item.attendees || 0, 
+            revenue: item.revenue || 0 
+          },
+          organizerName: item.organizer_name || 'Organisateur',
+          organizerAvatar: item.organizer_avatar,
+          createdAt: item.created_at,
+          publishedAt: item.published_at,
+          price: item.price || 0,
+          isLive: item.status === 'live' || item.is_live || false,
+          liveRoomName: item.live_room_name,
+          liveStatus: item.live_status,
+          speaker: item.speaker,
+          jitsiRoom: item.jitsi_room,
+          participantsCount: item.participants_count,
+          maxParticipants: item.max_participants,
+          reactions: item.reactions,
+          isRegistered: item.is_registered
+        }))
       } catch (error) {
-        console.error('Failed to fetch events:', error)
-        setEvents([])
+        console.error('Error loading events:', error)
+        return DEMO_EVENTS
       }
+    },
+    {
+      cacheKey: 'pro:events:list',
+      cacheTime: 5 * 60 * 1000,
+      initialData: DEMO_EVENTS
     }
-    fetchEvents()
-  }, [])
+  )
+
+  const events = cachedEvents || DEMO_EVENTS
 
   // Fonction de navigation conditionnelle
   const handleBack = () => {
@@ -151,13 +204,13 @@ export default function EventsPro() {
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
       setShowCreateModal(true)
-      // Remove the query param from URL
       navigate('/pro/events', { replace: true })
     }
   }, [searchParams, navigate])
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'all' | 'published' | 'draft' | 'live'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'live' | 'past' | 'mine'>('all')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null)
   const [showTicketModal, setShowTicketModal] = useState(false)
@@ -165,10 +218,21 @@ export default function EventsPro() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  // Set active tab from URL parameter
+  const CATEGORIES = [
+    { id: 'all', label: 'Toutes' },
+    { id: 'TECHNOLOGY', label: '💻 Technologie' },
+    { id: 'BUSINESS', label: '📈 Business & Finance' },
+    { id: 'DESIGN', label: '🎨 Design & UI/UX' },
+    { id: 'HEALTH', label: '🏥 Santé & Bien-être' },
+    { id: 'LAW', label: '⚖️ Droit & Fiscalité' },
+    { id: 'MARKETING', label: '📣 Marketing' },
+    { id: 'EDUCATION', label: '🎓 Masterclass' }
+  ]
+
+  // Set active tab or open create from URL
   useEffect(() => {
     const tabParam = searchParams.get('tab')
-    if (tabParam === 'published' || tabParam === 'draft' || tabParam === 'live') {
+    if (tabParam === 'upcoming' || tabParam === 'live' || tabParam === 'past' || tabParam === 'mine') {
       setActiveTab(tabParam)
     }
   }, [searchParams])
@@ -182,107 +246,71 @@ export default function EventsPro() {
     }
   }, [showCreateModal])
 
-  useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          // Fallback to localStorage if not authenticated
-          const saved = localStorage.getItem('exile_events_v2')
-          if (saved) {
-            setEvents(JSON.parse(saved) as EventItem[])
-          } else {
-            setEvents(DEMO_EVENTS)
-            localStorage.setItem('exile_events_v2', JSON.stringify(DEMO_EVENTS))
-          }
-          return
-        }
-
-        // Fetch events from backend
-        const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch events')
-        }
-
-        const data = await response.json()
-        
-        // Transform backend data to frontend format
-        const transformedEvents: EventItem[] = data.map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          startDate: item.start_date,
-          endDate: item.end_date,
-          format: item.format || 'virtual',
-          status: item.status || 'draft',
-          location: item.location ? { city: item.location, venue: item.venue || '' } : undefined,
-          coverImage: item.cover_image,
-          category: item.category || 'OTHER',
-          capacity: item.capacity || 100,
-          stats: { 
-            views: item.views || 0, 
-            registrations: item.registrations || 0, 
-            attendees: item.attendees || 0, 
-            revenue: item.revenue || 0 
-          },
-          organizerName: item.organizer_name || 'Organisateur',
-          organizerAvatar: item.organizer_avatar,
-          createdAt: item.created_at,
-          publishedAt: item.published_at,
-          price: item.price || 0,
-          isLive: item.is_live || false,
-          liveRoomName: item.live_room_name,
-          liveStatus: item.live_status,
-          speaker: item.speaker,
-          jitsiRoom: item.jitsi_room,
-          participantsCount: item.participants_count,
-          maxParticipants: item.max_participants,
-          reactions: item.reactions,
-          isRegistered: item.is_registered
-        }))
-
-        setEvents(transformedEvents)
-        localStorage.setItem('exile_events_v2', JSON.stringify(transformedEvents))
-      } catch (error) {
-        console.error('Error loading events:', error);
-        // Fallback to localStorage if API fails
-        const saved = localStorage.getItem('exile_events_v2')
-        if (saved) {
-          setEvents(JSON.parse(saved) as EventItem[])
-        } else {
-          setEvents(DEMO_EVENTS)
-          localStorage.setItem('exile_events_v2', JSON.stringify(DEMO_EVENTS))
-        }
-      }
-    };
-    loadEvents();
-  }, [])
-
-  useEffect(() => {
-    const saveEvents = async () => {
-      if (events.length > 0) {
-        try {
-          // Note: This would need to be updated to use API calls for individual event updates
-          // For now, we keep localStorage as a cache
-          localStorage.setItem('exile_events_v2', JSON.stringify(events))
-        } catch (error) {
-          console.error('Error saving events:', error);
-        }
-      }
-    };
-    saveEvents();
-  }, [events])
-
   const showToastMsg = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
   }, [])
+
+  const handleShareEvent = useCallback(async (event: EventItem) => {
+    const shareUrl = `${window.location.origin}/pro/events/${event.id}/preview`
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: event.title,
+          text: `Rejoignez l'événement "${event.title}" sur EXILE`,
+          url: shareUrl
+        })
+        showToastMsg('✓ Événement partagé !')
+        return
+      } catch (e) {}
+    }
+    navigator.clipboard?.writeText(shareUrl)
+    showToastMsg('🔗 Lien de l\'événement copié dans le presse-papier !')
+  }, [showToastMsg])
+
+  const handleToggleRegister = useCallback((event: EventItem) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+    setEvents(prev => prev.map(e => {
+      if (e.id === event.id) {
+        const newRegistered = !e.isRegistered
+        return {
+          ...e,
+          isRegistered: newRegistered,
+          stats: {
+            ...e.stats,
+            registrations: newRegistered ? e.stats.registrations + 1 : Math.max(0, e.stats.registrations - 1)
+          }
+        }
+      }
+      return e
+    }))
+    showToastMsg(event.isRegistered ? 'Inscription annulée' : '🎉 Inscription confirmée avec succès !')
+  }, [isAuthenticated, navigate, setEvents, showToastMsg])
+
+  const addToGoogleCalendar = useCallback((event: EventItem) => {
+    const start = new Date(event.startDate).toISOString().replace(/-|:|\.\d\d\d/g, '')
+    const end = new Date(event.endDate).toISOString().replace(/-|:|\.\d\d\d/g, '')
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${start}/${end}&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.location?.venue || 'En ligne')}`
+    window.open(url, '_blank')
+  }, [])
+
+  const downloadICS = useCallback((event: EventItem) => {
+    const start = new Date(event.startDate).toISOString().replace(/-|:|\.\d\d\d/g, '')
+    const end = new Date(event.endDate).toISOString().replace(/-|:|\.\d\d\d/g, '')
+    const icsData = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//EXILE Platform//NONSGML v1.0//FR\nBEGIN:VEVENT\nSUMMARY:${event.title}\nDESCRIPTION:${event.description}\nLOCATION:${event.location?.venue || 'En ligne'}\nDTSTART:${start}\nDTEND:${end}\nEND:VEVENT\nEND:VCALENDAR`
+    
+    const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.setAttribute('download', `${event.title.replace(/\s+/g, '_')}.ics`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    showToastMsg('📅 Fichier calendrier (.ics) téléchargé !')
+  }, [showToastMsg])
 
   const createEvent = useCallback((data: Omit<EventItem, 'id' | 'createdAt' | 'stats'>) => {
     if (!isAuthenticated) {
@@ -329,180 +357,237 @@ export default function EventsPro() {
     }
   }, [navigate])
 
+  const isUpcoming = (date: string) => new Date(date) > new Date()
+  const isPast = (date: string) => new Date(date) < new Date()
+
+  // Live priority events
+  const activeLiveEvents = events.filter(e => e.isLive)
+
   const filtered = events.filter(e => {
-    if (activeTab === 'live') return e.isLive
-    if (activeTab !== 'all' && e.status !== activeTab) return false
+    // Catégorie
+    if (selectedCategory !== 'all' && e.category !== selectedCategory) return false
+
+    // Onglet horizontal
+    if (activeTab === 'live') {
+      if (!e.isLive) return false
+    } else if (activeTab === 'upcoming') {
+      if (!isUpcoming(e.startDate) || e.isLive) return false
+    } else if (activeTab === 'past') {
+      if (!isPast(e.endDate || e.startDate) || e.isLive) return false
+    } else if (activeTab === 'mine') {
+      if (!e.isRegistered && e.status !== 'draft') return false
+    }
+
+    // Recherche
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      return e.title.toLowerCase().includes(q) || e.description.toLowerCase().includes(q)
+      return (
+        e.title.toLowerCase().includes(q) ||
+        e.description.toLowerCase().includes(q) ||
+        e.organizerName.toLowerCase().includes(q) ||
+        (e.location?.city && e.location.city.toLowerCase().includes(q))
+      )
     }
     return true
-  }).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+  }).sort((a, b) => {
+    if (a.isLive && !b.isLive) return -1
+    if (!a.isLive && b.isLive) return 1
+    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  })
 
   const formatDate = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
-  const isUpcoming = (date: string) => new Date(date) > new Date()
-
   // ============ RENDU ============
   return (
-    <div className={`flex-1 flex flex-col ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-16 sm:pb-20`}>
+    <div className={`flex-1 h-full min-h-0 flex flex-col overflow-hidden ${resolvedTheme === 'dark' ? 'bg-[#0b0e14] text-zinc-100' : 'bg-slate-50 text-slate-900'} transition-colors`}>
       {/* TOAST */}
       {toast && (
-        <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-[100] bg-emerald-500/90 backdrop-blur text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium shadow-xl animate-in fade-in slide-in-from-top-2">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-zinc-900 text-white border border-zinc-700/80 px-4 sm:px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-2xl animate-in fade-in slide-in-from-top-2">
           {toast}
         </div>
       )}
 
-      {/* HEADER - Compact pour desktop */}
-      <div className={`fixed top-0 left-0 right-0 w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} backdrop-blur-lg border-b z-[100] px-3 sm:px-4 py-2.5 sm:py-3 md:py-2 md:mt-0 shadow-md`}>
-        {/* Mobile: Vertical layout */}
-        <div className="md:hidden flex flex-col gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
+      {/* ── EN-TÊTE FULL-WIDTH FLUSH AU TOP (Même design que Demandes) ── */}
+      <div className={`flex-shrink-0 p-3.5 border-b backdrop-blur-xl ${resolvedTheme === 'dark' ? 'border-white/5 bg-black/40' : 'border-slate-200 bg-white/80'}`}>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handleBack}
-              className={`p-1.5 sm:p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-800' : 'hover:bg-gray-200'} transition-colors`}
+              className={`p-2 rounded-xl transition-colors ${resolvedTheme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+              title="Retour"
             >
-              <ArrowLeft className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+              <ArrowLeft size={18} />
             </button>
-            <div className="flex-1">
-              <h1 className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} tracking-tight`}>Événements</h1>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF6B00] to-orange-400 flex items-center justify-center text-white shadow-sm">
+              <Calendar size={18} />
             </div>
-            <button
-              onClick={() => isAuthenticated ? setShowCreateModal(true) : navigate('/login')}
-              className="flex items-center gap-1.5 sm:gap-2 bg-primary text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Créer</span>
-              <span className="sm:hidden">+</span>
-            </button>
+            <div>
+              <h1 className="font-bold text-base leading-tight">
+                Événements & Live
+              </h1>
+            </div>
           </div>
 
-          {/* STATS - Mobile */}
-          <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide">
-            {[
-              { icon: Calendar, value: events.filter(e => e.status === 'published').length, label: 'Publiés', color: resolvedTheme === 'dark' ? 'text-emerald-400' : 'text-emerald-600', bg: resolvedTheme === 'dark' ? 'bg-emerald-900/30' : 'bg-emerald-100' },
-              { icon: Users, value: events.reduce((s, e) => s + e.stats.registrations, 0), label: 'Inscrits', color: resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600', bg: resolvedTheme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100' },
-              { icon: Radio, value: events.filter(e => e.isLive).length, label: 'Live', color: resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600', bg: resolvedTheme === 'dark' ? 'bg-red-900/30' : 'bg-red-100' },
-            ].map((s, i) => (
-              <div key={i} className={`flex-shrink-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl border px-2 sm:px-3 py-1.5 sm:py-2 flex items-center gap-2 sm:gap-2.5 min-w-[70px] sm:min-w-[80px]`}>
-                <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-lg ${s.bg} flex items-center justify-center`}>
-                  <s.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${s.color}`} />
-                </div>
-                <div>
-                  <p className={`text-xs sm:text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} leading-tight`}>{s.value}</p>
-                  <p className={`text-[9px] sm:text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{s.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* TABS + SEARCH - Mobile */}
-          <div className="flex gap-1.5 sm:gap-2">
-            <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1">
-              {(['all', 'published', 'draft', 'live'] as const).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-medium whitespace-nowrap transition-all ${
-                    activeTab === tab
-                      ? 'bg-primary text-white'
-                      : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-400 border-zinc-600 hover:text-zinc-200' : 'bg-white text-gray-600 border-gray-200 hover:text-gray-900'
-                  }`}
-                >
-                  {tab === 'all' && 'Tous'}
-                  {tab === 'published' && 'Publiés'}
-                  {tab === 'draft' && 'Brouillons'}
-                  {tab === 'live' && 'Live'}
-                </button>
-              ))}
-            </div>
-            <div className="relative w-28 sm:w-32 flex-shrink-0">
-              <Search className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Rechercher..."
-                className={`w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'} border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-              />
-            </div>
-          </div>
+          <button
+            onClick={() => isAuthenticated ? setShowCreateModal(true) : navigate('/login')}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl shadow-md text-xs font-bold transition-all active:scale-95 flex-shrink-0"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">Créer un événement</span>
+            <span className="sm:hidden">Créer</span>
+          </button>
         </div>
 
-        {/* Desktop: Horizontal compact layout */}
-        <div className="hidden md:flex items-center gap-2 sm:gap-4">
-          <button
-            onClick={handleBack}
-            className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-800' : 'hover:bg-gray-200'} transition-colors`}
-          >
-            <ArrowLeft className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
-          </button>
-          <h1 className={`text-base sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} tracking-tight`}>Événements</h1>
+        {/* Search Bar */}
+        <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'}`}>
+          <Search size={15} className={resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Rechercher par titre, intervenant ou ville..."
+            className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-200">
+              <X size={13} />
+            </button>
+          )}
+        </div>
 
-          {/* STATS - Desktop horizontal */}
-          <div className="flex gap-1.5 sm:gap-2">
-            {[
-              { icon: Calendar, value: events.filter(e => e.status === 'published').length, label: 'Publiés', color: resolvedTheme === 'dark' ? 'text-emerald-400' : 'text-emerald-600', bg: resolvedTheme === 'dark' ? 'bg-emerald-900/30' : 'bg-emerald-100' },
-              { icon: Users, value: events.reduce((s, e) => s + e.stats.registrations, 0), label: 'Inscrits', color: resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600', bg: resolvedTheme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100' },
-              { icon: Radio, value: events.filter(e => e.isLive).length, label: 'Live', color: resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600', bg: resolvedTheme === 'dark' ? 'bg-red-900/30' : 'bg-red-100' },
-            ].map((s, i) => (
-              <div key={i} className={`flex-shrink-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} rounded-lg border px-1.5 sm:px-2 py-0.5 sm:py-1 flex items-center gap-1.5 sm:gap-2`}>
-                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded ${s.bg} flex items-center justify-center`}>
-                  <s.icon className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${s.color}`} />
-                </div>
-                <div>
-                  <p className={`text-[10px] sm:text-xs font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} leading-tight`}>{s.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* TABS - Desktop */}
-          <div className="flex gap-1">
-            {(['all', 'published', 'draft', 'live'] as const).map(tab => (
+        {/* 1. STATUS TABS FILTER (YouTube Style) */}
+        <div className="flex gap-1.5 pt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {[
+            { id: 'all', label: 'Tous', count: events.length },
+            { id: 'upcoming', label: 'À venir', count: events.filter(e => isUpcoming(e.startDate) && !e.isLive).length },
+            { id: 'live', label: 'En direct', count: activeLiveEvents.length },
+            { id: 'past', label: 'Passés', count: events.filter(e => isPast(e.endDate || e.startDate) && !e.isLive).length },
+            { id: 'mine', label: 'Mes événements', count: events.filter(e => e.isRegistered || e.status === 'draft').length }
+          ].map(tab => {
+            const active = activeTab === tab.id
+            return (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium whitespace-nowrap transition-all ${
-                  activeTab === tab
-                    ? 'bg-primary text-white'
-                    : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-400 border-zinc-600 hover:text-zinc-200' : 'bg-white text-gray-600 border-gray-200 hover:text-gray-900'
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  active
+                    ? 'bg-[#FF6B00] text-white shadow-md shadow-[#FF6B00]/25'
+                    : resolvedTheme === 'dark'
+                    ? 'text-zinc-300 hover:text-white hover:bg-zinc-800/80 bg-zinc-800/40'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-100/70'
                 }`}
               >
-                {tab === 'all' && 'Tous'}
-                {tab === 'published' && 'Publiés'}
-                {tab === 'draft' && 'Brouillons'}
-                {tab === 'live' && 'Live'}
+                {tab.id === 'live' && activeLiveEvents.length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                )}
+                <span>{tab.label}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${active ? 'bg-white/20 text-white' : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300' : 'bg-slate-200 text-slate-700'}`}>
+                  {tab.count}
+                </span>
               </button>
-            ))}
-          </div>
+            )
+          })}
+        </div>
 
-          {/* SEARCH - Desktop */}
-          <div className="relative w-36 sm:w-48 flex-shrink-0">
-            <Search className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Rechercher..."
-              className={`w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1 sm:py-1.5 text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'} border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-            />
-          </div>
-
-          <div className="flex-1" />
-
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 sm:gap-2 bg-primary text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-colors active:scale-95"
-          >
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            Créer
-          </button>
+        {/* 2. CATEGORIES HORIZONTAL SCROLL CHIPS */}
+        <div className="flex gap-1.5 overflow-x-auto pt-2 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+          {CATEGORIES.map(cat => {
+            const isSelected = selectedCategory === cat.id
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
+                  isSelected
+                    ? 'bg-zinc-800 text-[#FF6B00] border border-[#FF6B00]/50 font-bold'
+                    : resolvedTheme === 'dark'
+                    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-800/20 border border-zinc-800'
+                    : 'text-slate-600 hover:text-slate-900 bg-slate-100/80 border border-slate-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* LISTE EVENMAN */}
-      <div className="w-full px-3 sm:px-4 py-4 sm:py-6 pt-48 sm:pt-56 md:pt-20 pb-20 sm:pb-24 md:pb-6">
+      {/* Contenu principal défilant */}
+      <div className="flex-1 overflow-y-auto w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 pb-20 md:pb-8">
+
+        {/* ─── 3. PRIORITY SECTION: LIVES EN DIRECT MAINTENANT ─── */}
+        {activeLiveEvents.length > 0 && activeTab !== 'past' && (
+          <div className="mb-6 space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+              <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-red-500 flex items-center gap-1.5">
+                <span>En Direct Maintenant</span>
+                <span className="px-1.5 py-0.2 bg-red-600/15 text-red-500 text-[10px] rounded-md font-bold">
+                  {activeLiveEvents.length} LIVE
+                </span>
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeLiveEvents.map(liveEvt => (
+                <div
+                  key={`live-featured-${liveEvt.id}`}
+                  className={`relative rounded-3xl border overflow-hidden p-4 flex flex-col justify-between ${
+                    resolvedTheme === 'dark'
+                      ? 'bg-gradient-to-br from-red-950/30 via-zinc-900/90 to-zinc-900 border-red-500/30 shadow-lg shadow-red-950/20'
+                      : 'bg-gradient-to-br from-red-50 to-white border-red-200 shadow-md'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-full bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 animate-pulse shadow-md">
+                        <Radio className="w-3 h-3" />
+                        EN DIRECT
+                      </span>
+                      <span className="text-[11px] font-semibold text-red-400 flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        {liveEvt.participantsCount || liveEvt.stats.attendees || 42} participants
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <h3
+                      onClick={() => navigate(`/pro/events/${liveEvt.id}/preview`)}
+                      className="text-sm sm:text-base font-bold cursor-pointer hover:text-red-400 transition-colors line-clamp-2"
+                    >
+                      {liveEvt.title}
+                    </h3>
+                    <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-600'} line-clamp-2`}>
+                      {liveEvt.description}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-3 border-t border-red-500/20">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <img
+                        src={liveEvt.organizerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                        alt={liveEvt.organizerName}
+                        className="w-7 h-7 rounded-full object-cover border border-red-500/40 flex-shrink-0"
+                      />
+                      <span className="text-xs font-semibold truncate">{liveEvt.organizerName}</span>
+                    </div>
+
+                    <button
+                      onClick={() => startLive(liveEvt)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/30 flex items-center gap-1.5 active:scale-95 transition-all flex-shrink-0"
+                    >
+                      <Video className="w-3.5 h-3.5" />
+                      <span>Rejoindre le Direct</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* LISTE EVENMAN */}
         {filtered.length === 0 ? (
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} rounded-2xl border p-4 sm:p-6 md:p-12 text-center`}>
             <Calendar className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'} mx-auto mb-2 sm:mb-3`} />
@@ -511,137 +596,163 @@ export default function EventsPro() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {filtered.map(event => (
-              <div key={event.id} className={`group ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700 hover:border-zinc-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-xl md:rounded-2xl border overflow-hidden transition-all active:scale-[0.99]`}>
-                {/* KOUVRI */}
-                <div className={`relative h-36 sm:h-48 md:h-40 lg:h-36 xl:h-40 ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-100'} overflow-hidden w-full`}>
-                  {event.coverImage ? (
-                    <img src={event.coverImage} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                  ) : (
-                    <div className={`w-full h-full bg-gradient-to-br ${resolvedTheme === 'dark' ? 'from-zinc-800 via-zinc-900 to-black' : 'from-gray-200 via-gray-300 to-gray-400'} flex items-center justify-center`}>
-                      <Calendar className={`w-8 h-8 sm:w-10 sm:h-10 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'}`} />
-                    </div>
-                  )}
-                  <div className={`absolute inset-0 bg-gradient-to-t ${resolvedTheme === 'dark' ? 'from-black' : 'from-gray-900/80'} via-transparent to-transparent`} />
+              <div key={event.id} className={`group ${resolvedTheme === 'dark' ? 'bg-zinc-900/70 border-zinc-800/80 hover:bg-zinc-900 hover:border-zinc-700' : 'bg-white border-slate-200 hover:shadow-md'} rounded-3xl border overflow-hidden transition-all flex flex-col justify-between`}>
+                <div>
+                  {/* KOUVRI */}
+                  <div className={`relative h-40 sm:h-44 ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-slate-100'} overflow-hidden w-full`}>
+                    {event.coverImage ? (
+                      <img src={event.coverImage} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className={`w-full h-full bg-gradient-to-br ${resolvedTheme === 'dark' ? 'from-zinc-800 to-zinc-950' : 'from-slate-100 to-slate-300'} flex items-center justify-center`}>
+                        <Calendar className={`w-10 h-10 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-slate-400'}`} />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-                  {/* BADGES */}
-                  <div className="absolute top-1.5 sm:top-2 left-1.5 sm:left-2 flex gap-1 sm:gap-1.5">
+                    {/* BADGES */}
+                    <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                      {event.isLive && (
+                        <span className="bg-red-600/90 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1">
+                          <Radio className="w-2.5 h-2.5" />
+                          En Direct
+                        </span>
+                      )}
+                      {!event.isLive && event.status === 'published' && isUpcoming(event.startDate) && (
+                        <span className="bg-emerald-600/90 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          À venir
+                        </span>
+                      )}
+                      {event.status === 'draft' && (
+                        <span className="bg-zinc-700/90 backdrop-blur text-zinc-300 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Brouillon
+                        </span>
+                      )}
+                      {event.isRegistered && (
+                        <span className="bg-[#FF6B00] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          Inscrit
+                        </span>
+                      )}
+                    </div>
+
+                    {/* ACTION RAPIDE: LIVE */}
                     {event.isLive && (
-                      <span className="bg-red-600/90 backdrop-blur text-white text-[8px] sm:text-[9px] md:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-0.5 md:px-2.5 md:py-1 rounded-full uppercase tracking-wider animate-pulse">
-                        <Radio className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 inline mr-0.5 sm:mr-1" />
-                        Live
-                      </span>
-                    )}
-                    {!event.isLive && event.status === 'published' && isUpcoming(event.startDate) && (
-                      <span className="bg-emerald-600/90 backdrop-blur text-white text-[8px] sm:text-[9px] md:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-0.5 md:px-2.5 md:py-1 rounded-full uppercase tracking-wider">
-                        À venir
-                      </span>
-                    )}
-                    {event.status === 'draft' && (
-                      <span className={`${resolvedTheme === 'dark' ? 'bg-zinc-700/90 text-zinc-300' : 'bg-gray-600/90 text-gray-200'} backdrop-blur text-[8px] sm:text-[9px] md:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-0.5 md:px-2.5 md:py-1 rounded-full uppercase tracking-wider`}>
-                        Brouillon
-                      </span>
+                      <button
+                        onClick={() => navigate(`/pro/events/${event.id}/preview`)}
+                        className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xl bg-red-600 hover:bg-red-700 text-white animate-pulse"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Rejoindre</span>
+                      </button>
                     )}
                   </div>
 
-                  {/* ACTION RAPIDE: LIVE */}
-                  {event.isLive && (
-                    <button
-                      onClick={() => navigate(`/pro/events/${event.id}/preview`)}
-                      className={`absolute bottom-2 sm:bottom-3 right-2 sm:right-3 px-2 sm:px-3 sm:px-4 py-1 sm:py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs sm:text-sm font-bold transition-all flex items-center gap-1 sm:gap-2 shadow-xl animate-pulse ${
-                        resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-white text-gray-900 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Video className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">Rejoindre</span>
-                      <span className="sm:hidden">Rejoindre</span>
-                    </button>
-                  )}
+                  {/* TITRE & DESCRIPTION */}
+                  <div className="p-3.5 space-y-2">
+                    <h3 className={`text-xs sm:text-sm font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-slate-900'} leading-snug line-clamp-2`}>
+                      {event.title}
+                    </h3>
+                    <p className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'} line-clamp-2`}>
+                      {event.description}
+                    </p>
+
+                    {/* META INFOS */}
+                    <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-medium pt-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-[#FF6B00]" />
+                        {formatDate(event.startDate)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {event.format === 'virtual' ? (
+                          <><Video className="w-3 h-3 text-blue-400" /> En ligne</>
+                        ) : (
+                          <><MapPin className="w-3 h-3 text-emerald-400" /> {event.location?.city || 'Sur place'}</>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3 h-3 text-purple-400" />
+                        {event.stats.registrations}/{event.capacity}
+                      </span>
+                    </div>
+
+                    {/* ORGANISATEUR */}
+                    <div className={`flex items-center gap-2 pt-2 border-t ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-slate-100'}`}>
+                      <div className="w-6 h-6 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                        {event.organizerAvatar ? <img src={event.organizerAvatar} className="w-full h-full rounded-full object-cover" /> : event.organizerName.charAt(0)}
+                      </div>
+                      <span className={`text-[11px] font-medium truncate ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        {event.organizerName}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* TIT */}
-                <div className="p-2.5 sm:p-3 md:p-2 lg:p-2">
-                  <h3 className={`text-xs sm:text-sm md:text-sm lg:text-xs font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-1 md:mb-1 lg:mb-1 leading-tight line-clamp-2`}>{event.title}</h3>
-                  <p className={`text-[10px] sm:text-xs md:text-xs lg:text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1.5 sm:mb-2 md:mb-2 lg:mb-2 line-clamp-1`}>{event.description}</p>
-
-                  {/* INFO */}
-                  <div className={`flex flex-wrap gap-x-1.5 sm:gap-x-2 gap-y-0.5 sm:gap-y-1 text-[10px] sm:text-xs md:text-xs lg:text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1.5 sm:mb-2 md:mb-2 lg:mb-2`}>
-                    <span className="flex items-center gap-0.5">
-                      <Clock className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-2.5 md:h-2.5 lg:w-2 lg:h-2" />
-                      {formatDate(event.startDate)}
-                    </span>
-                    <span className="flex items-center gap-0.5">
-                      {event.format === 'virtual' ? (
-                        <><Video className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-2.5 md:h-2.5 lg:w-2 lg:h-2" /> En ligne</>
-                      ) : (
-                        <><MapPin className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-2.5 md:h-2.5 lg:w-2 lg:h-2" /> {event.location?.city}</>
-                      )}
-                    </span>
-                    <span className="flex items-center gap-0.5">
-                      <Users className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-2.5 md:h-2.5 lg:w-2 lg:h-2" />
-                      {event.stats.registrations}/{event.capacity}
-                    </span>
-                  </div>
-
-                  {/* ORGANIZATEUR */}
-                  <div className={`flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 md:mb-2 lg:mb-2 pb-1.5 sm:pb-2 md:pb-2 lg:pb-2 border-b ${resolvedTheme === 'dark' ? 'border-zinc-700' : 'border-gray-200'}`}>
-                    <div className="w-5 h-5 sm:w-6 sm:h-6 md:w-5 md:h-5 lg:w-4 lg:h-4 rounded-full bg-blue-600 flex items-center justify-center text-white text-[9px] sm:text-[10px] md:text-[10px] lg:text-[9px] font-bold">
-                      {event.organizerAvatar ? <img src={event.organizerAvatar} className="w-full h-full rounded-full object-cover" /> : event.organizerName.charAt(0)}
-                    </div>
-                    <span className={`text-[10px] sm:text-xs md:text-xs lg:text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} truncate`}>{event.organizerName}</span>
-                  </div>
-
-                  {/* AKSIYON */}
-                  <div className="flex flex-wrap gap-0.5 sm:gap-1 md:gap-1 lg:gap-1">
-                    {event.status === 'draft' && (
-                      <button
-                        onClick={() => publishEvent(event.id)}
-                        className={`flex-1 min-w-[60px] sm:min-w-[80px] flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800/40 hover:bg-emerald-900/50' : 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'} border rounded-xl text-[10px] sm:text-xs font-medium transition-colors`}
-                      >
-                        <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">Publier</span>
-                        <span className="sm:hidden">Publier</span>
-                      </button>
-                    )}
-
-                    {!event.isLive && event.status === 'published' && (
-                      <button
-                        onClick={() => {
-                          setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isLive: true, liveRoomName: `exile-${event.id}` } : e))
-                          startLive({ ...event, isLive: true, liveRoomName: `exile-${event.id}` })
-                        }}
-                        className={`flex-1 min-w-[60px] sm:min-w-[80px] flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-red-900/30 text-red-400 border-red-800/40 hover:bg-red-900/50' : 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200'} border rounded-xl text-[10px] sm:text-xs font-medium transition-colors`}
-                      >
-                        <Radio className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">Live</span>
-                        <span className="sm:hidden">Live</span>
-                      </button>
-                    )}
-
+                {/* BOUTONS D'ACTIONS EN BAS DE CARTE */}
+                <div className={`p-3 pt-0 flex flex-col gap-2`}>
+                  {/* Bouton d'inscription / participation principale */}
+                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => { setSelectedEvent(event); setShowTicketModal(true) }}
-                      className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-xl text-[10px] sm:text-xs font-medium transition-colors`}
+                      onClick={() => handleToggleRegister(event)}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                        event.isRegistered
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-[#FF6B00]/25'
+                      }`}
                     >
-                      <Ticket className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">Ticket</span>
-                      <span className="sm:hidden">Ticket</span>
+                      {event.isRegistered ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Inscrit ✓</span>
+                        </>
+                      ) : (
+                        <>
+                          <Ticket className="w-3.5 h-3.5" />
+                          <span>S'inscrire ({event.price === 0 ? 'Gratuit' : `${event.price}$`})</span>
+                        </>
+                      )}
                     </button>
 
+                    {/* Partager */}
+                    <button
+                      onClick={() => handleShareEvent(event)}
+                      className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
+                        resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
+                      }`}
+                      title="Partager l'événement"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Google Calendar */}
+                    <button
+                      onClick={() => addToGoogleCalendar(event)}
+                      className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
+                        resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
+                      }`}
+                      title="Ajouter au calendrier Google"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Boutons secondaires (Stats / Supprimer si organisateur) */}
+                  <div className="flex items-center justify-between text-[11px] pt-1">
                     <button
                       onClick={() => { setSelectedEvent(event); setShowStatsModal(true) }}
-                      className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-xl text-[10px] sm:text-xs font-medium transition-colors`}
+                      className={`font-semibold transition-colors flex items-center gap-1 ${
+                        resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-800'
+                      }`}
                     >
-                      <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">Stats</span>
-                      <span className="sm:hidden">Stats</span>
+                      <BarChart3 className="w-3 h-3" />
+                      <span>Statistiques</span>
                     </button>
 
                     <button
                       onClick={() => deleteEvent(event.id)}
-                      className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-red-900/30 text-red-400 border-red-800/40 hover:bg-red-900/50' : 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200'} border rounded-xl text-[10px] sm:text-xs font-medium transition-colors`}
+                      className="text-red-400 hover:text-red-500 font-semibold transition-colors flex items-center gap-1"
                     >
-                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">Supprimer</span>
-                      <span className="sm:hidden">Supprimer</span>
+                      <Trash2 className="w-3 h-3" />
+                      <span>Supprimer</span>
                     </button>
                   </div>
                 </div>
@@ -719,11 +830,11 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
     price: 0,
     location: { city: '', venue: '' },
     coverImage: '' as string,
-    // Live & Jitsi fields
+    // Live & Direct fields
     liveStatus: 'at_coming' as 'at_coming' | 'live' | 'ended',
     speakerName: '',
     speakerAvatar: '' as string,
-    jitsiRoom: '',
+    liveRoomName: '',
     maxParticipants: 100
   })
   const [coverImagePreview, setCoverImagePreview] = useState<string | null>(null)
@@ -839,35 +950,56 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
       isLive: false,
       organizerName: 'Moi',
       organizerAvatar: null,
-      // Live & Jitsi fields
-      liveStatus: form.liveStatus,
-      ...(form.speakerName && { speaker: { name: form.speakerName, avatar: form.speakerAvatar || undefined } }),
-      ...(form.jitsiRoom && { jitsiRoom: form.jitsiRoom }),
-      maxParticipants: form.maxParticipants,
-      participantsCount: 0,
-      reactions: { thumbs_up: 0, clap: 0, bulb: 0, heart: 0 },
       isRegistered: false
     })
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center">
-      <div className={`${resolvedTheme === 'dark' ? 'bg-[#0f0f0f] border-zinc-800' : 'bg-white border-gray-200'} md:rounded-2xl rounded-t-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border-t md:border`}>
-        {/* Header */}
-        <div className={`sticky top-0 ${resolvedTheme === 'dark' ? 'bg-[#0f0f0f] border-zinc-800' : 'bg-white border-gray-200'} border-b px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between z-10`}>
-          <h2 className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Nouvel événement</h2>
-          <button onClick={onClose} className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-800' : 'hover:bg-gray-100'} rounded-full transition-colors`}>
-            <X className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`} />
+    <div className="fixed inset-0 z-[99999] bg-black/80 md:backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
+      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-950 md:bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'} h-full w-full md:h-auto md:max-h-[92vh] md:max-w-2xl md:rounded-3xl flex flex-col overflow-hidden border-0 md:border shadow-2xl`}>
+        
+        {/* Header - Simple & Clean */}
+        <div className={`sticky top-0 ${resolvedTheme === 'dark' ? 'bg-zinc-950 md:bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-slate-200'} border-b px-4 py-3.5 flex items-center justify-between z-10 backdrop-blur`}>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className={`p-2 rounded-xl transition-colors ${resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-slate-100 text-slate-700'}`}
+            >
+              <ArrowLeft className="w-5 h-5 md:hidden" />
+              <X className="w-5 h-5 hidden md:block" />
+            </button>
+            <div>
+              <h2 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-slate-900'}`}>
+                Créer un Événement
+              </h2>
+              <p className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
+                Webinaire, masterclass ou atelier professionnel
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowPreview(true)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+              resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Aperçu
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 pb-20 sm:pb-24 md:pb-6">
+        {/* Scrollable Form Body */}
+        <form id="create-event-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* UPLOAD IMAGE */}
           <div>
-            <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Image de couverture</label>
+            <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+              Image de couverture
+            </label>
             <div
-              className={`relative border-2 border-dashed rounded-xl p-4 sm:p-6 text-center transition-all ${
-                isDragging ? 'border-blue-500 bg-blue-500/10' : resolvedTheme === 'dark' ? 'border-zinc-700 hover:border-zinc-600' : 'border-gray-300 hover:border-gray-400'
+              className={`relative border-2 border-dashed rounded-2xl p-4 sm:p-6 text-center transition-all ${
+                isDragging ? 'border-[#FF6B00] bg-[#FF6B00]/10' : resolvedTheme === 'dark' ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40' : 'border-slate-300 hover:border-slate-400 bg-slate-50'
               }`}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
               onDragLeave={() => setIsDragging(false)}
@@ -875,13 +1007,13 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
             >
               {coverImagePreview ? (
                 <div className="relative">
-                  <img src={coverImagePreview} alt="Preview" className="w-full h-36 sm:h-48 object-cover rounded-lg" />
+                  <img src={coverImagePreview} alt="Preview" className="w-full h-40 sm:h-48 object-cover rounded-xl" />
                   <button
                     type="button"
                     onClick={() => { setCoverImagePreview(null); setForm({ ...form, coverImage: '' }) }}
-                    className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-black/60 text-white p-1.5 sm:p-2 rounded-full hover:bg-black/80 transition-colors"
+                    className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full hover:bg-black transition-colors"
                   >
-                    <X className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
@@ -895,13 +1027,17 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
                   />
                   <label
                     htmlFor="coverImageInput"
-                    className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2"
+                    className="cursor-pointer flex flex-col items-center gap-2"
                   >
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-100'} flex items-center justify-center`}>
-                      <Plus className={`w-5 h-5 sm:w-6 sm:h-6 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`} />
+                    <div className={`w-12 h-12 rounded-2xl ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300' : 'bg-white shadow-sm text-slate-600'} flex items-center justify-center`}>
+                      <Plus className="w-6 h-6" />
                     </div>
-                    <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Cliquez ou glissez une image</p>
-                    <p className={`text-[9px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'}`}>JPEG, PNG, WebP, GIF (max 5MB)</p>
+                    <p className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Ajouter une affiche ou bannière
+                    </p>
+                    <p className={`text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
+                      JPEG, PNG, WebP (max 5MB)
+                    </p>
                   </label>
                 </div>
               )}
@@ -909,271 +1045,203 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
           </div>
 
           <div>
-            <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Titre</label>
-            <div className="relative">
-              <Calendar className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-              <input
-                required
-                value={form.title}
-                onChange={e => { setForm({ ...form, title: e.target.value }); setErrors({ ...errors, title: '' }) }}
-                placeholder="Nom de l'événement (min 5 caractères)"
-                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white placeholder-zinc-600' : 'bg-white text-gray-900 placeholder-gray-400'} border rounded-xl pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 text-xs sm:text-sm focus:outline-none transition-colors ${errors.title ? 'border-red-500 focus:border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-blue-500' : 'border-gray-300 focus:border-blue-500'}`}
-              />
-            </div>
-            {errors.title && <p className="text-[10px] sm:text-xs text-red-500 mt-1">{errors.title}</p>}
+            <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+              Titre de l'événement *
+            </label>
+            <input
+              required
+              value={form.title}
+              onChange={e => { setForm({ ...form, title: e.target.value }); setErrors({ ...errors, title: '' }) }}
+              placeholder="Ex: Masterclass : Optimiser son Architecture Cloud en 2026"
+              className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100 placeholder-zinc-500' : 'bg-slate-50 text-slate-900 placeholder-slate-400'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none transition-colors ${errors.title ? 'border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-[#FF6B00]' : 'border-slate-200 focus:border-[#FF6B00]'}`}
+            />
+            {errors.title && <p className="text-[10px] text-red-500 mt-1">{errors.title}</p>}
           </div>
 
           <div>
-            <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Description</label>
+            <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+              Description *
+            </label>
             <textarea
               value={form.description}
               onChange={e => { setForm({ ...form, description: e.target.value }); setErrors({ ...errors, description: '' }) }}
-              placeholder="Décrivez votre événement... (min 20 caractères)"
+              placeholder="Présentez les thématiques abordées, le public cible et les points clés..."
               rows={3}
-              className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white placeholder-zinc-600' : 'bg-white text-gray-900 placeholder-gray-400'} border rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm focus:outline-none transition-colors resize-none ${errors.description ? 'border-red-500 focus:border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-blue-500' : 'border-gray-300 focus:border-blue-500'}`}
+              className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100 placeholder-zinc-500' : 'bg-slate-50 text-slate-900 placeholder-slate-400'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none transition-colors resize-none ${errors.description ? 'border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-[#FF6B00]' : 'border-slate-200 focus:border-[#FF6B00]'}`}
             />
-            {errors.description && <p className="text-[10px] sm:text-xs text-red-500 mt-1">{errors.description}</p>}
+            {errors.description && <p className="text-[10px] text-red-500 mt-1">{errors.description}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Début</label>
-              <div className="relative">
-                <Clock className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                <input
-                  type="datetime-local"
-                  required
-                  value={form.startDate}
-                  onChange={e => { setForm({ ...form, startDate: e.target.value }); setErrors({ ...errors, startDate: '' }) }}
-                  className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white' : 'bg-white text-gray-900'} border rounded-xl pl-9 sm:pl-10 pr-2 sm:pr-3 py-2 sm:py-3 text-xs sm:text-sm focus:outline-none transition-colors ${errors.startDate ? 'border-red-500 focus:border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-blue-500' : 'border-gray-300 focus:border-blue-500'}`}
-                />
-              </div>
-              {errors.startDate && <p className="text-[10px] sm:text-xs text-red-500 mt-1">{errors.startDate}</p>}
+              <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                Date & Heure de début *
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={form.startDate}
+                onChange={e => { setForm({ ...form, startDate: e.target.value }); setErrors({ ...errors, startDate: '' }) }}
+                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100' : 'bg-slate-50 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none transition-colors ${errors.startDate ? 'border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-[#FF6B00]' : 'border-slate-200 focus:border-[#FF6B00]'}`}
+              />
+              {errors.startDate && <p className="text-[10px] text-red-500 mt-1">{errors.startDate}</p>}
             </div>
             <div>
-              <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Fin</label>
-              <div className="relative">
-                <Clock className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                <input
-                  type="datetime-local"
-                  required
-                  value={form.endDate}
-                  onChange={e => { setForm({ ...form, endDate: e.target.value }); setErrors({ ...errors, endDate: '' }) }}
-                  className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white' : 'bg-white text-gray-900'} border rounded-xl pl-9 sm:pl-10 pr-2 sm:pr-3 py-2 sm:py-3 text-xs sm:text-sm focus:outline-none transition-colors ${errors.endDate ? 'border-red-500 focus:border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-blue-500' : 'border-gray-300 focus:border-blue-500'}`}
-                />
-              </div>
-              {errors.endDate && <p className="text-[10px] sm:text-xs text-red-500 mt-1">{errors.endDate}</p>}
+              <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                Date & Heure de fin *
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={form.endDate}
+                onChange={e => { setForm({ ...form, endDate: e.target.value }); setErrors({ ...errors, endDate: '' }) }}
+                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100' : 'bg-slate-50 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none transition-colors ${errors.endDate ? 'border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-[#FF6B00]' : 'border-slate-200 focus:border-[#FF6B00]'}`}
+              />
+              {errors.endDate && <p className="text-[10px] text-red-500 mt-1">{errors.endDate}</p>}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Format</label>
+              <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                Format
+              </label>
               <select
                 value={form.format}
                 onChange={e => setForm({ ...form, format: e.target.value as any })}
-                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-xl px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition-colors`}
+                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#FF6B00] focus:outline-none transition-colors`}
               >
-                <option value="virtual">En ligne</option>
+                <option value="virtual">En ligne (Live / Webinaire)</option>
                 <option value="in-person">Présentiel</option>
                 <option value="hybrid">Hybride</option>
               </select>
             </div>
             <div>
-              <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Catégorie</label>
+              <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                Catégorie
+              </label>
               <select
                 value={form.category}
                 onChange={e => setForm({ ...form, category: e.target.value })}
-                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-xl px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition-colors`}
+                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#FF6B00] focus:outline-none transition-colors`}
               >
-                <option>Tech</option>
-                <option>Business</option>
-                <option>Design</option>
-                <option>Marketing</option>
-                <option>Finance</option>
-                <option>Education</option>
-                <option>Autre</option>
+                <option value="Tech">Technologie</option>
+                <option value="Business">Business & Finance</option>
+                <option value="Design">Design & UI/UX</option>
+                <option value="Marketing">Marketing & Vente</option>
+                <option value="Santé">Santé & Bien-être</option>
+                <option value="Droit">Droit & Fiscalité</option>
+                <option value="Education">Masterclass Pro</option>
+                <option value="Autre">Autre</option>
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Capacité</label>
-              <div className="relative">
-                <Users className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                <input
-                  type="number"
-                  min={1}
-                  value={form.capacity}
-                  onChange={e => { setForm({ ...form, capacity: parseInt(e.target.value) || 1 }); setErrors({ ...errors, capacity: '' }) }}
-                  className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white' : 'bg-white text-gray-900'} border rounded-xl pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 text-xs sm:text-sm focus:outline-none transition-colors ${errors.capacity ? 'border-red-500 focus:border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-blue-500' : 'border-gray-300 focus:border-blue-500'}`}
-                />
-              </div>
-              {errors.capacity && <p className="text-[10px] sm:text-xs text-red-500 mt-1">{errors.capacity}</p>}
+              <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                Capacité max (places)
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={form.capacity}
+                onChange={e => { setForm({ ...form, capacity: parseInt(e.target.value) || 1 }); setErrors({ ...errors, capacity: '' }) }}
+                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100' : 'bg-slate-50 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none transition-colors ${errors.capacity ? 'border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-[#FF6B00]' : 'border-slate-200 focus:border-[#FF6B00]'}`}
+              />
+            </div>
+            <div>
+              <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                Tarif (0 = Gratuit)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={form.price}
+                onChange={e => setForm({ ...form, price: parseFloat(e.target.value) || 0 })}
+                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100' : 'bg-slate-50 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none border-zinc-800 focus:border-[#FF6B00] transition-colors`}
+              />
             </div>
           </div>
 
           {form.format !== 'virtual' && (
-            <div>
-              <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Lieu</label>
-              <div className="relative mb-2">
-                <MapPin className={`absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                  Ville *
+                </label>
                 <input
                   value={form.location.city}
                   onChange={e => { setForm({ ...form, location: { ...form.location, city: e.target.value } }); setErrors({ ...errors, city: '' }) }}
-                  placeholder="Ville"
-                  className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white placeholder-zinc-600' : 'bg-white text-gray-900 placeholder-gray-400'} border rounded-xl pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 text-xs sm:text-sm focus:outline-none transition-colors ${errors.city ? 'border-red-500 focus:border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-blue-500' : 'border-gray-300 focus:border-blue-500'}`}
+                  placeholder="Paris, Montréal, Dakar..."
+                  className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100 placeholder-zinc-500' : 'bg-slate-50 text-slate-900 placeholder-slate-400'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none transition-colors ${errors.city ? 'border-red-500' : resolvedTheme === 'dark' ? 'border-zinc-800 focus:border-[#FF6B00]' : 'border-slate-200 focus:border-[#FF6B00]'}`}
+                />
+                {errors.city && <p className="text-[10px] text-red-500 mt-1">{errors.city}</p>}
+              </div>
+              <div>
+                <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
+                  Nom du lieu
+                </label>
+                <input
+                  value={form.location.venue}
+                  onChange={e => setForm({ ...form, location: { ...form.location, venue: e.target.value } })}
+                  placeholder="Centre de conférences, Salle A..."
+                  className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 text-zinc-100 placeholder-zinc-500' : 'bg-slate-50 text-slate-900 placeholder-slate-400'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none border-zinc-800 focus:border-[#FF6B00] transition-colors`}
                 />
               </div>
-              {errors.city && <p className="text-[10px] sm:text-xs text-red-500 mt-1">{errors.city}</p>}
-              <input
-                value={form.location.venue}
-                onChange={e => setForm({ ...form, location: { ...form.location, venue: e.target.value } })}
-                placeholder="Nom du lieu"
-                className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white placeholder-zinc-600' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'} border rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition-colors`}
-              />
             </div>
           )}
-
-          {/* Live & Jitsi Configuration - Simplifié */}
-          <div className={`p-3 sm:p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900/50 border-zinc-800' : 'bg-gray-50 border-gray-200'}`}>
-            <h3 className={`text-xs sm:text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2`}>
-              <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              Options Live
-            </h3>
-            
-            <div className="space-y-2 sm:space-y-3">
-              <div>
-                <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Statut</label>
-                <div className="flex gap-1.5 sm:gap-2">
-                  {(['at_coming', 'live', 'ended'] as const).map(status => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setForm({ ...form, liveStatus: status })}
-                      className={`flex-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium transition-all ${
-                        form.liveStatus === status
-                          ? status === 'live' ? 'bg-red-500 text-white' : 'bg-primary text-white'
-                          : resolvedTheme === 'dark'
-                          ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {status === 'at_coming' && 'À venir'}
-                      {status === 'live' && 'En direct'}
-                      {status === 'ended' && 'Terminé'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <div>
-                  <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Salle Jitsi</label>
-                  <input
-                    type="text"
-                    value={form.jitsiRoom}
-                    onChange={e => setForm({ ...form, jitsiRoom: e.target.value })}
-                    placeholder="Nom de la salle"
-                    className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white placeholder-zinc-600' : 'bg-white text-gray-900 placeholder-gray-400'} border rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition-colors ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-300'}`}
-                  />
-                </div>
-                <div>
-                  <label className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'} font-medium mb-1 sm:mb-1.5 block`}>Intervenant</label>
-                  <input
-                    type="text"
-                    value={form.speakerName}
-                    onChange={e => setForm({ ...form, speakerName: e.target.value })}
-                    placeholder="Nom"
-                    className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white placeholder-zinc-600' : 'bg-white text-gray-900 placeholder-gray-400'} border rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm focus:border-blue-500 focus:outline-none transition-colors ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-300'}`}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className={`flex-1 ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors`}
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPreview(true)}
-              className={`flex-1 ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors`}
-            >
-              Prévisualiser
-            </button>
-            <button
-              type="submit"
-              className={`flex-1 ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors`}
-            >
-              Créer
-            </button>
-          </div>
         </form>
+
+        {/* Footer Actions - Clean & Fixed */}
+        <div className={`p-4 border-t ${resolvedTheme === 'dark' ? 'border-zinc-800 bg-zinc-950 md:bg-zinc-900' : 'border-slate-200 bg-white'} flex items-center justify-end gap-3 flex-shrink-0`}>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+              resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            form="create-event-form"
+            className="px-6 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Créer l'Événement</span>
+          </button>
+        </div>
       </div>
 
       {/* MODAL PREVISUALISATION */}
       {showPreview && (
-        <div className="fixed inset-0 z-[101] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className={`${resolvedTheme === 'dark' ? 'bg-[#0f0f0f] border-zinc-800' : 'bg-white border-gray-200'} rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border`}>
-            <div className={`sticky top-0 ${resolvedTheme === 'dark' ? 'bg-[#0f0f0f] border-zinc-800' : 'bg-white border-gray-200'} border-b px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between z-10`}>
-              <h2 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Prévisualisation</h2>
-              <button onClick={() => setShowPreview(false)} className={`p-1.5 sm:p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-800' : 'hover:bg-gray-100'} rounded-full transition-colors`}>
-                <X className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`} />
+        <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'} rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border shadow-2xl p-5 space-y-4`}>
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <h2 className="text-base font-bold">Aperçu de l'événement</h2>
+              <button onClick={() => setShowPreview(false)} className="p-1.5 rounded-full hover:bg-zinc-800">
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-3 sm:p-4">
-              <div className={`group ${resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800/50' : 'bg-gray-50 border-gray-200'} rounded-xl border overflow-hidden`}>
-                <div className={`relative h-36 sm:h-48 ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-200'} overflow-hidden`}>
-                  {coverImagePreview ? (
-                    <img src={coverImagePreview} alt={form.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className={`w-full h-full bg-gradient-to-br ${resolvedTheme === 'dark' ? 'from-zinc-800 via-zinc-900 to-black' : 'from-gray-200 via-gray-300 to-gray-400'} flex items-center justify-center`}>
-                      <Calendar className={`w-10 h-10 sm:w-12 sm:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'}`} />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-transparent to-transparent" />
-                </div>
-                <div className="p-3 sm:p-4">
-                  <h3 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-1.5 sm:mb-2`}>{form.title || 'Titre de l\'événement'}</h3>
-                  <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-2 sm:mb-3 line-clamp-2`}>{form.description || 'Description de l\'événement...'}</p>
-                  <div className={`flex flex-wrap gap-x-2 sm:gap-x-3 gap-y-0.5 sm:gap-y-1 text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-3 sm:mb-4`}>
-                    <span className="flex items-center gap-0.5 sm:gap-1">
-                      <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                      {form.startDate ? new Date(form.startDate).toLocaleDateString('fr-FR') : 'Date'}
-                    </span>
-                    <span className="flex items-center gap-0.5 sm:gap-1">
-                      {form.format === 'virtual' ? (
-                        <><Video className="w-3 h-3 sm:w-4 sm:h-4" /> En ligne</>
-                      ) : (
-                        <><MapPin className="w-3 h-3 sm:w-4 sm:h-4" /> {form.location.city || 'Lieu'}</>
-                      )}
-                    </span>
-                    <span className="flex items-center gap-0.5 sm:gap-1">
-                      <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                      {form.capacity} places
-                    </span>
+            <div className="rounded-2xl border border-zinc-800 overflow-hidden bg-zinc-950">
+              <div className="aspect-video relative bg-zinc-900">
+                {coverImagePreview ? (
+                  <img src={coverImagePreview} alt={form.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                    <Calendar className="w-12 h-12" />
                   </div>
-                  <div className={`flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4 pb-3 sm:pb-4 border-b ${resolvedTheme === 'dark' ? 'border-zinc-800/50' : 'border-gray-200'}`}>
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] sm:text-sm font-bold">M</div>
-                    <span className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Moi</span>
-                  </div>
-                  <div className="flex gap-1.5 sm:gap-2">
-                    <button className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300' : 'bg-gray-100 text-gray-600'} rounded-xl text-[10px] sm:text-xs font-medium`}>
-                      <Ticket className="w-3 h-3 sm:w-4 sm:h-4" />
-                      Ticket
-                    </button>
-                    <button className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300' : 'bg-gray-100 text-gray-600'} rounded-xl text-[10px] sm:text-xs font-medium`}>
-                      <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
-                      Stats
-                    </button>
-                  </div>
+                )}
+              </div>
+              <div className="p-4 space-y-2">
+                <h3 className="font-bold text-sm">{form.title || 'Titre de l\'événement'}</h3>
+                <p className="text-xs text-zinc-400 line-clamp-2">{form.description || 'Description de l\'événement...'}</p>
+                <div className="flex items-center gap-3 text-[11px] text-zinc-500 pt-2 border-t border-zinc-800">
+                  <span>{form.format === 'virtual' ? '🎥 En ligne' : '📍 ' + (form.location.city || 'Lieu')}</span>
+                  <span>👥 {form.capacity} places</span>
+                  <span>💰 {form.price === 0 ? 'Gratuit' : `${form.price}$`}</span>
                 </div>
               </div>
             </div>

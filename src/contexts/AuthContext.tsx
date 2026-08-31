@@ -61,12 +61,65 @@ interface JWTPayload {
   exp: number
 }
 
+function resolveAvatarUrl(photo: string | null | undefined): string | undefined {
+  if (!photo || typeof photo !== 'string') return undefined
+  const clean = photo.trim()
+  if (!clean || clean === 'null' || clean === 'undefined') return undefined
+  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('blob:')) {
+    return clean
+  }
+  if (clean.startsWith('/media/') || clean.startsWith('media/')) {
+    const cleanMedia = clean.startsWith('/') ? clean : `/${clean}`
+    return `http://localhost:8000${cleanMedia}`
+  }
+  // Ne pas construire d'URL /public/ sur des buckets privés sans URL signée
+  return undefined
+}
+
 export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
   const navigate = useNavigate()
   const { showLogoutSuccess } = useNotifications()
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
+
+  const fetchProfileAvatar = async (tokenStr: string, currentUserId: string | number) => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+      const headers = { Authorization: `Bearer ${tokenStr}` }
+      const res = await fetch(`${API_BASE}/profil/profils/me/`, { headers }).catch(() => null)
+      let profileData: any = null
+      if (res && res.ok) {
+        profileData = await res.json()
+      } else {
+        const res2 = await fetch(`${API_BASE}/profil/profils/`, { headers }).catch(() => null)
+        if (res2 && res2.ok) {
+          const list = await res2.json()
+          const items = Array.isArray(list) ? list : (list.results || [])
+          profileData = items.find((p: any) => String(p.user) === String(currentUserId) || String(p.id) === String(currentUserId)) || items[0]
+        }
+      }
+
+      if (profileData) {
+        const rawPhoto = profileData.photo_url || profileData.photo || profileData.avatar
+        const avatar = resolveAvatarUrl(rawPhoto)
+        if (avatar) {
+          setUser(prev => prev ? { ...prev, avatarUrl: avatar, fullName: profileData.full_name || prev.fullName } : prev)
+        }
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    const handleProfileUpdated = (e: any) => {
+      const avatarUrl = e?.detail?.avatarUrl
+      if (avatarUrl) {
+        setUser(prev => prev ? { ...prev, avatarUrl } : prev)
+      }
+    }
+    window.addEventListener('exile_profile_updated', handleProfileUpdated)
+    return () => window.removeEventListener('exile_profile_updated', handleProfileUpdated)
+  }, [])
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken')
@@ -77,12 +130,14 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
           const storedProfile = JSON.parse(
             localStorage.getItem('exile_user_profile') || '{}'
           )
+          const userId = decoded.id || decoded.user_id || storedProfile.id || 0
+          const avatar = resolveAvatarUrl(storedProfile.photo || storedProfile.avatar_url || storedProfile.avatar)
           const userData: User = {
-            id: decoded.id || decoded.user_id || storedProfile.id || 0,
+            id: userId,
             email: decoded.email || storedProfile.email || '',
             username: decoded.username || storedProfile.username || '',
-            fullName: decoded.full_name || storedProfile.name || '',
-            avatarUrl: undefined,
+            fullName: decoded.full_name || storedProfile.name || storedProfile.full_name || '',
+            avatarUrl: avatar,
             roles: [],
             type: (decoded.type || 'PROFESSIONAL').toLowerCase() as 'professional' | 'institution',
             legacyPro: false,
@@ -90,6 +145,7 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
           }
           setUser(userData)
           setIsAuthenticated(true)
+          fetchProfileAvatar(token, userId)
         } else {
           localStorage.removeItem('accessToken')
           localStorage.removeItem('refreshToken')
@@ -112,12 +168,10 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
       
       // Decode token to get user info
       try {
-        console.log('Token access:', result.data.access)
         const decoded = jwtDecode<any>(result.data.access)
-        console.log('Token décodé:', decoded)
-        
+        const userId = decoded.user_id || decoded.id || decoded.sub || 0
         const userData: User = {
-          id: decoded.user_id || decoded.id || decoded.sub || 0,
+          id: userId,
           email: decoded.email || '',
           username: decoded.username || username,
           fullName: decoded.full_name || '',
@@ -127,12 +181,12 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
           legacyPro: false,
           institutionPlan: undefined
         }
-        console.log('Setting user data in AuthContext:', userData)
         setUser(userData)
         setIsAuthenticated(true)
 
         // Clear old data on successful login (BEFORE storing new profile)
         clearOldData()
+        fetchProfileAvatar(result.data.access, userId)
 
         // Store user profile in localStorage
         const userProfileData = {
@@ -305,15 +359,17 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
 
   const logout = (): void => {
     try {
-      // Show logout notification
-      showLogoutSuccess()
-
       // Clear all authentication tokens from localStorage
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
+      localStorage.removeItem('token')
+      localStorage.removeItem('access_token')
 
-      // Clear all localStorage data
-      localStorage.clear()
+      // Clear cached user credentials & profile to prevent any invalid network requests
+      localStorage.removeItem('exile_cached_avatar')
+      localStorage.removeItem('exile_cached_banner')
+      localStorage.removeItem('exile_user_profile')
+      localStorage.removeItem('exile_user_id')
 
       // Clear all sessionStorage data
       sessionStorage.clear()
@@ -325,7 +381,12 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
         document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
       })
 
-      // Reset all user state
+      // Notify other components to clear avatar & user info immediately
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('exile_profile_updated', { detail: { avatarUrl: null } }))
+      }
+
+      // Reset user state
       setUser(null)
       setIsAuthenticated(false)
 
@@ -333,8 +394,10 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
       navigate('/login')
     } catch (error) {
       console.error('Error during logout:', error)
-      // Even if there's an error, force logout
-      localStorage.clear()
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('exile_cached_avatar')
+      localStorage.removeItem('exile_user_profile')
       sessionStorage.clear()
       setUser(null)
       setIsAuthenticated(false)

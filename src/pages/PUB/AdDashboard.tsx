@@ -1,32 +1,45 @@
 // ============================================================
 // EXILE Platform — PUB/AdDashboard.tsx
 // Dashboard de gestion des campagnes publicitaires
-// Pour les marques / entreprises qui veulent faire de la pub
-// React 18 + TypeScript — fichier unique
+// Sécurisé & Obfusqué · Import Logo & Confirmation Modal
 // ============================================================
 
-import { useState, useMemo } from "react";
-import { type Ad, type AdStatus, DEMO_ADS } from "./AdBanner";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw } from "lucide-react";
+import { type Ad, type AdStatus, getStoredAds, saveStoredAds } from "./AdBanner";
 import { useTheme } from "../../contexts/ThemeContext";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
 
-function fmtEUR(n: number) {
-  return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+function fmtCurrency(n: number, currency: string = "HTG") {
+  const symbolMap: Record<string, string> = {
+    HTG: "HTG ",
+    USD: "$",
+    EUR: "€",
+    CAD: "CAD $"
+  };
+  const symbol = symbolMap[currency] || `${currency} `;
+  return `${symbol}${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}`;
 }
+
 function fmtNum(n: number) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "k";
   return n.toLocaleString("fr-FR");
 }
+
 function ctr(clicks: number, impressions: number) {
   if (!impressions) return "0%";
   return ((clicks / impressions) * 100).toFixed(2) + "%";
 }
+
 function progressPct(spent: number, budget: number) {
-  return Math.min((spent / budget) * 100, 100);
+  return Math.min((spent / (budget || 1)) * 100, 100);
 }
 
 const STATUS_LABELS: Record<AdStatus, string> = {
@@ -44,13 +57,9 @@ function getStatusColors(resolvedTheme: string | undefined, status: AdStatus): s
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// SOUS-COMPOSANTS
-// ─────────────────────────────────────────────────────────────
-
 function StatCard({ label, value, sub, accent, resolvedTheme }: { label: string; value: string; sub?: string; accent?: string; resolvedTheme?: string | undefined }) {
   return (
-    <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} border rounded-2xl p-5`}>
+    <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} border rounded-2xl p-5 shadow-sm`}>
       <p className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'} uppercase tracking-wide mb-2`}>{label}</p>
       <p className={`text-2xl font-bold ${accent ?? (resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-zinc-900')}`}>{value}</p>
       {sub && <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'} mt-1`}>{sub}</p>}
@@ -58,13 +67,69 @@ function StatCard({ label, value, sub, accent, resolvedTheme }: { label: string;
   );
 }
 
-function ProgressBar({ pct, color, resolvedTheme }: { pct: number; color: string; resolvedTheme?: string | undefined }) {
+// ─────────────────────────────────────────────────────────────
+// MODAL : CONFIRMATION D'ACTION (Supprimer, Mettre en pause, Modifier)
+// ─────────────────────────────────────────────────────────────
+
+interface ConfirmActionModalProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  resolvedTheme?: string;
+}
+
+function ConfirmActionModal({
+  isOpen,
+  title,
+  message,
+  confirmText,
+  cancelText = "Annuler",
+  danger = false,
+  onConfirm,
+  onCancel,
+  resolvedTheme,
+}: ConfirmActionModalProps) {
+  if (!isOpen) return null;
+
   return (
-    <div className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-100'} rounded-full h-1.5 overflow-hidden`}>
-      <div
-        className={`h-full rounded-full ${color} transition-all duration-700`}
-        style={{ width: `${pct}%` }}
-      />
+    <div className="fixed inset-0 z-[400] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white border-zinc-800' : 'bg-white text-zinc-900 border-zinc-200'} border rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${danger ? 'bg-red-500/20 text-red-500' : 'bg-amber-500/20 text-amber-500'}`}>
+            <AlertTriangle size={22} />
+          </div>
+          <div>
+            <h3 className="font-bold text-base">{title}</h3>
+            <p className="text-xs text-zinc-400">Action sécurisée</p>
+          </div>
+        </div>
+
+        <p className={`text-xs leading-relaxed ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-zinc-700'}`}>
+          {message}
+        </p>
+
+        <div className="flex gap-2 pt-2 justify-end">
+          <button
+            onClick={onCancel}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'} transition-colors`}
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-md active:scale-95 ${
+              danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -74,6 +139,13 @@ function ProgressBar({ pct, color, resolvedTheme }: { pct: number; color: string
 // ─────────────────────────────────────────────────────────────
 
 const CATEGORY_OPTIONS = ["Technologie", "Commerce", "Finance", "Santé", "Éducation", "Mode", "Alimentation", "Services", "Autre"];
+const CURRENCY_OPTIONS = [
+  { code: "HTG", label: "Gourdes (HTG)" },
+  { code: "USD", label: "Dollar US ($)" },
+  { code: "EUR", label: "Euro (€)" },
+  { code: "CAD", label: "Dollar Canadien (CAD $)" }
+];
+
 const GRADIENT_OPTIONS = [
   { label: "Bleu → Cyan",     value: "from-blue-600 to-cyan-500" },
   { label: "Ambre → Orange",  value: "from-amber-500 to-orange-600" },
@@ -87,6 +159,7 @@ interface CampaignFormData {
   brandName: string;
   brandInitials: string;
   brandColor: string;
+  brandLogo: string;
   tagline: string;
   description: string;
   ctaLabel: string;
@@ -94,90 +167,127 @@ interface CampaignFormData {
   gradient: string;
   category: string;
   budget: string;
+  currency: string;
+  exchangeRate: string;
   targetViews: string;
   startDate: string;
   endDate: string;
 }
 
 const EMPTY_FORM: CampaignFormData = {
-  brandName: "", brandInitials: "", brandColor: "#2563eb",
+  brandName: "", brandInitials: "", brandColor: "#2563eb", brandLogo: "",
   tagline: "", description: "", ctaLabel: "En savoir plus",
   ctaUrl: "https://", gradient: GRADIENT_OPTIONS[0].value,
-  category: CATEGORY_OPTIONS[0], budget: "300", targetViews: "10000",
+  category: CATEGORY_OPTIONS[0], budget: "1000",
+  currency: "HTG", exchangeRate: "1 USD = 132 HTG",
+  targetViews: "10000",
   startDate: new Date().toISOString().split("T")[0],
   endDate: "",
 };
 
 function CampaignModal({
   initial,
+  isConverting = false,
   onSave,
   onClose,
   resolvedTheme,
 }: {
   initial?: Ad;
-  onSave: (ad: Ad) => void;
+  isConverting?: boolean;
+  onSave: (adData: any) => void;
   onClose: () => void;
   resolvedTheme?: string | undefined;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<CampaignFormData>(
     initial
       ? {
-          brandName: initial.brandName,
-          brandInitials: initial.brandInitials,
-          brandColor: initial.brandColor,
-          tagline: initial.tagline,
-          description: initial.description,
-          ctaLabel: initial.ctaLabel,
-          ctaUrl: initial.ctaUrl,
-          gradient: initial.gradient,
-          category: initial.category,
-          budget: String(initial.budget),
-          targetViews: String(initial.targetViews),
-          startDate: initial.startDate,
+          brandName: initial.brandName || "",
+          brandInitials: initial.brandInitials || "",
+          brandColor: initial.brandColor || "#2563eb",
+          brandLogo: initial.brandLogo || "",
+          tagline: initial.tagline || "",
+          description: initial.description || "",
+          ctaLabel: initial.ctaLabel || "En savoir plus",
+          ctaUrl: initial.ctaUrl || "https://",
+          gradient: initial.gradient || GRADIENT_OPTIONS[0].value,
+          category: initial.category || CATEGORY_OPTIONS[0],
+          budget: String(initial.budget || "1000"),
+          currency: initial.currency || "HTG",
+          exchangeRate: initial.exchangeRate || "1 USD = 132 HTG",
+          targetViews: String(initial.targetViews || "10000"),
+          startDate: initial.startDate || new Date().toISOString().split("T")[0],
           endDate: initial.endDate ?? "",
         }
       : EMPTY_FORM
   );
   const [errors, setErrors] = useState<Partial<CampaignFormData>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const set = (k: keyof CampaignFormData, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: undefined }));
+    setSubmitError(null);
+  };
+
+  // Importer un logo personnalisé (File Picker)
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        setSubmitError("L'image du logo est trop lourde (max 3Mo)");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          set("brandLogo", event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const validate = (): boolean => {
     const e: Partial<CampaignFormData> = {};
     if (!form.brandName.trim()) e.brandName = "Requis";
     if (!form.brandInitials.trim()) e.brandInitials = "Requis";
-    if (form.tagline.length < 5) e.tagline = "Min 5 caractères";
-    if (form.tagline.length > 60) e.tagline = "Max 60 caractères";
-    if (form.description.length > 120) e.description = "Max 120 caractères";
     if (!form.ctaLabel.trim()) e.ctaLabel = "Requis";
-    if (Number(form.budget) < 10) e.budget = "Budget min 10 EUR";
+    if (Number(form.budget) <= 0) e.budget = "Budget valide requis";
     if (!form.startDate) e.startDate = "Requis";
     setErrors(e);
-    return Object.keys(e).length === 0;
+    if (Object.keys(e).length > 0) {
+      setSubmitError("Veuillez remplir les champs obligatoires (*)");
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = () => {
-    if (validate()) onSave(form);
+    if (validate()) {
+      const finalTagline = form.tagline.trim() || `${form.brandName} - Solutions & Services Pro`;
+      onSave({
+        ...form,
+        tagline: finalTagline
+      });
+    }
   };
 
   const previewGrad = form.gradient;
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-label={initial ? "Modifier la campagne" : "Nouvelle campagne"}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-white'} rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto`}>
+      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 text-white border-zinc-800' : 'bg-white text-zinc-900 border-zinc-200'} border rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto`}>
         {/* Header */}
         <div className={`sticky top-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-100'} border-b px-6 py-4 flex items-center justify-between rounded-t-3xl z-10`}>
-          <h2 className={`text-base font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-zinc-900'}`}>
-            {initial ? "Modifier la campagne" : "Nouvelle campagne publicitaire"}
+          <h2 className="text-base font-bold">
+            {initial ? "Modifier la campagne publicitaire" : "Lancer une nouvelle campagne (PUB)"}
           </h2>
           <button
             onClick={onClose}
@@ -190,101 +300,140 @@ function CampaignModal({
 
         <div className="p-6 space-y-6">
 
-          {/* Aperçu live */}
-          <div className={`relative rounded-2xl bg-gradient-to-r ${previewGrad} p-5 overflow-hidden`}>
+          {submitError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-bold rounded-xl text-center">
+              {submitError}
+            </div>
+          )}
+
+          {/* Aperçu live avec Logo personnalisable */}
+          <div className={`relative rounded-2xl bg-gradient-to-r ${previewGrad} p-5 overflow-hidden shadow-lg`}>
             <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10 blur-xl pointer-events-none" />
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-white font-black text-xs">
-                {form.brandInitials || "??"}
-              </div>
+              {form.brandLogo ? (
+                <img
+                  src={form.brandLogo}
+                  alt={form.brandName}
+                  className="w-12 h-12 rounded-xl object-cover border-2 border-white/30 shadow-md flex-shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-white font-black text-xs shadow-sm flex-shrink-0">
+                  {form.brandInitials || "??"}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-sm truncate">{form.tagline || "Votre accroche ici…"}</p>
-                <p className="text-white/60 text-xs truncate">{form.description || "Description courte…"}</p>
+                <p className="text-white text-xs font-semibold opacity-80">{form.category}</p>
+                <p className="text-white text-base font-bold leading-tight">{form.brandName || "Nom de votre marque"}</p>
               </div>
-              <span className="bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/30 whitespace-nowrap">
-                {form.ctaLabel || "CTA"}
-              </span>
             </div>
+            <p className="text-white text-sm font-semibold mt-3">{form.tagline || "Votre accroche percutante ici"}</p>
+            {form.description && <p className="text-white/80 text-xs mt-1">{form.description}</p>}
           </div>
-          <p className="text-[11px] text-zinc-400 text-center -mt-4">Aperçu en temps réel</p>
 
-          {/* Section : Marque */}
+          {/* Section : Marque & Logo Personnalisé */}
           <fieldset>
-            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>Marque / Entreprise</legend>
+            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>Informations Marque & Logo Personnalisé</legend>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 sm:col-span-1">
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Nom de la marque *</label>
+              <div>
+                <label className="text-xs font-medium mb-1 block">Nom de la marque *</label>
                 <input value={form.brandName} onChange={e => set("brandName", e.target.value)}
-                  placeholder="ex: TechHaïti"
+                  placeholder="ex: TechHaïti / DigiFinance"
                   className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                 {errors.brandName && <p className="text-xs text-red-500 mt-1">{errors.brandName}</p>}
               </div>
               <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Initiales (2–3 lettres) *</label>
-                <input value={form.brandInitials} onChange={e => set("brandInitials", e.target.value.slice(0, 3).toUpperCase())}
-                  placeholder="TH"
-                  className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
+                <label className="text-xs font-medium mb-1 block">Initiales (2 lettres) *</label>
+                <input value={form.brandInitials} onChange={e => set("brandInitials", e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="TH" maxLength={2}
+                  className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                 {errors.brandInitials && <p className="text-xs text-red-500 mt-1">{errors.brandInitials}</p>}
               </div>
-              <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Catégorie</label>
-                <select value={form.category} onChange={e => set("category", e.target.value)}
-                  className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}>
-                  {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Couleur principale</label>
-                <div className="flex items-center gap-2">
-                  <input type="color" value={form.brandColor} onChange={e => set("brandColor", e.target.value)}
-                    className={`w-10 h-10 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-200 bg-white'} cursor-pointer p-1`} />
-                  <span className="text-xs text-zinc-400">{form.brandColor}</span>
+
+              {/* Import Logo Image */}
+              <div className="col-span-2 space-y-2">
+                <label className="text-xs font-medium block">Logo de l'entreprise (Importer un logo)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleLogoUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-colors ${
+                      resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-300 text-zinc-800 hover:bg-zinc-200'
+                    }`}
+                  >
+                    <Upload size={14} />
+                    <span>Téléverser mon logo image</span>
+                  </button>
+
+                  {form.brandLogo && (
+                    <div className="flex items-center gap-2">
+                      <img src={form.brandLogo} alt="Logo" className="w-8 h-8 rounded-lg object-cover border" />
+                      <button
+                        type="button"
+                        onClick={() => set("brandLogo", "")}
+                        className="text-xs text-red-400 hover:underline"
+                      >
+                        Retirer
+                      </button>
+                    </div>
+                  )}
                 </div>
+                <input
+                  type="text"
+                  value={form.brandLogo}
+                  onChange={e => set("brandLogo", e.target.value)}
+                  placeholder="Ou collez l'URL directe de votre logo (https://...)"
+                  className={`w-full px-3 py-2 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-300' : 'border-zinc-200 bg-zinc-50 text-zinc-700'} text-xs focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
               </div>
             </div>
           </fieldset>
 
-          {/* Section : Contenu */}
+          {/* Section : Message Publicitaire */}
           <fieldset>
-            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>Contenu publicitaire</legend>
+            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>Message Publicitaire</legend>
             <div className="space-y-3">
               <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 flex justify-between`}>
-                  <span>Accroche *</span>
+                <label className="text-xs font-medium mb-1 flex justify-between">
+                  <span>Accroche (Tagline)</span>
                   <span className={form.tagline.length > 60 ? "text-red-500" : "text-zinc-400"}>{form.tagline.length}/60</span>
                 </label>
                 <input value={form.tagline} onChange={e => set("tagline", e.target.value)}
                   placeholder="Le futur du numérique commence ici."
                   className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
-                {errors.tagline && <p className="text-xs text-red-500 mt-1">{errors.tagline}</p>}
               </div>
               <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 flex justify-between`}>
+                <label className="text-xs font-medium mb-1 flex justify-between">
                   <span>Description</span>
                   <span className={form.description.length > 120 ? "text-red-500" : "text-zinc-400"}>{form.description.length}/120</span>
                 </label>
                 <textarea value={form.description} onChange={e => set("description", e.target.value)}
                   rows={2} placeholder="Description courte de votre offre…"
                   className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`} />
-                {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Texte du bouton *</label>
+                  <label className="text-xs font-medium mb-1 block">Texte du bouton *</label>
                   <input value={form.ctaLabel} onChange={e => set("ctaLabel", e.target.value)}
-                    placeholder="Découvrir"
+                    placeholder="Visiter / Découvrir"
                     className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                   {errors.ctaLabel && <p className="text-xs text-red-500 mt-1">{errors.ctaLabel}</p>}
                 </div>
                 <div>
-                  <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>URL de destination *</label>
+                  <label className="text-xs font-medium mb-1 block">URL de destination *</label>
                   <input value={form.ctaUrl} onChange={e => set("ctaUrl", e.target.value)}
                     placeholder="https://votre-site.com"
                     className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                 </div>
               </div>
               <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-2 block`}>Couleur du fond</label>
+                <label className="text-xs font-medium mb-2 block">Couleur du fond</label>
                 <div className="flex flex-wrap gap-2">
                   {GRADIENT_OPTIONS.map(g => (
                     <button key={g.value} onClick={() => set("gradient", g.value)}
@@ -301,35 +450,51 @@ function CampaignModal({
             </div>
           </fieldset>
 
-          {/* Section : Budget & Dates */}
+          {/* Section : Monnaie, Taux & Budget */}
           <fieldset>
-            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>Budget & Diffusion</legend>
+            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>Budget, Devise & Taux de Change</legend>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Budget total (EUR) *</label>
+                <label className="text-xs font-medium mb-1 block">Devise / Monnaie *</label>
+                <select
+                  value={form.currency}
+                  onChange={e => set("currency", e.target.value)}
+                  className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                >
+                  {CURRENCY_OPTIONS.map(c => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block">Budget total ({form.currency}) *</label>
                 <input value={form.budget} onChange={e => set("budget", e.target.value)}
-                  placeholder="300"
+                  placeholder="1000"
                   className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                 {errors.budget && <p className="text-xs text-red-500 mt-1">{errors.budget}</p>}
               </div>
-              <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Objectif vues</label>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-xs font-medium mb-1 block">Préciser votre Taux (Conversion / Change)</label>
+                <input value={form.exchangeRate} onChange={e => set("exchangeRate", e.target.value)}
+                  placeholder="ex: 1 USD = 132 HTG ou 100 HTG/1000 vues"
+                  className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-xs font-medium mb-1 block">Objectif Vues (AlgoPro) *</label>
                 <input value={form.targetViews} onChange={e => set("targetViews", e.target.value)}
                   placeholder="10000"
                   className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
-                {errors.targetViews && <p className="text-xs text-red-500 mt-1">{errors.targetViews}</p>}
               </div>
               <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Date début</label>
+                <label className="text-xs font-medium mb-1 block">Date début *</label>
                 <input type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)}
                   className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                 {errors.startDate && <p className="text-xs text-red-500 mt-1">{errors.startDate}</p>}
               </div>
               <div>
-                <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'} mb-1 block`}>Date fin</label>
+                <label className="text-xs font-medium mb-1 block">Date fin</label>
                 <input type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)}
                   className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
-                {errors.endDate && <p className="text-xs text-red-500 mt-1">{errors.endDate}</p>}
               </div>
             </div>
           </fieldset>
@@ -342,8 +507,8 @@ function CampaignModal({
             Annuler
           </button>
           <button onClick={handleSubmit}
-            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm">
-            {initial ? "Enregistrer" : "Lancer la campagne"}
+            className="px-6 py-2.5 rounded-xl text-sm font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white transition-all shadow-md active:scale-95">
+            {isConverting || !initial?.id ? "🚀 Lancer la campagne" : "Enregistrer les modifications"}
           </button>
         </div>
       </div>
@@ -356,21 +521,308 @@ function CampaignModal({
 // ─────────────────────────────────────────────────────────────
 
 export default function AdDashboard() {
-  const { resolvedTheme } = useTheme()
-  const [ads, setAds] = useState<Ad[]>(DEMO_ADS);
-  const [modal, setModal] = useState<{ open: boolean; editing?: Ad }>({ open: false });
+  const { resolvedTheme } = useTheme();
+  const navigate = useNavigate();
+
+  // 🔒 VERROU DE SÉCURITÉ RENFORCÉE — Authentification Administrateur Strict
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
+    return sessionStorage.getItem('exile_pub_admin_unlocked') === 'true';
+  });
+  const [pin, setPin] = useState('');
+  const [masterKey, setMasterKey] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState(0);
+
+  // Minuteur de décompte en cas de blocage anti-force brute
+  useEffect(() => {
+    if (lockoutTime > 0) {
+      const timer = setInterval(() => {
+        setLockoutTime((prev) => (prev > 1 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [lockoutTime]);
+
+  const handleUnlockDashboard = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockoutTime > 0) return;
+
+    const validPIN = localStorage.getItem('exile_pub_admin_pin') || '8899';
+    const validMaster = localStorage.getItem('exile_pub_admin_key') || 'AdminExile2026!';
+
+    if (pin.trim() === validPIN && masterKey.trim() === validMaster) {
+      sessionStorage.setItem('exile_pub_admin_unlocked', 'true');
+      setIsUnlocked(true);
+      setAuthError(null);
+      setFailedAttempts(0);
+    } else {
+      const nextAttempts = failedAttempts + 1;
+      setFailedAttempts(nextAttempts);
+      if (nextAttempts >= 3) {
+        setLockoutTime(30);
+        setAuthError('❌ 3 échecs consécutifs ! Système verrouillé pendant 30 secondes.');
+      } else {
+        setAuthError(`❌ Code PIN ou Clé Maître incorrect ! (${3 - nextAttempts} essai(s) restant(s))`);
+      }
+    }
+  };
+
+  const handleLockDashboard = () => {
+    sessionStorage.removeItem('exile_pub_admin_unlocked');
+    setIsUnlocked(false);
+    setPin('');
+    setMasterKey('');
+  };
+
+  const [activeTab, setActiveTab] = useState<'ads' | 'inquiries' | 'trash' | 'settings'>('ads');
+  const [inquiries, setInquiries] = useState<any[]>(() => {
+    return JSON.parse(localStorage.getItem('exile_pub_inquiries') || '[]');
+  });
+
+  const [trash, setTrash] = useState<any[]>(() => {
+    return JSON.parse(localStorage.getItem('exile_pub_trash') || '[]');
+  });
+
+  const [platformLogo, setPlatformLogo] = useState<string>(() => {
+    return localStorage.getItem('exile_pub_platform_logo') || '';
+  });
+
+  const [adminPinInput, setAdminPinInput] = useState<string>(() => {
+    return localStorage.getItem('exile_pub_admin_pin') || '8899';
+  });
+  const [adminKeyInput, setAdminKeyInput] = useState<string>(() => {
+    return localStorage.getItem('exile_pub_admin_key') || 'AdminExile2026!';
+  });
+
+  const [ads, setAds] = useState<Ad[]>(getStoredAds);
+  const [modal, setModal] = useState<{ open: boolean; editing?: Ad; isConverting?: boolean }>({ open: false });
   const [filter, setFilter] = useState<AdStatus | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+
+  // Synchroniser les demandes d'entreprises en direct
+  useEffect(() => {
+    const handleInquiryUpdate = () => {
+      setInquiries(JSON.parse(localStorage.getItem('exile_pub_inquiries') || '[]'));
+    };
+    window.addEventListener('exile_pub_inquiry_added', handleInquiryUpdate);
+    window.addEventListener('storage', handleInquiryUpdate);
+    return () => {
+      window.removeEventListener('exile_pub_inquiry_added', handleInquiryUpdate);
+      window.removeEventListener('storage', handleInquiryUpdate);
+    };
+  }, []);
+
+  // Soft Delete Inquiry -> Trash
+  const handleDeleteInquiry = (id: string) => {
+    const itemToDelete = inquiries.find(i => i.id === id);
+    if (!itemToDelete) return;
+
+    setConfirmModal({
+      isOpen: true,
+      title: "Déplacer la demande vers la corbeille ?",
+      message: `La demande de "${itemToDelete.companyName}" sera déplacée dans la corbeille. Vous pourrez la restaurer ultérieurement.`,
+      confirmText: "Déplacer en Corbeille",
+      danger: true,
+      onConfirm: () => {
+        const nextInquiries = inquiries.filter(i => i.id !== id);
+        const trashItem = { type: 'inquiry', data: itemToDelete, deletedAt: new Date().toISOString() };
+        const nextTrash = [trashItem, ...trash];
+
+        setInquiries(nextInquiries);
+        setTrash(nextTrash);
+
+        localStorage.setItem('exile_pub_inquiries', JSON.stringify(nextInquiries));
+        localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
+
+        showToast("Demande déplacée dans la corbeille");
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  // Soft Delete Ad -> Trash
+  const requestDeleteAd = (ad: Ad) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Déplacer la campagne vers la corbeille ?",
+      message: `La campagne "${ad.brandName}" sera déplacée dans la corbeille et pourra être restaurée à tout moment.`,
+      confirmText: "Déplacer en Corbeille",
+      danger: true,
+      onConfirm: () => {
+        const nextAds = ads.filter((a) => a.id !== ad.id);
+        const trashItem = { type: 'ad', data: ad, deletedAt: new Date().toISOString() };
+        const nextTrash = [trashItem, ...trash];
+
+        updateAds(nextAds);
+        setTrash(nextTrash);
+        localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
+
+        showToast("Campagne déplacée dans la corbeille");
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  // Restauration depuis la Corbeille
+  const handleRestoreTrashItem = (trashItem: any) => {
+    if (trashItem.type === 'ad') {
+      const nextAds = [trashItem.data, ...ads];
+      updateAds(nextAds);
+      const nextTrash = trash.filter(t => t.data.id !== trashItem.data.id);
+      setTrash(nextTrash);
+      localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
+      showToast(`✓ Campagne "${trashItem.data.brandName}" restaurée avec succès !`);
+    } else if (trashItem.type === 'inquiry') {
+      const nextInquiries = [trashItem.data, ...inquiries];
+      setInquiries(nextInquiries);
+      localStorage.setItem('exile_pub_inquiries', JSON.stringify(nextInquiries));
+      const nextTrash = trash.filter(t => t.data.id !== trashItem.data.id);
+      setTrash(nextTrash);
+      localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
+      showToast(`✓ Demande de "${trashItem.data.companyName}" restaurée avec succès !`);
+    }
+  };
+
+  // Suppression Définitive depuis la Corbeille
+  const handlePermanentDeleteTrashItem = (trashItem: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Suppression définitive ?",
+      message: "Cette action est irréversible. L'élément sera supprimé définitivement du système.",
+      confirmText: "Supprimer définitivement",
+      danger: true,
+      onConfirm: () => {
+        const nextTrash = trash.filter(t => t.data.id !== trashItem.data.id);
+        setTrash(nextTrash);
+        localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
+        showToast("Élément supprimé définitivement");
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  // Sauvegarder les Paramètres Administrateur & Logo
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('exile_pub_admin_pin', adminPinInput);
+    localStorage.setItem('exile_pub_admin_key', adminKeyInput);
+    localStorage.setItem('exile_pub_platform_logo', platformLogo);
+    showToast("✓ Paramètres administrateur & Logo sauvegardés !");
+  };
+
+  // Filtrer les demandes reçues avec la recherche
+  const filteredInquiries = useMemo(() => {
+    if (!searchQuery.trim()) return inquiries;
+    const q = searchQuery.toLowerCase();
+    return inquiries.filter(i =>
+      (i.companyName && i.companyName.toLowerCase().includes(q)) ||
+      (i.contactName && i.contactName.toLowerCase().includes(q)) ||
+      (i.email && i.email.toLowerCase().includes(q)) ||
+      (i.phoneWhatsApp && i.phoneWhatsApp.toLowerCase().includes(q)) ||
+      (i.sector && i.sector.toLowerCase().includes(q)) ||
+      (i.message && i.message.toLowerCase().includes(q))
+    );
+  }, [inquiries, searchQuery]);
+
+  // Convertir une demande en campagne (Bouton -> 🚀 Lancer la campagne)
+  const handleConvertInquiryToAd = (inquiry: any) => {
+    const prefilledAd: Ad = {
+      id: `ad_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      brandName: inquiry.companyName || "Nouvelle Marque",
+      brandInitials: (inquiry.companyName || "NM").slice(0, 2).toUpperCase(),
+      brandColor: "#2563eb",
+      tagline: inquiry.message ? inquiry.message.slice(0, 55) : "Offre exclusive EXILE",
+      description: inquiry.message || "",
+      ctaLabel: "Visiter",
+      ctaUrl: "https://",
+      gradient: "from-blue-600 to-indigo-600",
+      category: inquiry.sector || "Technologie",
+      budget: Number(inquiry.budget || 1000),
+      currency: inquiry.currency || "HTG",
+      exchangeRate: "1 USD = 132 HTG",
+      targetViews: 10000,
+      impressions: 0,
+      clicks: 0,
+      spent: 0,
+      status: "active",
+      startDate: new Date().toISOString().split("T")[0]
+    };
+
+    setActiveTab('ads');
+    setModal({ open: true, editing: prefilledAd, isConverting: true });
+  };
+
+  // État pour les Modales de Confirmation (Supprimer, Mettre en pause, Modifier)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirmer",
+    danger: false,
+    onConfirm: () => {},
+  });
+
+  // Synchroniser avec les évènements externes
+  useEffect(() => {
+    const handleUpdate = () => setAds(getStoredAds())
+    window.addEventListener('exile_ads_updated', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+    return () => {
+      window.removeEventListener('exile_ads_updated', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
+    }
+  }, [])
+
+  const updateAds = (nextAds: Ad[]) => {
+    setAds(nextAds)
+    saveStoredAds(nextAds)
+
+    const syncWithBackend = async () => {
+      try {
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
+        if (token) {
+          await fetch(`${API_BASE_URL}/pub/annonces/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ campaigns: nextAds })
+          })
+        }
+      } catch {}
+    }
+    syncWithBackend()
+  }
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2600);
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const filtered = useMemo(
-    () => (filter === "all" ? ads : ads.filter((a) => a.status === filter)),
-    [ads, filter]
-  );
+  const filtered = useMemo(() => {
+    return ads.filter((a) => {
+      if (filter !== "all" && a.status !== filter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          a.brandName.toLowerCase().includes(q) ||
+          a.tagline.toLowerCase().includes(q) ||
+          a.category.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [ads, filter, searchQuery]);
 
   const globalStats = useMemo(() => ({
     totalImpressions: ads.reduce((s, a) => s + a.impressions, 0),
@@ -380,68 +832,229 @@ export default function AdDashboard() {
     active:           ads.filter((a) => a.status === "active").length,
   }), [ads]);
 
-  const handleSave = (data: CampaignFormData) => {
+  const handleSave = (data: any) => {
     if (modal.editing) {
-      setAds((prev) =>
-        prev.map((a) =>
-          a.id === modal.editing!.id
-            ? {
-                ...a,
-                ...data,
-                budget: Number(data.budget),
-                targetViews: Number(data.targetViews),
-              }
-            : a
-        )
+      const next = ads.map((a) =>
+        a.id === modal.editing!.id
+          ? {
+              ...a,
+              ...data,
+              budget: Number(data.budget || 0),
+              targetViews: Number(data.targetViews || 10000),
+            }
+          : a
       );
-      showToast("Campagne mise à jour ✓");
+      updateAds(next);
+      showToast("✓ Campagne mise à jour avec succès");
     } else {
       const newAd: Ad = {
-        id: crypto.randomUUID(),
+        id: `ad_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         ...data,
+        brandColor: data.brandColor || "#2563eb",
         impressions: 0,
         clicks: 0,
         spent: 0,
         status: "active",
+        budget: Number(data.budget || 1000),
+        targetViews: Number(data.targetViews || 10000),
       };
-      setAds((prev) => [...prev, newAd]);
-      showToast("Campagne créée ✓");
+      const next = [newAd, ...ads];
+      updateAds(next);
+      showToast("🚀 Nouvelle campagne lancée & enregistrée !");
     }
     setModal({ open: false });
   };
 
-  const toggleStatus = (id: string) => {
-    setAds((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, status: a.status === "active" ? "paused" : "active" }
-          : a
-      )
-    );
-    showToast("Statut mis à jour ✓");
+  // Demander confirmation avant de changer le statut (Mettre en pause / Activer)
+  const requestToggleStatus = (ad: Ad) => {
+    const isPausing = ad.status === "active";
+    setConfirmModal({
+      isOpen: true,
+      title: isPausing ? "Mettre la campagne en pause ?" : "Activer la campagne ?",
+      message: isPausing
+        ? `Êtes-vous sûr de vouloir mettre la campagne "${ad.brandName}" en pause ? Elle ne sera plus affichée dans le feed.`
+        : `Voulez-vous réactiver la diffusion de la campagne "${ad.brandName}" ?`,
+      confirmText: isPausing ? "Oui, mettre en pause" : "Oui, réactiver",
+      danger: false,
+      onConfirm: () => {
+        const next = ads.map((a) =>
+          a.id === ad.id
+            ? { ...a, status: a.status === "active" ? ("paused" as AdStatus) : ("active" as AdStatus) }
+            : a
+        );
+        updateAds(next);
+        showToast(isPausing ? "Campagne mise en pause" : "Campagne réactivée !");
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
-  const deleteAd = (id: string) => {
-    setAds((prev) => prev.filter((a) => a.id !== id));
-    showToast("Campagne supprimée");
+
+
+  // Demander confirmation avant d'ouvrir la modification
+  const requestEditAd = (ad: Ad) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Modifier la campagne ?",
+      message: `Voulez-vous modifier les informations ou le budget de la campagne "${ad.brandName}" ?`,
+      confirmText: "Ouvrir l'éditeur",
+      danger: false,
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setModal({ open: true, editing: ad });
+      },
+    });
   };
+
+  if (!isUnlocked) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-slate-900 text-white'}`}>
+        <div className="w-full max-w-md bg-zinc-900/90 border border-zinc-800 rounded-3xl p-8 shadow-2xl space-y-6 backdrop-blur-xl text-center">
+          <div className="w-16 h-16 rounded-3xl bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/30 flex items-center justify-center mx-auto shadow-lg">
+            <Lock size={32} />
+          </div>
+
+          <div className="space-y-1">
+            <h2 className="text-xl font-black tracking-tight text-white">Zone Administrateur PUB</h2>
+            <p className="text-xs text-zinc-400">Authentification renforcée à double facteur requise</p>
+          </div>
+
+          {authError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold rounded-2xl animate-pulse">
+              {authError}
+            </div>
+          )}
+
+          <form onSubmit={handleUnlockDashboard} className="space-y-4 text-left">
+            <div>
+              <label className="text-xs font-bold text-zinc-300 block mb-1.5 flex items-center gap-1.5">
+                <Shield size={14} className="text-blue-400" />
+                <span>Code PIN Administrateur (4 chiffres)</span>
+              </label>
+              <input
+                type="password"
+                maxLength={4}
+                required
+                disabled={lockoutTime > 0}
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="••••"
+                className="w-full px-4 py-3 rounded-2xl bg-zinc-800/80 border border-zinc-700 text-white text-center tracking-[0.5em] text-lg font-mono focus:outline-none focus:ring-2 focus:ring-[#FF6B00]"
+              />
+              <p className="text-[10px] text-zinc-500 mt-1">PIN par défaut: 8899</p>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-zinc-300 block mb-1.5 flex items-center gap-1.5">
+                <Key size={14} className="text-amber-400" />
+                <span>Clé Maître d'Authentification</span>
+              </label>
+              <input
+                type="password"
+                required
+                disabled={lockoutTime > 0}
+                value={masterKey}
+                onChange={(e) => setMasterKey(e.target.value)}
+                placeholder="Clé maître requise"
+                className="w-full px-4 py-3 rounded-2xl bg-zinc-800/80 border border-zinc-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B00]"
+              />
+              <p className="text-[10px] text-zinc-500 mt-1">Clé maître par défaut: AdminExile2026!</p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={lockoutTime > 0}
+              className="w-full py-3.5 rounded-2xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-extrabold text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {lockoutTime > 0 ? (
+                <span>Patientez {lockoutTime}s...</span>
+              ) : (
+                <>
+                  <Lock size={16} />
+                  <span>🔓 Déverrouiller le Dashboard Admin</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          <button
+            onClick={() => navigate('/pro')}
+            className="text-xs text-zinc-500 hover:text-zinc-300 font-semibold transition-colors block mx-auto"
+          >
+            ← Annuler et retourner au site
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} font-sans`}>
-
-      {/* Header */}
-      <header className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} border-b px-6 py-4 flex items-center justify-between sticky top-0 z-20`}>
-        <div>
-          <h1 className={`text-lg font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-zinc-900'}`}>Gestion des Publicités</h1>
-          <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>EXILE Platform · Module PUB</p>
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} font-sans pb-12`}>
+      {/* Toast Feedback */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-zinc-900 text-white border border-zinc-700 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-top-2">
+          {toast}
         </div>
-        <button
-          onClick={() => setModal({ open: true })}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
-        >
-          <span className="text-lg leading-none">+</span>
-          Nouvelle campagne
-        </button>
+      )}
+
+      {/* Header Admin PUB Spécifique (Lien Sécurisé Obfusqué) */}
+      <header className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} border-b px-4 sm:px-8 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-20 shadow-sm`}>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/pro')}
+            className={`p-2 rounded-xl border transition-colors ${resolvedTheme === 'dark' ? 'border-zinc-800 hover:bg-zinc-800 text-zinc-300' : 'border-zinc-200 hover:bg-zinc-100 text-zinc-700'}`}
+            title="Retour"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold flex items-center gap-2">
+              <Megaphone className="text-[#FF6B00] w-5 h-5" />
+              <span>Gestion des Publicités (Espace Sécurisé Pro)</span>
+            </h1>
+            <p className="text-xs text-zinc-400">EXILE Platform · Module PUB Sécurisé</p>
+          </div>
+        </div>
+
+        {/* Barre de Recherche Dashboard */}
+        <div className="flex items-center gap-3 flex-1 max-w-md">
+          <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border w-full ${resolvedTheme === 'dark' ? 'bg-zinc-800/80 border-zinc-700 text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`}>
+            <Search size={16} className="text-zinc-400 flex-shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher une marque, catégorie..."
+              className="bg-transparent outline-none text-xs sm:text-sm w-full"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="text-zinc-400 hover:text-zinc-200">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={handleLockDashboard}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
+              resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200'
+            }`}
+            title="Verrouiller la session"
+          >
+            <LogOut size={16} />
+            <span className="hidden sm:inline">Verrouiller</span>
+          </button>
+
+          <button
+            onClick={() => setModal({ open: true })}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md active:scale-95"
+          >
+            <Plus size={18} />
+            <span>Lancer une campagne</span>
+          </button>
+        </div>
       </header>
 
       <div className="max-w-screen-xl mx-auto px-4 md:px-8 py-6 space-y-6">
@@ -449,165 +1062,484 @@ export default function AdDashboard() {
         {/* Stats globales */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatCard label="Campagnes actives" value={String(globalStats.active)} sub={`sur ${ads.length} total`} accent={resolvedTheme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'} resolvedTheme={resolvedTheme} />
-          <StatCard label="Impressions totales" value={fmtNum(globalStats.totalImpressions)} sub="toutes campagnes" resolvedTheme={resolvedTheme} />
-          <StatCard label="Clics totaux" value={fmtNum(globalStats.totalClicks)} sub={`CTR moyen ${ctr(globalStats.totalClicks, globalStats.totalImpressions)}`} resolvedTheme={resolvedTheme} />
-          <StatCard label="Budget total" value={fmtEUR(globalStats.totalBudget)} sub="alloué" resolvedTheme={resolvedTheme} />
-          <StatCard label="Dépensé" value={fmtEUR(globalStats.totalSpent)} sub={`${Math.round(progressPct(globalStats.totalSpent, globalStats.totalBudget))}% du budget`} accent={resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} resolvedTheme={resolvedTheme} />
+          <StatCard label="Impressions totales" value={fmtNum(globalStats.totalImpressions)} sub="AlgoPro Connecté" resolvedTheme={resolvedTheme} />
+          <StatCard label="Clics totaux" value={fmtNum(globalStats.totalClicks)} sub={`CTR ${ctr(globalStats.totalClicks, globalStats.totalImpressions)}`} resolvedTheme={resolvedTheme} />
+          <StatCard label="Budget alloué" value={fmtNum(globalStats.totalBudget)} sub="Devise choisie" resolvedTheme={resolvedTheme} />
+          <StatCard label="Dépensé" value={fmtNum(globalStats.totalSpent)} sub={`${Math.round(progressPct(globalStats.totalSpent, globalStats.totalBudget))}% du budget`} accent={resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} resolvedTheme={resolvedTheme} />
         </div>
 
-        {/* Filtres */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {(["all", "active", "paused", "ended"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                filter === f
-                  ? "bg-blue-600 text-white"
-                  : `${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-500'} border hover:border-zinc-300`
-              }`}
-            >
-              {f === "all" ? "Toutes" : STATUS_LABELS[f]}
-              {f !== "all" && (
-                <span className="ml-1.5 opacity-70">({ads.filter(a => a.status === f).length})</span>
-              )}
-            </button>
-          ))}
+        {/* Navigation Onglets (Campagnes, Messagerie Demandes, Corbeille, Paramètres) */}
+        <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 flex-wrap">
+          <button
+            onClick={() => setActiveTab('ads')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'ads'
+                ? 'bg-[#FF6B00] text-white shadow-md'
+                : `${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white' : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900'} border`
+            }`}
+          >
+            <Megaphone size={15} />
+            <span>Campagnes Active ({ads.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('inquiries')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 relative ${
+              activeTab === 'inquiries'
+                ? 'bg-[#FF6B00] text-white shadow-md'
+                : `${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white' : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900'} border`
+            }`}
+          >
+            <MessageSquare size={15} />
+            <span>Messagerie & Demandes Reçues</span>
+            {inquiries.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black animate-pulse">
+                {inquiries.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('trash')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 relative ${
+              activeTab === 'trash'
+                ? 'bg-[#FF6B00] text-white shadow-md'
+                : `${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white' : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900'} border`
+            }`}
+          >
+            <Trash2 size={15} />
+            <span>Corbeille PUB</span>
+            {trash.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-red-500/80 text-white text-[10px] font-black">
+                {trash.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'settings'
+                ? 'bg-[#FF6B00] text-white shadow-md'
+                : `${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white' : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900'} border`
+            }`}
+          >
+            <Settings size={15} />
+            <span>Paramètres & Logo</span>
+          </button>
         </div>
 
-        {/* Liste des campagnes */}
-        <div className="space-y-4">
-          {filtered.length === 0 && (
-            <div className={`text-center py-16 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
-              <p className="text-3xl mb-3">📭</p>
-              <p className="text-sm font-medium">Aucune campagne dans cette catégorie</p>
-            </div>
-          )}
-          {filtered.map((ad) => (
-            <div
-              key={ad.id}
-              className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow`}
-            >
-              <div className="flex items-start gap-4">
-
-                {/* Logo */}
-                <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-black text-white flex-shrink-0 bg-gradient-to-br ${ad.gradient}`}
-                >
-                  {ad.brandInitials}
-                </div>
-
-                {/* Infos */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h3 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-zinc-900'}`}>{ad.brandName}</h3>
-                    <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${getStatusColors(resolvedTheme, ad.status)}`}>
-                      {ad.status === "active" && <span className="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1 animate-pulse" />}
-                      {STATUS_LABELS[ad.status]}
-                    </span>
-                    <span className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-500 border-zinc-700' : 'text-zinc-400 border-zinc-200'} border px-2 py-0.5 rounded-full`}>{ad.category}</span>
-                  </div>
-                  <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-zinc-700'} font-medium mb-0.5`}>{ad.tagline}</p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'} mb-3`}>{ad.description}</p>
-
-                  {/* Métriques */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-                    {[
-                      { label: "Impressions", value: fmtNum(ad.impressions) },
-                      { label: "Clics",        value: fmtNum(ad.clicks) },
-                      { label: "CTR",           value: ctr(ad.clicks, ad.impressions) },
-                      { label: "Budget restant", value: fmtEUR(ad.budget - ad.spent) },
-                    ].map((m) => (
-                      <div key={m.label} className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-50'} rounded-xl px-3 py-2`}>
-                        <p className={`text-[10px] font-medium ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'} uppercase tracking-wide`}>{m.label}</p>
-                        <p className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-zinc-200' : 'text-zinc-800'}`}>{m.value}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Budget progress */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className={`flex justify-between text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'} mb-1`}>
-                        <span>Budget dépensé</span>
-                        <span>{fmtEUR(ad.spent)} / {fmtEUR(ad.budget)}</span>
-                      </div>
-                      <ProgressBar
-                        pct={progressPct(ad.spent, ad.budget)}
-                        color={ad.status === "active" ? "bg-blue-500" : resolvedTheme === 'dark' ? "bg-zinc-600" : "bg-zinc-300"}
-                        resolvedTheme={resolvedTheme}
-                      />
-                    </div>
-                    <div className="flex-shrink-0">
-                      <div className={`flex justify-between text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'} mb-1`}>
-                        <span>Vues</span>
-                        <span>{fmtNum(ad.impressions)}/{fmtNum(ad.targetViews)}</span>
-                      </div>
-                      <div className="w-24">
-                        <ProgressBar
-                          pct={progressPct(ad.impressions, ad.targetViews)}
-                          color={ad.status === "active" ? "bg-emerald-500" : resolvedTheme === 'dark' ? "bg-zinc-600" : "bg-zinc-300"}
-                          resolvedTheme={resolvedTheme}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dates */}
-                  <p className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'} mt-2`}>
-                    Du {ad.startDate}{ad.endDate ? ` au ${ad.endDate}` : " (sans date de fin)"}
-                  </p>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-2 flex-shrink-0">
+        {/* ── ONGLET 1 : CAMPAGNES PUBLICITAIRES ── */}
+        {activeTab === 'ads' && (
+          <>
+            {/* Filtres par Statut */}
+            <div className="flex items-center justify-between gap-2 flex-wrap border-b border-zinc-200 dark:border-zinc-800 pb-4">
+              <div className="flex items-center gap-2">
+                {(["all", "active", "paused", "ended"] as const).map((f) => (
                   <button
-                    onClick={() => setModal({ open: true, editing: ad })}
-                    className={`px-3 py-2 text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300 border-zinc-700 hover:bg-zinc-800' : 'text-zinc-600 border-zinc-200 hover:bg-zinc-50'} border rounded-xl transition-colors`}
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    onClick={() => toggleStatus(ad.id)}
-                    className={`px-3 py-2 text-xs font-semibold rounded-xl transition-colors ${
-                      ad.status === "active"
-                        ? `${resolvedTheme === 'dark' ? 'text-amber-600 border-amber-800 hover:bg-amber-950/30' : 'text-amber-600 border-amber-200 hover:bg-amber-50'} border`
-                        : `${resolvedTheme === 'dark' ? 'text-emerald-600 border-emerald-800 hover:bg-emerald-950/30' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'} border`
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                      filter === f
+                        ? "bg-[#FF6B00] text-white shadow-sm"
+                        : `${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-500'} border hover:border-zinc-300`
                     }`}
                   >
-                    {ad.status === "active" ? "Pause" : "Activer"}
+                    {f === "all" ? "Toutes les campagnes" : STATUS_LABELS[f]}
+                    {f !== "all" && (
+                      <span className="ml-1.5 opacity-70">({ads.filter(a => a.status === f).length})</span>
+                    )}
                   </button>
+                ))}
+              </div>
+
+              <p className="text-xs text-zinc-400 font-medium">
+                {filtered.length} {filtered.length > 1 ? "campagnes trouvées" : "campagne trouvée"}
+              </p>
+            </div>
+
+            {/* Liste des campagnes */}
+            <div className="space-y-4">
+              {filtered.length === 0 ? (
+                <div className={`p-12 text-center rounded-3xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200'} space-y-3`}>
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-800 text-zinc-400 flex items-center justify-center mx-auto">
+                    <Megaphone size={24} />
+                  </div>
+                  <p className="text-sm font-bold">Aucune campagne publicitaire trouvée</p>
+                  <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                    Cliquez sur le bouton ci-dessous pour créer votre première campagne publicitaire.
+                  </p>
                   <button
-                    onClick={() => deleteAd(ad.id)}
-                    className={`px-3 py-2 text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-red-500 border-red-800 hover:bg-red-950/30' : 'text-red-500 border-red-200 hover:bg-red-50'} border rounded-xl transition-colors`}
+                    onClick={() => setModal({ open: true })}
+                    className="px-5 py-2.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold rounded-xl transition-all shadow-md"
                   >
-                    Supprimer
+                    + Créer une campagne
                   </button>
                 </div>
+              ) : (
+                filtered.map((ad) => (
+                  <div
+                    key={ad.id}
+                    className={`p-5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm transition-all hover:border-zinc-400/50`}
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      {ad.brandLogo ? (
+                        <img
+                          src={ad.brandLogo}
+                          alt={ad.brandName}
+                          className="w-12 h-12 rounded-2xl object-cover border border-white/20 shadow-md flex-shrink-0"
+                        />
+                      ) : (
+                        <div
+                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-extrabold text-sm shadow-md flex-shrink-0"
+                          style={{ backgroundColor: ad.brandColor || "#2563eb" }}
+                        >
+                          {ad.brandInitials}
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-sm sm:text-base truncate">{ad.brandName}</h3>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${getStatusColors(resolvedTheme, ad.status)}`}>
+                            {STATUS_LABELS[ad.status]}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+                            {ad.category}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-zinc-400 mt-1 truncate">{ad.tagline}</p>
+                        
+                        <div className="flex items-center gap-4 mt-2 text-[11px] text-zinc-500 flex-wrap">
+                          <span>🎯 Objectif Vues (AlgoPro): <strong className="text-blue-400">{fmtNum(ad.impressions)} / {fmtNum(ad.targetViews)}</strong></span>
+                          <span>💰 Budget: <strong className="text-emerald-400">{fmtCurrency(ad.budget, ad.currency)}</strong></span>
+                          {ad.exchangeRate && <span>💱 Taux: {ad.exchangeRate}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 border-zinc-800 pt-3 md:pt-0">
+                      <button
+                        onClick={() => requestToggleStatus(ad)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors flex items-center gap-1 ${
+                          ad.status === "active"
+                            ? "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                            : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                        }`}
+                      >
+                        {ad.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+                        <span>{ad.status === "active" ? "Mettre en pause" : "Activer"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => requestEditAd(ad)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-700 hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center gap-1"
+                      >
+                        <Edit3 size={14} />
+                        <span>Modifier</span>
+                      </button>
+
+                      <button
+                        onClick={() => requestDeleteAd(ad)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 size={14} />
+                        <span>Supprimer</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── ONGLET 2 : MESSAGERIE & DEMANDES REÇUES ── */}
+        {activeTab === 'inquiries' && (
+          <div className="space-y-4">
+            {filteredInquiries.length === 0 ? (
+              <div className={`p-12 text-center rounded-3xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200'} space-y-3`}>
+                <div className="w-12 h-12 rounded-2xl bg-zinc-800 text-zinc-400 flex items-center justify-center mx-auto">
+                  <MessageSquare size={24} />
+                </div>
+                <p className="text-sm font-bold">Aucune demande d'entreprise trouvée</p>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  {searchQuery ? "Aucun résultat ne correspond à votre recherche." : "Lorsqu'un utilisateur soumet une demande publicitaire via la plateforme, elle apparaîtra directement ici."}
+                </p>
+              </div>
+            ) : (
+              filteredInquiries.map((inquiry) => (
+                <div
+                  key={inquiry.id}
+                  className={`p-5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-sm`}
+                >
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    <div className="w-12 h-12 rounded-2xl bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/30 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                      📩
+                    </div>
+
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-base">{inquiry.companyName}</h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                          {inquiry.sector || "Entreprise"}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                          Canal : {inquiry.preferredContact || "WhatsApp 💬"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
+                        {inquiry.contactName && <span>👤 Contact: <strong className="text-white">{inquiry.contactName}</strong></span>}
+                        {inquiry.phoneWhatsApp && (
+                          <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                            <Phone size={12} />
+                            <span>{inquiry.phoneWhatsApp}</span>
+                          </span>
+                        )}
+                        {inquiry.email && (
+                          <span className="flex items-center gap-1 text-blue-400 font-semibold">
+                            <Mail size={12} />
+                            <span>{inquiry.email}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <p className={`text-xs p-3 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'} mt-2 leading-relaxed`}>
+                        "{inquiry.message}"
+                      </p>
+
+                      <div className="flex items-center gap-4 text-[11px] text-zinc-400 pt-1">
+                        <span>💰 Budget Proposé: <strong className="text-emerald-400">{fmtCurrency(Number(inquiry.budget || 0), inquiry.currency || "HTG")}</strong></span>
+                        <span>🕒 Date: {new Date(inquiry.createdAt).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Rapides Admin */}
+                  <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 border-zinc-800 pt-3 md:pt-0 flex-shrink-0">
+                    {inquiry.phoneWhatsApp && (
+                      <a
+                        href={`https://wa.me/${inquiry.phoneWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Bonjour ${inquiry.contactName || inquiry.companyName}, concernant votre demande publicitaire sur EXILE...`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm flex items-center gap-1.5"
+                      >
+                        <MessageSquare size={14} />
+                        <span>WhatsApp</span>
+                      </a>
+                    )}
+
+                    {inquiry.phoneWhatsApp && (
+                      <a
+                        href={`tel:${inquiry.phoneWhatsApp}`}
+                        className="px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm flex items-center gap-1.5"
+                      >
+                        <Phone size={14} />
+                        <span>Appeler</span>
+                      </a>
+                    )}
+
+                    {inquiry.email && (
+                      <a
+                        href={`mailto:${inquiry.email}?subject=Demande Publicitaire EXILE - ${inquiry.companyName}`}
+                        className="px-3 py-2 rounded-xl text-xs font-bold border border-zinc-700 hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center gap-1.5"
+                      >
+                        <Mail size={14} />
+                        <span>Email</span>
+                      </a>
+                    )}
+
+                    <button
+                      onClick={() => handleConvertInquiryToAd(inquiry)}
+                      className="px-3 py-2 rounded-xl text-xs font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white transition-all shadow-sm flex items-center gap-1.5"
+                    >
+                      <Plus size={14} />
+                      <span>Convertir en Pub</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteInquiry(inquiry.id)}
+                      className="p-2 rounded-xl text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── ONGLET 3 : CORBEILLE PUB (Restauration) ── */}
+        {activeTab === 'trash' && (
+          <div className="space-y-4">
+            {trash.length === 0 ? (
+              <div className={`p-12 text-center rounded-3xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200'} space-y-3`}>
+                <div className="w-12 h-12 rounded-2xl bg-zinc-800 text-zinc-400 flex items-center justify-center mx-auto">
+                  <Trash2 size={24} />
+                </div>
+                <p className="text-sm font-bold">La corbeille PUB est vide</p>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Les éléments supprimés apparaîtront ici et pourront être restaurés à tout moment.
+                </p>
+              </div>
+            ) : (
+              trash.map((item) => (
+                <div
+                  key={item.data.id}
+                  className={`p-5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} flex items-center justify-between gap-4 shadow-sm`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-sm">
+                      {item.type === 'ad' ? '📢' : '📩'}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm">
+                        {item.type === 'ad' ? item.data.brandName : item.data.companyName}
+                      </h4>
+                      <p className="text-xs text-zinc-400">
+                        {item.type === 'ad' ? `Campagne (${item.data.category})` : `Demande (${item.data.sector || 'Entreprise'})`} · Supprimé le {new Date(item.deletedAt).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleRestoreTrashItem(item)}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-1.5 shadow-sm"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Restaurer</span>
+                    </button>
+                    <button
+                      onClick={() => handlePermanentDeleteTrashItem(item)}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1.5"
+                    >
+                      <Trash2 size={14} />
+                      <span>Supprimer définitivement</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── ONGLET 4 : PARAMÈTRES ADMINISTRATEUR & LOGO ── */}
+        {activeTab === 'settings' && (
+          <div className={`p-6 rounded-3xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} shadow-sm max-w-2xl space-y-6`}>
+            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+              <div className="w-10 h-10 rounded-2xl bg-[#FF6B00]/20 text-[#FF6B00] flex items-center justify-center font-bold">
+                <Settings size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-base">Paramètres Administrateur PUB & Logo</h3>
+                <p className="text-xs text-zinc-400">Configuration du système, sécurité & logo de la plateforme</p>
               </div>
             </div>
-          ))}
-        </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-5">
+              {/* Section : Logo Personnalisé de la Plateforme */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 block">
+                  Logo Personnalisé de la Plateforme (Apparaît dans les notifications utilisateurs)
+                </label>
+                <div className="flex items-center gap-4">
+                  {platformLogo ? (
+                    <img src={platformLogo} alt="Logo Admin" className="w-14 h-14 rounded-2xl object-cover border border-white/20 shadow-md" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-[#FF6B00]/20 text-[#FF6B00] flex items-center justify-center font-black text-sm border border-[#FF6B00]/30">
+                      EXILE
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      value={platformLogo}
+                      onChange={e => setPlatformLogo(e.target.value)}
+                      placeholder="Collez l'URL de votre logo d'entreprise (https://...)"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00]`}
+                    />
+                    {platformLogo && (
+                      <button
+                        type="button"
+                        onClick={() => setPlatformLogo('')}
+                        className="text-xs text-red-400 hover:underline"
+                      >
+                        Revenir au logo par défaut
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section : Sécurité Admin (PIN & Clé Maître) */}
+              <div className="space-y-3 pt-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 block">
+                  Sécurité Accès Dashboard (PIN & Clé Maître)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold block mb-1">Code PIN Administrateur (4 chiffres)</label>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={adminPinInput}
+                      onChange={e => setAdminPinInput(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-mono tracking-widest text-center ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00]`}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold block mb-1">Clé Maître d'Authentification</label>
+                    <input
+                      type="text"
+                      value={adminKeyInput}
+                      onChange={e => setAdminKeyInput(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00]`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end">
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl text-xs font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white transition-all shadow-md active:scale-95 flex items-center gap-2"
+                >
+                  <RefreshCw size={14} />
+                  <span>Enregistrer les paramètres</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
 
-      {/* Modal */}
+      {/* Modal Création / Edition */}
       {modal.open && (
         <CampaignModal
           initial={modal.editing}
+          isConverting={modal.isConverting}
           onSave={handleSave}
           onClose={() => setModal({ open: false })}
           resolvedTheme={resolvedTheme}
         />
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div role="status" aria-live="polite"
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] ${resolvedTheme === 'dark' ? 'bg-white text-zinc-900' : 'bg-zinc-900 text-white'} text-sm font-semibold px-5 py-3 rounded-full shadow-xl whitespace-nowrap`}
-        >
-          {toast}
-        </div>
-      )}
+      {/* Modal de Confirmation pour Actions Sensibles (Supprimer, Mettre en pause, Modifier) */}
+      <ConfirmActionModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        danger={confirmModal.danger}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        resolvedTheme={resolvedTheme}
+      />
     </div>
   );
 }

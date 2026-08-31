@@ -5,30 +5,61 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useProfessionalProfile } from '../../hooks/useProfessionalProfile';
 import { useProfessionalVideos } from '../../hooks/useProfessionalVideos';
 import { useProfessionalEvents } from '../../hooks/useProfessionalEvents';
-import { MapPin, Calendar, Video, UserPlus, Share, Flag, Ban, MessageCircle, Star, Eye, Heart, Award, ExternalLink, CheckCircle2, Users, UserMinus, ArrowLeft } from 'lucide-react';
-import type { Video as FeedVideo } from '../../types/video';
+import { videoApi } from '../../services/videoApi';
+import {
+  MapPin,
+  Calendar,
+  Video,
+  UserPlus,
+  Share2,
+  Flag,
+  MessageCircle,
+  Eye,
+  Heart,
+  Award,
+  ExternalLink,
+  CheckCircle2,
+  Users,
+  UserMinus,
+  ArrowLeft,
+  Briefcase,
+  Globe,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  CalendarDays,
+  Send
+} from 'lucide-react';
+import { ContactModal } from '../../components/modals/ContactModal';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 export const PublicProfile = () => {
   const { resolvedTheme } = useTheme();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const { profile, loading: profileLoading, error: profileError } = useProfessionalProfile(id || '');
-  const { videos, loading: videosLoading } = useProfessionalVideos(id || '', 1, 8);
+  const { videos, loading: videosLoading } = useProfessionalVideos(id || '', 1, 12);
   const { events, loading: eventsLoading } = useProfessionalEvents(id || '');
 
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isBlocked, setIsBlocked] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'videos' | 'events' | 'about'>('videos');
+  const [isSkillsExpanded, setIsSkillsExpanded] = useState(false);
 
-  const isOnline = profile?.lastLoginAt && new Date(profile.lastLoginAt) > new Date(Date.now() - 5 * 60 * 1000);
+  const formattedUsername = profile?.username
+    ? (profile.username.startsWith('@') ? profile.username : `@${profile.username}`)
+    : '@Utilisateur';
+
+  const isOnline = profile?.status === 'online' || (profile?.lastLoginAt && new Date(profile.lastLoginAt) > new Date(Date.now() - 5 * 60 * 1000));
 
   // Update subscribers count when profile loads
   useEffect(() => {
-    if (profile?.followersCount) {
+    if (profile?.followersCount != null) {
       setSubscribersCount(profile.followersCount);
     }
   }, [profile?.followersCount]);
@@ -39,7 +70,7 @@ export const PublicProfile = () => {
       if (!isAuthenticated || !id) return;
       
       try {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
         const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -49,9 +80,9 @@ export const PublicProfile = () => {
         
         if (response.ok) {
           const data = await response.json();
-          const subscriptions = data.results || data;
-          const isSubscribed = subscriptions.some((sub: any) => sub.professionnel === id);
-          setIsSubscribed(isSubscribed);
+          const subscriptions = Array.isArray(data) ? data : (data.results || []);
+          const isSub = subscriptions.some((sub: any) => String(sub.professionnel) === String(id) || String(sub.user?.id) === String(id));
+          setIsSubscribed(isSub);
         }
       } catch (error) {
         console.error('Error checking subscription:', error);
@@ -59,13 +90,6 @@ export const PublicProfile = () => {
     };
     
     checkSubscription();
-  }, [isAuthenticated, id]);
-
-  // Check block status (disabled - backend removed)
-  useEffect(() => {
-    if (isAuthenticated && id) {
-      setIsBlocked(false);
-    }
   }, [isAuthenticated, id]);
 
   const handleSubscribe = async () => {
@@ -76,131 +100,51 @@ export const PublicProfile = () => {
     if (!id) return;
 
     try {
-      const token = localStorage.getItem('accessToken');
-      
-      if (isSubscribed) {
-        // Unsubscribe
-        const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ professionnel: id })
-        });
-        
-        if (response.ok) {
-          setIsSubscribed(false);
-          setSubscribersCount(prev => Math.max(0, prev - 1));
-        }
-      } else {
-        // Subscribe
-        const response = await fetch(`${API_BASE_URL}/abonnement/abonnements/`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ professionnel: id })
-        });
-        
-        if (response.ok) {
-          setIsSubscribed(true);
-          setSubscribersCount(prev => prev + 1);
-        }
+      const res = await videoApi.toggleSubscription(id);
+      if (res.success && res.data) {
+        setIsSubscribed(res.data.is_subscribed);
+        setSubscribersCount(res.data.subscribers_count);
+      } else if (res.error) {
+        alert(res.error);
       }
     } catch (error) {
-      console.error('Error subscribing:', error);
+      console.error('Error toggling subscription:', error);
     }
-  };
-
-  const handleContact = () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    alert('Fonctionnalité de contact bientôt disponible');
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/pro/profile/${id}`;
+    const url = window.location.href;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: profile?.fullName || 'Profil EXILE',
+          title: `Profil de ${formattedUsername} sur EXILE`,
           url
         });
-      } catch (error) {
-        console.error('Error sharing:', error);
-      }
+      } catch {}
     } else {
       navigator.clipboard.writeText(url);
-      alert('Lien copié dans le presse-papier');
-    }
-  };
-
-  const handleReport = () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    alert('Fonctionnalité de signalement bientôt disponible');
-  };
-
-  const handleBlock = async () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    if (!id) return;
-
-    if (confirm(isBlocked ? 'Voulez-vous vraiment débloquer cet utilisateur ?' : 'Voulez-vous vraiment bloquer cet utilisateur ?')) {
-      try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          alert('Token non trouvé. Veuillez vous reconnecter.')
-          return
-        }
-
-        const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
-          method: isBlocked ? 'DELETE' : 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ blocked_user: id })
-        })
-
-        if (response.ok) {
-          alert(isBlocked ? 'Utilisateur débloqué avec succès' : 'Utilisateur bloqué avec succès')
-          setIsBlocked(!isBlocked)
-        } else {
-          throw new Error('Erreur lors de l\'opération')
-        }
-      } catch (error) {
-        console.error('Error blocking user:', error);
-      }
+      alert('Lien du profil copié dans le presse-papier !');
     }
   };
 
   if (profileLoading) {
     return (
-      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex items-center justify-center`}>
-        <div className={`w-8 h-8 border-4 ${resolvedTheme === 'dark' ? 'border-zinc-500 border-t-blue-500' : 'border-gray-400 border-t-blue-600'} rounded-full animate-spin`} />
+      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-gray-50 text-gray-900'} flex items-center justify-center`}>
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (profileError || !profile) {
     return (
-      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} flex items-center justify-center`}>
-        <div className={`p-6 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} text-center`}>
-          <p className={`text-lg ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>
-            {profileError || 'Profil non trouvé'}
-          </p>
+      <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-gray-50 text-gray-900'} flex items-center justify-center p-4`}>
+        <div className={`p-8 rounded-3xl border text-center max-w-md ${
+          resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
+        } shadow-lg`}>
+          <p className="text-base font-semibold mb-4">Profil introuvable ou indisponible.</p>
           <button
-            onClick={() => navigate('/pro')}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            onClick={() => navigate(-1)}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition-colors"
           >
             Retour
           </button>
@@ -209,476 +153,393 @@ export const PublicProfile = () => {
     );
   }
 
-  return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-20`}>
-      {/* Header */}
-      <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800/90 border-zinc-700' : 'bg-white/90 border-gray-200'} border-b fixed top-0 left-0 right-0 z-50 backdrop-blur-md`}>
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
-            >
-              <ArrowLeft className={`w-5 h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
-            </button>
-            <h1 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Profil
-            </h1>
-          </div>
-        </div>
-      </div>
+  const skillsList = profile.skills || [];
 
-      {/* Main Content */}
-      <div className="pt-16 px-4 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Profile Info */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Profile Card */}
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-              {/* Avatar */}
-              <div className="flex flex-col items-center text-center mb-6">
-                <div className="relative mb-4">
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-4xl font-bold">
-                    {profile.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt={profile.fullName} className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      profile.fullName?.charAt(0) || profile.username?.charAt(0) || '?'
-                    )}
-                  </div>
-                  {isOnline && (
-                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
+  return (
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-gray-50 text-gray-900'} pb-24`}>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-6">
+        
+        {/* Navigation Bar */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className={`p-2.5 rounded-xl border transition-all ${
+              resolvedTheme === 'dark'
+                ? 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-white'
+                : 'bg-white border-gray-200 hover:bg-gray-100 text-gray-900'
+            } shadow-sm active:scale-95 flex items-center gap-2`}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-xs sm:text-sm font-semibold">Retour</span>
+          </button>
+
+          <button
+            onClick={handleShare}
+            className={`p-2.5 rounded-xl border transition-all ${
+              resolvedTheme === 'dark'
+                ? 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-white'
+                : 'bg-white border-gray-200 hover:bg-gray-100 text-gray-900'
+            } shadow-sm active:scale-95 flex items-center gap-2`}
+            title="Partager ce profil"
+          >
+            <Share2 className="w-4 h-4" />
+            <span className="text-xs sm:text-sm font-semibold hidden sm:inline">Partager</span>
+          </button>
+        </div>
+
+        {/* Profile Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+          
+          {/* Left Column: Identity & Bio & Skills */}
+          <div className={`lg:col-span-4 xl:col-span-4 rounded-3xl border p-4 sm:p-5 ${
+            resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+          } shadow-sm space-y-4`}>
+            
+            {/* Banner */}
+            <div className="relative rounded-2xl overflow-hidden aspect-[21/9] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 shadow-md">
+              {profile.bannerUrl && (
+                <img
+                  src={profile.bannerUrl}
+                  alt="Bannière"
+                  className="w-full h-full object-cover object-center"
+                />
+              )}
+            </div>
+
+            {/* Avatar & Online status */}
+            <div className="flex flex-col items-center -mt-12 sm:-mt-14 relative">
+              <div className="relative">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-extrabold text-3xl flex items-center justify-center overflow-hidden border-4 border-white dark:border-zinc-900 shadow-xl ring-2 ring-blue-500/30">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={formattedUsername} className="w-full h-full object-cover object-center" />
+                  ) : (
+                    formattedUsername.replace('@', '').charAt(0).toUpperCase()
                   )}
                 </div>
-                
-                <h2 className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  {profile.fullName}
-                </h2>
-                <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-2`}>
-                  @{profile.username}
-                </p>
-                {profile.verified && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-xs font-medium">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Vérifié
-                  </span>
-                )}
+                <span
+                  className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm ${
+                    isOnline ? 'bg-emerald-500' : 'bg-gray-400'
+                  }`}
+                  title={isOnline ? 'En ligne' : 'Hors ligne'}
+                />
               </div>
 
-              {/* Status */}
-              <div className={`flex items-center justify-center gap-2 mb-4 ${isOnline ? 'text-green-500' : 'text-zinc-500'}`}>
-                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-zinc-500'}`} />
-                <span className="text-sm">
+              {/* Status text */}
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
                   {isOnline ? 'En ligne' : 'Hors ligne'}
                 </span>
               </div>
 
-              {/* Profession & Specialty */}
+              {/* Username strictly @Username */}
+              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-center">
+                {formattedUsername}
+              </h2>
+
+              {/* Profession */}
               {profile.profession && (
-                <div className="mb-4">
-                  <p className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                    {profile.profession}
-                  </p>
-                  {profile.specialty && (
-                    <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                      {profile.specialty}
-                    </p>
+                <div className="flex items-center gap-1.5 mt-1 text-blue-600 dark:text-blue-400 font-semibold text-xs sm:text-sm">
+                  <Briefcase className="w-4 h-4 flex-shrink-0" />
+                  <span>{profile.profession}</span>
+                  {profile.speciality && (
+                    <span className="text-gray-400 font-normal">({profile.speciality})</span>
                   )}
                 </div>
               )}
-
-              {/* Location */}
-              {(profile.city || profile.country) && (
-                <div className={`flex items-center gap-2 text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-4`}>
-                  <MapPin className="w-4 h-4" />
-                  {profile.city && profile.country ? `${profile.city}, ${profile.country}` : profile.city || profile.country}
-                </div>
-              )}
-
-              {/* Bio */}
-              {profile.bio && (
-                <div className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-4`}>
-                  {profile.bio.length > 150 ? (
-                    <>
-                      {profile.bio.substring(0, 150)}...
-                      <button className="text-blue-500 ml-1">Voir plus</button>
-                    </>
-                  ) : (
-                    profile.bio
-                  )}
-                </div>
-              )}
-
-              {/* Joined Date */}
-              <div className={`flex items-center gap-2 text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} mb-6`}>
-                <Calendar className="w-3 h-3" />
-                Membre depuis {new Date(profile.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2">
-                <button
-                  onClick={handleSubscribe}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-colors font-medium ${
-                    isSubscribed
-                      ? 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                >
-                  {isSubscribed ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                  {isSubscribed ? 'Ne plus suivre' : 'Suivre'}
-                </button>
-                <button
-                  onClick={handleContact}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-100 text-zinc-700 rounded-xl hover:bg-zinc-200 transition-colors font-medium"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Contacter
-                </button>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={handleShare}
-                    className="flex items-center justify-center gap-1 px-3 py-2 bg-zinc-100 text-zinc-700 rounded-xl hover:bg-zinc-200 transition-colors text-sm"
-                  >
-                    <Share className="w-4 h-4" />
-                    Partager
-                  </button>
-                  <button
-                    onClick={handleReport}
-                    className="flex items-center justify-center gap-1 px-3 py-2 bg-zinc-100 text-zinc-700 rounded-xl hover:bg-zinc-200 transition-colors text-sm"
-                  >
-                    <Flag className="w-4 h-4" />
-                    Signaler
-                  </button>
-                  <button
-                    onClick={handleBlock}
-                    className={`flex items-center justify-center gap-1 px-3 py-2 rounded-xl transition-colors text-sm ${
-                      isBlocked
-                        ? 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                        : 'bg-red-50 text-red-600 hover:bg-red-100'
-                    }`}
-                  >
-                    <Ban className="w-4 h-4" />
-                    {isBlocked ? 'Débloquer' : 'Bloquer'}
-                  </button>
-                </div>
-              </div>
             </div>
 
-            {/* Skills */}
-            {profile.skills && profile.skills.length > 0 && (
-              <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                <h3 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  Compétences
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {profile.skills.map((skill: any, index: number) => (
-                    <span key={index} className={`px-3 py-1 rounded-full text-sm ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300' : 'bg-gray-100 text-gray-700'}`}>
-                      {typeof skill === 'string' ? skill : skill.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Action CTAs */}
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={handleSubscribe}
+                className={`py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 ${
+                  isSubscribed
+                    ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isSubscribed ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                <span>{isSubscribed ? 'Abonné' : "S'abonner"}</span>
+              </button>
 
-            {/* Languages */}
-            {profile.languages && profile.languages.length > 0 && (
-              <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                <h3 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  Langues
-                </h3>
-                <div className="space-y-2">
-                  {profile.languages.map((lang, index) => (
-                    <div key={index} className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                      {lang}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              <button
+                onClick={() => setShowContactModal(true)}
+                className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+              >
+                <Send className="w-4 h-4" />
+                <span>Demande</span>
+              </button>
+            </div>
 
-            {/* Portfolio Links */}
-            {profile.websites && profile.websites.length > 0 && (
-              <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                <h3 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  Portfolio
-                </h3>
+            {/* Bio & Details */}
+            <div className="pt-3 border-t border-gray-100 dark:border-zinc-800/80 space-y-3 text-xs sm:text-sm">
+              <div>
+                <p className="font-semibold text-gray-400 dark:text-zinc-500 text-[11px] uppercase tracking-wider mb-1">
+                  À propos
+                </p>
+                <p className="text-gray-700 dark:text-zinc-300 leading-relaxed">
+                  {profile.bio || "Aucune biographie renseignée pour le moment."}
+                </p>
+              </div>
+
+              {profile.location && (
+                <div className="flex items-center gap-2 text-gray-600 dark:text-zinc-400">
+                  <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <span>{profile.location}</span>
+                </div>
+              )}
+
+              {profile.createdAt && (
+                <div className="flex items-center gap-2 text-gray-600 dark:text-zinc-400">
+                  <Calendar className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <span>Membre depuis {new Date(profile.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                </div>
+              )}
+
+              {profile.website && (
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <Globe className="w-4 h-4 flex-shrink-0" />
+                  <a href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`} target="_blank" rel="noreferrer" className="hover:underline truncate">
+                    {profile.website}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Compétences (Matching Profile.tsx) */}
+            {skillsList.length > 0 && (
+              <div className="pt-3 border-t border-gray-100 dark:border-zinc-800/80">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-gray-400 dark:text-zinc-500 text-[11px] uppercase tracking-wider">
+                    Compétences ({skillsList.length})
+                  </span>
+                </div>
+
                 <div className="space-y-2">
-                  {profile.websites.map((website, index) => (
-                    <a
-                      key={index}
-                      href={website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center gap-2 text-sm ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition-colors`}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      {website}
-                    </a>
-                  ))}
+                  <div className="flex flex-wrap gap-1.5">
+                    {skillsList.slice(0, 2).map((skill: any, idx: number) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 flex items-center gap-1.5"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        {skill.name || skill}
+                        {skill.level && (
+                          <span className="text-[10px] opacity-70">({skill.level})</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+
+                  {skillsList.length > 2 && (
+                    <>
+                      <button
+                        onClick={() => setIsSkillsExpanded(!isSkillsExpanded)}
+                        className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-1"
+                      >
+                        <span>{isSkillsExpanded ? 'Voir moins' : `+${skillsList.length - 2} autres compétences`}</span>
+                        {isSkillsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {isSkillsExpanded && (
+                        <div className="flex flex-wrap gap-1.5 pt-1 animate-in fade-in">
+                          {skillsList.slice(2).map((skill: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 flex items-center gap-1.5"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              {skill.name || skill}
+                              {skill.level && (
+                                <span className="text-[10px] opacity-70">({skill.level})</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Middle & Right Columns - Stats, Videos, Events */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Statistics */}
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-              <h3 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                Statistiques
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Users className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {subscribersCount}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Abonnés
-                  </p>
+          {/* Right Column: Statistics & Content Tabs */}
+          <div className="lg:col-span-8 xl:col-span-8 space-y-6">
+            
+            {/* Stats Dashboard */}
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              <div className={`p-4 rounded-2xl border text-center ${
+                resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+              } shadow-sm`}>
+                <div className="flex items-center justify-center gap-1.5 text-blue-500 mb-1">
+                  <Users className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Abonnés</span>
                 </div>
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Users className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-green-400' : 'text-green-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile.followingCount}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Abonnements
-                  </p>
+                <p className="text-xl sm:text-2xl font-extrabold">{subscribersCount}</p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border text-center ${
+                resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+              } shadow-sm`}>
+                <div className="flex items-center justify-center gap-1.5 text-purple-500 mb-1">
+                  <Video className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Vidéos</span>
                 </div>
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Video className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile.videosCount}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Vidéos
-                  </p>
+                <p className="text-xl sm:text-2xl font-extrabold">{videos?.length || 0}</p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border text-center ${
+                resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+              } shadow-sm`}>
+                <div className="flex items-center justify-center gap-1.5 text-emerald-500 mb-1">
+                  <CalendarDays className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Événements</span>
                 </div>
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Calendar className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile.eventsCount || 0}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Événements
-                  </p>
-                </div>
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Eye className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile.totalViews || 0}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Vues totales
-                  </p>
-                </div>
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Heart className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile.totalLikes || 0}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Likes totaux
-                  </p>
-                </div>
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Star className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile.rating?.toFixed(1) || '0.0'}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Note
-                  </p>
-                </div>
-                <div className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-50'} text-center`}>
-                  <Award className={`w-6 h-6 mx-auto mb-2 ${resolvedTheme === 'dark' ? 'text-pink-400' : 'text-pink-600'}`} />
-                  <p className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile.recommendationsCount || 0}
-                  </p>
-                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    Recommandations
-                  </p>
-                </div>
+                <p className="text-xl sm:text-2xl font-extrabold">{events?.length || 0}</p>
               </div>
             </div>
 
-            {/* Videos */}
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} flex items-center gap-2`}>
-                  <Video className="w-5 h-5" />
-                  Vidéos ({videos.length})
-                </h3>
-                {videos.length > 8 && (
-                  <button className={`text-sm ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition-colors`}>
-                    Voir toutes
-                  </button>
+            {/* Tab Controls */}
+            <div className={`p-1.5 rounded-2xl border flex items-center gap-1.5 ${
+              resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
+            } shadow-sm`}>
+              <button
+                onClick={() => setActiveTab('videos')}
+                className={`flex-1 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                  activeTab === 'videos'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Video className="w-4 h-4" />
+                <span>Vidéos ({videos?.length || 0})</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('events')}
+                className={`flex-1 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                  activeTab === 'events'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>Événements ({events?.length || 0})</span>
+              </button>
+            </div>
+
+            {/* Content Rendering */}
+            {activeTab === 'videos' && (
+              <div>
+                {videosLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} className="aspect-video bg-zinc-800 rounded-2xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : !videos || videos.length === 0 ? (
+                  <div className={`p-12 text-center rounded-3xl border ${
+                    resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-gray-200'
+                  }`}>
+                    <Video className="w-12 h-12 mx-auto mb-3 text-gray-400 opacity-50" />
+                    <p className="text-sm font-semibold">Aucune vidéo publique pour l'instant.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    {videos.map((vid: any) => (
+                      <div
+                        key={vid.id}
+                        onClick={() => navigate(`/pro/video/${vid.id}`)}
+                        className={`group rounded-2xl border overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                          resolvedTheme === 'dark'
+                            ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                            : 'bg-white border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="relative aspect-video bg-zinc-950 overflow-hidden">
+                          {vid.thumbnailUrl || vid.cover ? (
+                            <img src={vid.thumbnailUrl || vid.cover} alt={vid.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-zinc-500">
+                              <Play className="w-8 h-8 opacity-40" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-full bg-white/90 text-gray-900 flex items-center justify-center shadow-lg">
+                              <Play className="w-5 h-5 fill-current ml-0.5" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h4 className="font-bold text-sm sm:text-base line-clamp-1 group-hover:text-blue-500 transition-colors">
+                            {vid.title}
+                          </h4>
+                          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-zinc-400 mt-2">
+                            <span>{vid.viewsCount || vid.views || 0} vues</span>
+                            <span>{new Date(vid.createdAt || vid.created_at).toLocaleDateString('fr-FR')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
+            )}
 
-              {videosLoading && videos.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className={`w-8 h-8 border-4 ${resolvedTheme === 'dark' ? 'border-zinc-500 border-t-blue-500' : 'border-gray-400 border-t-blue-600'} rounded-full animate-spin`} />
-                </div>
-              ) : videos.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {videos.slice(0, 8).map((video: FeedVideo) => (
-                    <div
-                      key={video.id}
-                      onClick={() => navigate(`/pro/video/${video.id}`)}
-                      className={`${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity group`}
-                    >
-                      <div className="relative">
-                        {video.thumbnail ? (
-                          <img
-                            src={video.thumbnail}
-                            alt={video.title}
-                            className="w-full h-32 object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-32 bg-gray-300 flex items-center justify-center">
-                            <Video className="w-8 h-8 text-gray-400" />
-                          </div>
-                        )}
-
-                      </div>
-                      <div className="p-3">
-                        <h4 className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} line-clamp-2 mb-1`}>
-                          {video.title}
-                        </h4>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} flex items-center gap-1`}>
-                            <Eye className="w-3 h-3" />
-                            {video.views || 0}
-                          </span>
+            {activeTab === 'events' && (
+              <div>
+                {eventsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2].map(i => (
+                      <div key={i} className="h-24 bg-zinc-800 rounded-2xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : !events || events.length === 0 ? (
+                  <div className={`p-12 text-center rounded-3xl border ${
+                    resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-gray-200'
+                  }`}>
+                    <CalendarDays className="w-12 h-12 mx-auto mb-3 text-gray-400 opacity-50" />
+                    <p className="text-sm font-semibold">Aucun événement à venir.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {events.map((ev: any) => (
+                      <div
+                        key={ev.id}
+                        className={`p-4 rounded-2xl border ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
+                        } shadow-sm space-y-2`}
+                      >
+                        <h4 className="font-bold text-sm sm:text-base">{ev.title}</h4>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">{ev.description}</p>
+                        <div className="flex items-center gap-2 text-xs text-blue-500 font-semibold pt-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>{new Date(ev.date || ev.start_time).toLocaleDateString('fr-FR')}</span>
                         </div>
-                        <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} mt-1`}>
-                          {video.createdAt ? new Date(video.createdAt).toLocaleDateString('fr-FR') : ''}
-                        </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Video className={`w-12 h-12 mx-auto ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                  <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mt-2`}>
-                    Aucune vidéo
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Events */}
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} flex items-center gap-2`}>
-                  <Calendar className="w-5 h-5" />
-                  Événements ({events.length})
-                </h3>
-                {events.length > 6 && (
-                  <button className={`text-sm ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition-colors`}>
-                    Voir tous
-                  </button>
+                    ))}
+                  </div>
                 )}
-              </div>
-
-              {eventsLoading && events.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className={`w-8 h-8 border-4 ${resolvedTheme === 'dark' ? 'border-zinc-500 border-t-blue-500' : 'border-gray-400 border-t-blue-600'} rounded-full animate-spin`} />
-                </div>
-              ) : events.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {events.slice(0, 6).map((event: any) => (
-                    <div
-                      key={event.id}
-                      className={`${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'} rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity`}
-                    >
-                      {event.coverImageUrl ? (
-                        <img
-                          src={event.coverImageUrl}
-                          alt={event.title}
-                          className="w-full h-32 object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-32 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
-                          <Calendar className="w-8 h-8 text-white" />
-                        </div>
-                      )}
-                      <div className="p-3">
-                        <h4 className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} line-clamp-2 mb-1`}>
-                          {event.title}
-                        </h4>
-                        <div className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1`}>
-                          {new Date(event.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </div>
-                        {(event.city || event.country) && (
-                          <div className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} flex items-center gap-1`}>
-                            <MapPin className="w-3 h-3" />
-                            {event.city || event.country}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          {event.liveStatus === 'LIVE' && (
-                            <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full flex items-center gap-1">
-                              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                              En direct
-                            </span>
-                          )}
-                          {event.status === 'PUBLISHED' && new Date(event.startDate) > new Date() && (
-                            <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
-                              À venir
-                            </span>
-                          )}
-                          {event.status === 'COMPLETED' && (
-                            <span className="px-2 py-0.5 bg-zinc-500 text-white text-xs rounded-full">
-                              Terminé
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Calendar className={`w-12 h-12 mx-auto ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                  <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mt-2`}>
-                    Aucun événement
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Certifications */}
-            {profile.certifications && profile.certifications.length > 0 && (
-              <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-6`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} flex items-center gap-2`}>
-                    <Award className="w-5 h-5" />
-                    Certifications ({profile.certifications.length})
-                  </h3>
-                  {profile.certifications.length > 6 && (
-                    <button className={`text-sm ${resolvedTheme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition-colors`}>
-                      Voir toutes
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {profile.certifications.slice(0, 6).map((cert, index) => (
-                    <div key={index} className={`p-3 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'}`}>
-                      <p className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                        {cert}
-                      </p>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Contact Modal */}
+      {showContactModal && (
+        <ContactModal
+          isOpen={showContactModal}
+          onClose={() => setShowContactModal(false)}
+          targetUserId={profile.id || id || ''}
+          targetName={formattedUsername}
+          targetProfession={profile.profession}
+          targetSpeciality={profile.speciality}
+          targetAvatar={profile.avatarUrl}
+        />
+      )}
     </div>
   );
 };

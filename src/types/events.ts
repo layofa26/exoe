@@ -27,14 +27,14 @@ export interface Event {
     lng?: number
   }
   
-  // Streaming Live (Jitsi Meet)
+  // Streaming Live & WebRTC
   streaming?: {
     isLive: boolean
-    platform: 'jitsi' | 'zoom' | 'youtube' | 'custom'
-    roomName: string // Non chanm Jitsi a
-    startTime?: string // Lè live la kòmanse
-    endTime?: string // Lè live la fini
-    recording?: boolean // Si ap anrejistre
+    platform: 'webrtc' | 'zoom' | 'youtube' | 'custom'
+    roomName: string // Nom du salon de direct
+    startTime?: string // Date/Heure de début
+    endTime?: string // Date/Heure de fin
+    recording?: boolean
   }
   
   // Media

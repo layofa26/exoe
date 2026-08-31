@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
 import { api } from '../services/apiClient';
 import { unwrapList } from '../services/videoApi';
+import { useQuery } from './useQuery';
 
 /**
  * Réponse réelle de ProfilSerializer (backend Django).
@@ -61,6 +61,19 @@ export interface ProfessionalProfile {
   recommendationsCount: number;
 }
 
+const formatImageUrl = (filename: string | null | undefined): string => {
+  if (!filename) return '';
+  const clean = filename.trim();
+  if (!clean || clean === 'null' || clean === 'undefined') return '';
+  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:')) {
+    return clean;
+  }
+  if (clean.startsWith('/media/') || clean.startsWith('media/')) {
+    return `http://localhost:8000${clean.startsWith('/') ? clean : `/${clean}`}`;
+  }
+  return `https://phjpbbcymhtppfkyoegk.supabase.co/storage/v1/object/public/Exile_images/${clean.replace(/^\/+/, '')}`;
+};
+
 export const mapProfilResponse = (data: ProfilApiResponse): ProfessionalProfile => {
   const fullName = data.full_name || data.username || 'Utilisateur';
   return {
@@ -68,9 +81,9 @@ export const mapProfilResponse = (data: ProfilApiResponse): ProfessionalProfile 
     userId: data.user != null ? String(data.user) : String(data.id),
     fullName,
     username: data.username || '',
-    avatarUrl: data.photo_url || '',
-    bannerUrl: data.banner_url || '',
-    initials: fullName.charAt(0).toUpperCase(),
+    avatarUrl: formatImageUrl(data.photo_url || data.photo),
+    bannerUrl: formatImageUrl(data.banner_url || data.banner),
+    initials: (fullName || data.username || 'U').replace(/^@/, '').charAt(0).toUpperCase(),
     verified: false,
     createdAt: data.date_joined || data.created_at,
     profession: data.profession || data.user_profession || '',
@@ -97,58 +110,43 @@ export const mapProfilResponse = (data: ProfilApiResponse): ProfessionalProfile 
  * (celui exposé par les vidéos via `owner`).
  */
 export const useProfessionalProfile = (professionalId: string) => {
-  const [profile, setProfile] = useState<ProfessionalProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: profile,
+    isLoading: loading,
+    error: queryError,
+    refetch
+  } = useQuery<ProfessionalProfile | null>(
+    async () => {
+      if (!professionalId) return null;
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (!professionalId) {
-        setError('ID de professionnel manquant');
-        setLoading(false);
-        return;
-      }
+      const result = await api.get<unknown>(
+        `/profil/profils/?user=${encodeURIComponent(professionalId)}`
+      );
 
-      try {
-        setLoading(true);
-        setError(null);
-
-        const result = await api.get<unknown>(
-          `/profil/profils/?user=${encodeURIComponent(professionalId)}`
-        );
-
-        if (!result.success) {
-          setError(result.error || 'Impossible de charger le profil');
-          return;
-        }
-
+      if (result.success && result.data) {
         const profils = unwrapList<ProfilApiResponse>(result.data);
-
         if (profils.length > 0) {
-          setProfile(mapProfilResponse(profils[0]));
-          return;
+          return mapProfilResponse(profils[0]);
         }
-
-        // Repli: l'identifiant fourni est peut-être celui du profil lui-même
-        const byId = await api.get<ProfilApiResponse>(
-          `/profil/profils/${encodeURIComponent(professionalId)}/`
-        );
-
-        if (byId.success && byId.data) {
-          setProfile(mapProfilResponse(byId.data));
-        } else {
-          setError('Profil non trouvé');
-        }
-      } catch (err) {
-        console.error('Error loading professional profile:', err);
-        setError('Impossible de charger le profil');
-      } finally {
-        setLoading(false);
       }
-    };
 
-    loadProfile();
-  }, [professionalId]);
+      // Repli: l'identifiant fourni est peut-être celui du profil lui-même
+      const byId = await api.get<ProfilApiResponse>(
+        `/profil/profils/${encodeURIComponent(professionalId)}/`
+      );
 
-  return { profile, loading, error };
+      if (byId.success && byId.data) {
+        return mapProfilResponse(byId.data);
+      }
+
+      return null;
+    },
+    {
+      cacheKey: `pro:profile:public:${professionalId}`,
+      cacheTime: 10 * 60 * 1000,
+      enabled: !!professionalId
+    }
+  );
+
+  return { profile, loading, error: queryError ? queryError.message : null, refresh: refetch };
 };

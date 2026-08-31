@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -9,7 +9,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/apiClient'
 import { MessageListSchema } from '../../schemas/apiSchemas'
-import { getCurrentUserId } from '../../services/apiClient'
+import { useQuery } from '../../hooks/useQuery'
 
 interface ImportantMessage {
   id: string
@@ -30,35 +30,27 @@ interface ImportantMessage {
 export const ImportantMessages = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
-  
-  const [messages, setMessages] = useState<ImportantMessage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   const handleBack = () => {
     navigate('/pro/requests')
   }
 
-  useEffect(() => {
-    const loadImportantMessages = async () => {
+  // SWR query avec chargement instantané (0ms) depuis le cache
+  const {
+    data: cachedMessages,
+    isLoading: loading,
+    error: queryError,
+    setData: setMessages
+  } = useQuery<ImportantMessage[]>(
+    async () => {
       try {
-        setLoading(true)
-        setError(null)
-        
         const token = localStorage.getItem('accessToken')
-        if (!token) {
-          navigate('/login')
-          return
-        }
-        
-        const userId = getCurrentUserId()
-        
-        // Load important messages from backend
+        if (!token) return []
+
         const result = await api.get('/conversations/messages/?is_important=true', MessageListSchema)
-        
-        if (result.success && result.data) {
-          const messagesData = result.data.results.map((msg: any) => ({
+        if (result.success && result.data && result.data.results) {
+          return result.data.results.map((msg: any) => ({
             id: String(msg.id),
             conversationId: String(msg.conversation),
             senderId: String(msg.sender),
@@ -68,18 +60,22 @@ export const ImportantMessages = (): JSX.Element => {
             createdAt: msg.created_at,
             sender: msg.sender || {}
           }))
-          setMessages(messagesData)
         }
+        return []
       } catch (err) {
         console.error('Error loading important messages:', err)
-        setError('Erreur lors du chargement des messages importants')
-      } finally {
-        setLoading(false)
+        return []
       }
+    },
+    {
+      cacheKey: 'pro:conversations:important',
+      cacheTime: 1 * 60 * 1000,
+      initialData: []
     }
-    
-    loadImportantMessages()
-  }, [navigate])
+  )
+
+  const messages = cachedMessages || []
+  const error = queryError ? queryError.message : null
 
   const handleMessageClick = (conversationId: string) => {
     navigate(`/pro/conversation/${conversationId}`)
