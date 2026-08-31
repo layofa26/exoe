@@ -36,93 +36,6 @@ const VideoSkeleton = ({ resolvedTheme }: { resolvedTheme: string }) => {
   )
 }
 
-const DEFAULT_DEMO_VIDEOS: Video[] = [
-  {
-    id: "demo_1",
-    title: "Présentation de la plateforme EXILE & Opportunités Professionnelles",
-    description: "Découvrez comment maximiser votre visibilité professionnelle et créer du contenu sur EXILE.",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
-    thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
-    views: 1420,
-    viewsCount: 1420,
-    likes: 380,
-    likesCount: 380,
-    commentsCount: 24,
-    createdAt: new Date().toISOString(),
-    postedAt: new Date().toISOString(),
-    author: {
-      id: "auth_exile",
-      name: "Équipe EXILE Officiel",
-      username: "@exile_official",
-      profession: "Plateforme Professionnelle",
-      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-      avatarColor: "#FF6B00",
-      initials: "EX",
-      followers: 12500,
-      verified: true
-    }
-  },
-  {
-    id: "demo_2",
-    title: "Stratégie Marketing & Développement de Marque pour Entreprises",
-    description: "Conseils d'experts pour développer l'image de votre entreprise et toucher votre audience cible.",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    thumbnail: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=80",
-    thumbnailUrl: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=80",
-    views: 950,
-    viewsCount: 950,
-    likes: 210,
-    likesCount: 210,
-    commentsCount: 15,
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    postedAt: new Date(Date.now() - 86400000).toISOString(),
-    author: {
-      id: "auth_pro_2",
-      name: "Jean-Marc Dupont",
-      username: "@jm_dupont",
-      profession: "Consultant Marketing",
-      avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      avatarColor: "#3B82F6",
-      initials: "JD",
-      followers: 4800,
-      verified: true
-    }
-  },
-  {
-    id: "demo_3",
-    title: "Innovation Tech & Solutions Numériques pour Professionnels",
-    description: "Analyse des nouvelles tendances technologiques et outils d'automatisation.",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    thumbnail: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&auto=format&fit=crop&q=80",
-    thumbnailUrl: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&auto=format&fit=crop&q=80",
-    views: 2300,
-    viewsCount: 2300,
-    likes: 640,
-    likesCount: 640,
-    commentsCount: 42,
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    postedAt: new Date(Date.now() - 172800000).toISOString(),
-    author: {
-      id: "auth_pro_3",
-      name: "Marie Claire Valcin",
-      username: "@mc_valcin",
-      profession: "Ingénieure Software",
-      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
-      avatarColor: "#10B981",
-      initials: "MV",
-      followers: 8900,
-      verified: true
-    }
-  }
-];
-
 export default function VideoFeed() {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
@@ -177,7 +90,7 @@ export default function VideoFeed() {
   const subsAlgo = useSubsAlgo(userId)
   const requestsAlgo = useRequestsAlgo(userId)
 
-  // Hook SWR avec revalidation pour toujours obtenir des vidéos fraîches
+  // Hook SWR avec revalidation - Récupère exclusivement les VRAIES vidéos du Backend Django
   const {
     data: cachedVideos,
     isLoading: loading,
@@ -186,29 +99,18 @@ export default function VideoFeed() {
     setData: setVideos
   } = useQuery<Video[]>(
     async () => {
-      let localVideos: Video[] = []
-      try {
-        const storedLocal1 = JSON.parse(localStorage.getItem('exile_videos') || '[]')
-        const storedLocal2 = JSON.parse(localStorage.getItem('exile_user_videos') || '[]')
-        localVideos = [...storedLocal1, ...storedLocal2]
-      } catch {}
-
       try {
         const { videoApi, mapApiVideo } = await import('../../services/videoApi')
         const result = await videoApi.getVideos()
         const backendVideos: Video[] = result.success && result.data ? result.data.map(mapApiVideo) : []
-        const combined = [...localVideos, ...backendVideos]
-        if (combined.length === 0) {
-          return DEFAULT_DEMO_VIDEOS
-        }
-        return combined
+        return backendVideos
       } catch {
-        return localVideos.length > 0 ? localVideos : DEFAULT_DEMO_VIDEOS
+        return []
       }
     },
     {
-      cacheKey: 'pro:videos:feed:v5',
-      cacheTime: 30 * 1000,
+      cacheKey: 'pro:videos:feed:v6',
+      cacheTime: 15 * 1000,
       refetchOnMount: true,
     }
   )
@@ -550,10 +452,22 @@ export default function VideoFeed() {
                   ))}
                 </>
               ) : (
-                <div className="col-span-full py-16 px-4 text-center">
-                  <p className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                    {query ? 'Aucun résultat trouvé pour votre recherche' : 'Aucune vidéo disponible pour le moment'}
+                <div className="col-span-full py-16 px-4 text-center space-y-3">
+                  <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
+                    {query ? 'Aucun résultat trouvé pour votre recherche' : 'Aucune vidéo sur la plateforme pour le moment'}
                   </p>
+                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
+                    Soyez le premier à publier du contenu sur EXILE !
+                  </p>
+                  {!query && (
+                    <button
+                      onClick={() => setIsUploadOpen(true)}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-lg transition-all"
+                    >
+                      <Plus size={16} />
+                      <span>Publier une vidéo</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -595,10 +509,22 @@ export default function VideoFeed() {
                     />
                   ))
                 ) : (
-                  <div className="col-span-full py-20 px-4 text-center">
-                    <p className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
+                  <div className="col-span-full py-20 px-4 text-center space-y-3">
+                    <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
                       {query ? 'Aucun résultat trouvé pour votre recherche' : 'Aucune vidéo disponible pour le moment'}
                     </p>
+                    <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
+                      Soyez le premier à publier du contenu sur EXILE !
+                    </p>
+                    {!query && (
+                      <button
+                        onClick={() => setIsUploadOpen(true)}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-lg transition-all"
+                      >
+                        <Plus size={16} />
+                        <span>Publier une vidéo</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

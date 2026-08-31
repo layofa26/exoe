@@ -544,7 +544,10 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
 
   const formatAgo = (d?: string): string => {
     if (!d) return 'Récemment'
-    const ms = Date.now() - new Date(d).getTime()
+    const ts = new Date(d).getTime()
+    if (isNaN(ts)) return 'Récemment'
+    const ms = Date.now() - ts
+    if (isNaN(ms) || ms < 0) return 'Récemment'
     const m = Math.floor(ms / 60000)
     if (m < 60) return `${Math.max(1, m)} min`
     const h = Math.floor(m / 60)

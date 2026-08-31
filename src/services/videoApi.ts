@@ -1,6 +1,6 @@
 import type { Video as FeedVideo } from '../types/video'
 
-const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 // S'assurer que l'URL de base est toujours propre et sans double /v1
 const API_BASE_URL = RAW_API_BASE.replace(/\/+$/, '')
 
@@ -81,7 +81,7 @@ export const resolveMediaUrl = (url?: string | null): string => {
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
     return trimmed
   }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+  const apiBase = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
   const origin = apiBase.replace(/\/api.*$/, '').replace(/\/$/, '')
   return `${origin}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`
 }
