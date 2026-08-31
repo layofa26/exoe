@@ -21,7 +21,7 @@ interface UseWebSocketReturn {
   isConnected: boolean
 }
 
-const MAX_RETRIES = 8
+const MAX_RETRIES = 2
 const BASE_DELAY_MS = 1000
 const MAX_DELAY_MS = 30000
 
