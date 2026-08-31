@@ -315,17 +315,27 @@ export default function VideoFeed() {
   const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
   const currentUserId = userProfile?.id || 'current-user-' + Date.now()
 
-  // Filtrer videyo yo selon rechèch - Use real search results when searching
-  const displayVideos: Video[] = query && results
-    ? results.videos
-    : videos.filter(video => {
-        if (!query.trim()) return true;
-        const searchLower = query.toLowerCase();
-        const titleMatch = video.title?.toLowerCase().includes(searchLower);
-        const professionMatch = video.author?.profession?.toLowerCase().includes(searchLower);
-        const authorMatch = video.author?.name?.toLowerCase().includes(searchLower);
-        return titleMatch || professionMatch || authorMatch;
-      });
+  // Filtrer & Dédupliquer les vidéos par ID unique pour éviter les clés dupliquées React
+  const displayVideos: Video[] = useMemo(() => {
+    const rawList: Video[] = query && results
+      ? results.videos
+      : videos.filter(video => {
+          if (!query.trim()) return true;
+          const searchLower = query.toLowerCase();
+          const titleMatch = video.title?.toLowerCase().includes(searchLower);
+          const professionMatch = video.author?.profession?.toLowerCase().includes(searchLower);
+          const authorMatch = video.author?.name?.toLowerCase().includes(searchLower);
+          return titleMatch || professionMatch || authorMatch;
+        });
+
+    const seenIds = new Set<string>();
+    return rawList.filter((v, idx) => {
+      const idKey = v?.id != null ? String(v.id) : `idx_${idx}`;
+      if (seenIds.has(idKey)) return false;
+      seenIds.add(idKey);
+      return true;
+    });
+  }, [query, results, videos]);
 
   // Tracker les recherches avec useRequestsAlgo
   useEffect(() => {
@@ -523,7 +533,7 @@ export default function VideoFeed() {
               ) : displayVideos.length > 0 ? (
                 <>
                   {displayVideos.map((video, idx) => (
-                    <React.Fragment key={`video-${video.id}`}>
+                    <React.Fragment key={`mob-video-${video.id}-${idx}`}>
                       <FeedVideoCard
                         video={video}
                         onClick={() => handleOpen(video)}
@@ -575,9 +585,9 @@ export default function VideoFeed() {
                     </button>
                   </div>
                 ) : displayVideos.length > 0 ? (
-                  displayVideos.map((video) => (
+                  displayVideos.map((video, idx) => (
                     <FeedVideoCard
-                      key={`video-${video.id}`}
+                      key={`desk-video-${video.id}-${idx}`}
                       video={video}
                       onClick={() => handleOpen(video)}
                       onContact={handleContact}
