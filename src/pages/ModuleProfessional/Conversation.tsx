@@ -160,7 +160,7 @@ export const ConversationView = ({
     }
     return []
   })
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [hasDraft, setHasDraft] = useState(false)
@@ -714,8 +714,11 @@ export const ConversationView = ({
   }, [conversation, currentUserId])
 
   const isOtherOnline = useMemo(() => {
-    if (!otherParticipant) return false
-    return onlineUserId === String(otherParticipant.id)
+    if (!otherParticipant) return true
+    if (onlineUserId === String(otherParticipant.id)) return true
+    if (otherParticipant.is_online !== undefined) return Boolean(otherParticipant.is_online)
+    if (otherParticipant.isOnline !== undefined) return Boolean(otherParticipant.isOnline)
+    return true
   }, [onlineUserId, otherParticipant])
 
   const filteredMessages = useMemo(() => {
