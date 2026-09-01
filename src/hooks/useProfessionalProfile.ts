@@ -69,7 +69,8 @@ const formatImageUrl = (filename: string | null | undefined): string => {
     return clean;
   }
   if (clean.startsWith('/media/') || clean.startsWith('media/')) {
-    return `http://localhost:8000${clean.startsWith('/') ? clean : `/${clean}`}`;
+    const serverHost = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com' : 'http://localhost:8000')
+    return `${serverHost.replace('/api/v1', '').replace('/api', '')}${clean.startsWith('/') ? clean : `/${clean}`}`;
   }
   return `https://phjpbbcymhtppfkyoegk.supabase.co/storage/v1/object/public/Exile_images/${clean.replace(/^\/+/, '')}`;
 };

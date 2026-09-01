@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { ContactModal } from '../../components/modals/ContactModal';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
 
 export const PublicProfile = () => {
   const { resolvedTheme } = useTheme();
@@ -125,6 +125,39 @@ export const PublicProfile = () => {
       navigator.clipboard.writeText(url);
       alert('Lien du profil copié dans le presse-papier !');
     }
+  };
+
+  const handleContactClick = async () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    const targetUserId = profile?.userId || id;
+    if (!targetUserId) return;
+
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/conversations/start/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ participant_id: Number(targetUserId) })
+        });
+
+        if (res.ok) {
+          const convData = await res.json();
+          if (convData && convData.id) {
+            navigate(`/pro/requests?conv=${convData.id}`);
+            return;
+          }
+        }
+      }
+    } catch {}
+
+    setShowContactModal(true);
   };
 
   if (profileLoading) {
@@ -264,7 +297,7 @@ export const PublicProfile = () => {
               </button>
 
               <button
-                onClick={() => setShowContactModal(true)}
+                onClick={handleContactClick}
                 className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
               >
                 <Send className="w-4 h-4" />
