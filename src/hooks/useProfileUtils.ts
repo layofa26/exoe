@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
 
 interface Skill {
   id: string;
@@ -79,12 +79,6 @@ export const getProfileWithFallback = async (token: string) => {
 
   try {
     let res = await doFetchProfile(API_BASE_URL);
-    if ((!res || !res.ok) && API_BASE_URL.includes('onrender.com')) {
-      try {
-        const localRes = await doFetchProfile('http://localhost:8000/api/v1');
-        if (localRes && localRes.ok) res = localRes;
-      } catch {}
-    }
 
     if (res && res.ok) {
       const data = await res.json();

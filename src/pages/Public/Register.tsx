@@ -237,14 +237,13 @@ export const Register = (): JSX.Element => {
   }
 
   return (
-    <div className={`min-h-screen py-6 sm:py-12 px-3 sm:px-4 relative overflow-hidden ${
+    <div className={`min-h-screen py-4 sm:py-8 md:py-12 px-3 sm:px-6 relative overflow-hidden flex flex-col justify-center items-center ${
       resolvedTheme === 'dark' 
         ? 'bg-slate-900' 
         : 'bg-gray-50'
     }`}>
-      {/* Animated Background with Color Mixing and Simple Images */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Animated gradient background */}
+      {/* Animated Background with Color Mixing */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 animate-gradient-x" style={{
           background: `linear-gradient(45deg, 
             ${resolvedTheme === 'dark' ? '#1e3a8a' : '#3b82f6'}, 
@@ -256,30 +255,21 @@ export const Register = (): JSX.Element => {
           animation: 'gradient 15s ease infinite',
         }} />
         
-        {/* Simple geometric shapes */}
-        <div className="absolute top-20 left-10 w-32 h-32 bg-white/10 rounded-full animate-bounce" style={{ animationDuration: '3s' }} />
-        <div className="absolute top-40 right-20 w-24 h-24 bg-white/10 rounded-lg animate-spin" style={{ animationDuration: '10s' }} />
-        <div className="absolute bottom-32 left-1/4 w-20 h-20 bg-white/10 animate-pulse" />
-        <div className="absolute bottom-20 right-1/3 w-16 h-16 bg-white/10 rounded-full animate-ping" style={{ animationDuration: '2s' }} />
-        
-        {/* Simple lines */}
-        <div className="absolute top-1/3 left-0 w-full h-px bg-white/10" />
-        <div className="absolute top-2/3 left-0 w-full h-px bg-white/10" />
-        <div className="absolute top-0 left-1/3 h-full w-px bg-white/10" />
-        <div className="absolute top-0 right-1/3 h-full w-px bg-white/10" />
+        <div className="absolute top-20 left-10 w-24 sm:w-32 h-24 sm:h-32 bg-white/10 rounded-full animate-bounce" style={{ animationDuration: '3s' }} />
+        <div className="absolute top-40 right-10 sm:right-20 w-16 sm:w-24 h-16 sm:h-24 bg-white/10 rounded-lg animate-spin" style={{ animationDuration: '10s' }} />
       </div>
 
-      <div className="max-w-lg mx-auto relative z-10 mt-28">
-        <div className={`rounded-2xl shadow-2xl p-4 sm:p-8 backdrop-blur-sm ${
+      <div className="w-full max-w-lg mx-auto relative z-10 my-auto pt-16 sm:pt-20 pb-8">
+        <div className={`rounded-2xl shadow-2xl p-5 sm:p-8 backdrop-blur-md transition-all ${
           resolvedTheme === 'dark' 
-            ? 'bg-slate-800/80 border border-slate-700' 
-            : 'bg-white/80 border border-gray-200'
+            ? 'bg-slate-800/90 border border-slate-700/80 shadow-black/40' 
+            : 'bg-white/90 border border-gray-200/80 shadow-slate-200/60'
         }`}>
-          <div className="text-center mb-6 sm:mb-8">
-            <h1 className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>
+          <div className="text-center mb-5 sm:mb-7">
+            <h1 className={`text-xl sm:text-2xl md:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-1.5`}>
               Créer un compte Professionnel
             </h1>
-            <p className={`text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
+            <p className={`text-xs sm:text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
               Rejoignez la communauté d'experts EXILE
             </p>
           </div>

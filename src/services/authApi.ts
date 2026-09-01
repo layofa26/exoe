@@ -1,12 +1,10 @@
 import { LoginResponseSchema, RegisterResponseSchema, ApiErrorSchema } from '../schemas/authSchemas'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
-// Ensure API_BASE_URL always ends with /api/v1 for production URLs
-const PROD_API_BASE_URL = 'https://exile-backend-9q6o.onrender.com/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
   ? API_BASE_URL.replace('/api', '/api/v1') 
   : API_BASE_URL
-const API_TIMEOUT = 10000 // 10 seconds timeout for faster connection
+const API_TIMEOUT = 12000 // 12 seconds timeout
 
 // Helper functions for cookie management (for reading httpOnly cookies set by backend)
 const getCookie = (name: string): string | null => {
@@ -86,7 +84,7 @@ export const authApi = {
 
     const doFetch = async (baseUrl: string) => {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
       try {
         const response = await fetch(`${baseUrl}/users/login/`, {
           method: 'POST',
@@ -106,46 +104,20 @@ export const authApi = {
     }
 
     try {
-      let response: Response | null = null
-
-      // First attempt with configured endpoint
-      try {
-        response = await doFetch(FINAL_API_BASE_URL)
-      } catch (err) {
-        console.warn('Initial login endpoint failed, attempting fallback...', err)
-      }
-
-      // If remote returned an error or failed, and we are developing locally, try localhost:8000
-      if ((!response || !response.ok) && FINAL_API_BASE_URL.includes('onrender.com')) {
-        try {
-          const localResponse = await doFetch('http://localhost:8000/api/v1')
-          if (localResponse.ok || !response) {
-            response = localResponse
-          }
-        } catch {}
-      }
-
-      if (!response) {
-        return {
-          success: false,
-          error: 'Impossible de joindre le serveur. Vérifiez votre connexion internet.'
-        }
-      }
+      const response = await doFetch(FINAL_API_BASE_URL)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Erreur backend connexion:', {
-          status: response.status,
-          errorData
-        })
 
-        let errorMsg = 'Identifiants incorrects.'
+        let errorMsg = "Identifiants incorrects. Vérifiez votre nom d'utilisateur ou mot de passe."
         if (errorData.detail) {
           errorMsg = Array.isArray(errorData.detail) ? errorData.detail[0] : errorData.detail
         } else if (errorData.error) {
           errorMsg = Array.isArray(errorData.error) ? errorData.error[0] : errorData.error
         } else if (errorData.non_field_errors) {
           errorMsg = Array.isArray(errorData.non_field_errors) ? errorData.non_field_errors[0] : errorData.non_field_errors
+        } else if (errorData.password) {
+          errorMsg = Array.isArray(errorData.password) ? errorData.password[0] : errorData.password
         }
 
         return { success: false, error: errorMsg }
@@ -163,13 +135,12 @@ export const authApi = {
       if (error instanceof Error && error.name === 'AbortError') {
         return {
           success: false,
-          error: 'Délai de connexion dépassé. Veuillez réessayer.'
+          error: 'Délai de connexion dépassé. Le serveur se réveille, veuillez réessayer dans quelques secondes.'
         }
       }
-      console.error('Erreur de connexion:', error)
       return {
         success: false,
-        error: 'Erreur de connexion au serveur.'
+        error: 'Impossible de joindre le serveur. Vérifiez votre connexion internet.'
       }
     }
   },

@@ -70,7 +70,8 @@ function resolveAvatarUrl(photo: string | null | undefined): string | undefined 
   }
   if (clean.startsWith('/media/') || clean.startsWith('media/')) {
     const cleanMedia = clean.startsWith('/') ? clean : `/${clean}`
-    return `http://localhost:8000${cleanMedia}`
+    const serverHost = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com' : 'http://localhost:8000')
+    return `${serverHost.replace('/api/v1', '').replace('/api', '')}${cleanMedia}`
   }
   // Ne pas construire d'URL /public/ sur des buckets privés sans URL signée
   return undefined
@@ -85,7 +86,7 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
 
   const fetchProfileAvatar = async (tokenStr: string, currentUserId: string | number) => {
     try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
       const headers = { Authorization: `Bearer ${tokenStr}` }
       const res = await fetch(`${API_BASE}/profil/profils/me/`, { headers }).catch(() => null)
       let profileData: any = null
