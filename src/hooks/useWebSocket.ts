@@ -84,33 +84,17 @@ export function useWebSocket({
         }
       }
 
-      ws.onclose = (event) => {
+      ws.onclose = () => {
         if (!isMounted.current) return
         setConnectionState('disconnected')
-
-        // Don't retry on explicit auth/permission errors
-        if (event.code === 4001 || event.code === 4003) {
-          setConnectionState('error')
-          return
-        }
-
-        // Exponential backoff retry
-        if (retryCount.current < MAX_RETRIES && enabled) {
-          const delay = Math.min(
-            BASE_DELAY_MS * Math.pow(2, retryCount.current),
-            MAX_DELAY_MS
-          )
-          retryCount.current++
-          retryTimer.current = setTimeout(connect, delay)
-        }
       }
 
       ws.onerror = () => {
         if (!isMounted.current) return
-        setConnectionState('error')
+        setConnectionState('disconnected')
       }
     } catch {
-      setConnectionState('error')
+      setConnectionState('disconnected')
     }
   }, [conversationId, enabled])
 
