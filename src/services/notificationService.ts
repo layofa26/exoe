@@ -3,7 +3,12 @@ export interface AppNotification {
   type: 'message' | 'request_accepted' | 'new_contact' | 'system'
   title: string
   message: string
+  iconUrl?: string
   data?: any
+  actionButton?: {
+    label: string
+    actionUrl: string
+  }
   createdAt: string
   read: boolean
 }

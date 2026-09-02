@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Users,
@@ -15,9 +15,9 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
-import { getStoredAds, type Ad } from './AdBanner'
+import { getStoredAds, fetchRemoteAds, trackAdClick, type Ad } from './AdBanner'
 
 export interface FeaturedCompany {
   id: string
@@ -29,6 +29,16 @@ export interface FeaturedCompany {
   tagline?: string
   description?: string
   gradient?: string
+  brandLogo?: string
+  ctaLabel?: string
+  ctaTextColor?: string
+  ctaBgColor?: string
+  bgType?: 'color' | 'gradient' | 'media'
+  bgColor?: string
+  bgMediaUrl?: string
+  bgVideoUrl?: string
+  targetAudience?: 'all' | 'interests'
+  targetInterests?: string[]
 }
 
 interface RecommendedPro {
@@ -49,53 +59,6 @@ interface UpcomingEvent {
   isLive?: boolean
 }
 
-export const FEATURED_COMPANIES: FeaturedCompany[] = [
-  {
-    id: 'comp-1',
-    name: 'DigiFinance HT',
-    initials: 'DF',
-    category: 'Finance',
-    color: '#059669',
-    gradient: 'from-emerald-600 to-teal-700',
-    url: '#',
-    tagline: 'Comptabilité & Solutions FinTech',
-    description: 'Automatisez vos déclarations fiscales et optimisez la trésorerie de votre entreprise.'
-  },
-  {
-    id: 'comp-2',
-    name: 'TechHaïti',
-    initials: 'TH',
-    category: 'Technologie',
-    color: '#2563eb',
-    gradient: 'from-blue-600 to-indigo-700',
-    url: '#',
-    tagline: 'Transformation Digitale & Cloud',
-    description: 'Développement de logiciels sur mesure, audits cybersécurité et infrastructure cloud pour entreprises.'
-  },
-  {
-    id: 'comp-3',
-    name: 'Solèy Market',
-    initials: 'SM',
-    category: 'Supermarché',
-    color: '#ea580c',
-    gradient: 'from-amber-500 to-orange-600',
-    url: '#',
-    tagline: 'Logistique & Approvisionnement',
-    description: 'Livraison express et sourcing de produits de qualité pour les professionnels.'
-  },
-  {
-    id: 'comp-4',
-    name: 'Kay Reparasyon',
-    initials: 'KP',
-    category: 'Services',
-    color: '#7c3aed',
-    gradient: 'from-purple-600 to-indigo-800',
-    url: '#',
-    tagline: 'Maintenance & Réparations Pro',
-    description: 'Services techniques et maintenance rapide pour vos équipements et locaux professionnels.'
-  }
-]
-
 interface SectionPubProps {
   variant?: 'auto' | 'mobile' | 'desktop'
 }
@@ -108,9 +71,14 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
 
   const [realAds, setRealAds] = useState<Ad[]>(() => getStoredAds())
   const [currentAdIndex, setCurrentAdIndex] = useState(0)
+  const mobileSliderRef = useRef<HTMLDivElement>(null)
 
-  // Écouter les mises à jour en direct depuis le Dashboard PUB
+  // Synchronisation distante + écoute des mises à jour en direct depuis le Dashboard PUB
   useEffect(() => {
+    fetchRemoteAds().then(remote => {
+      if (Array.isArray(remote)) setRealAds(remote)
+    })
+
     const handleUpdate = () => {
       setRealAds(getStoredAds())
     }
@@ -124,33 +92,92 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
 
   const activeRealAds = realAds.filter(a => a.status === 'active')
 
-  const companies: FeaturedCompany[] = activeRealAds.map(a => ({
+  const userProfile = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+    } catch {
+      return {}
+    }
+  }, [])
+
+  const userInterests: string[] = useMemo(() => {
+    const list: string[] = []
+    if (Array.isArray(userProfile?.interests)) list.push(...userProfile.interests)
+    if (userProfile?.profession) list.push(userProfile.profession)
+    return list.map((s: string) => String(s).toLowerCase().trim())
+  }, [userProfile])
+
+  // Filtrage d'audience réel : Tous les visiteurs OU selon centres d'intérêt
+  const targetedAds = useMemo(() => {
+    return activeRealAds.filter(ad => {
+      // 1. Si ciblage = "all", visible pour tout le monde (connecté ou non)
+      if (!ad.targetAudience || ad.targetAudience === 'all') return true
+
+      // 2. Si ciblage = "interests"
+      if (ad.targetAudience === 'interests') {
+        const adInterests = (ad.targetInterests || []).map(i => i.toLowerCase().trim())
+        if (adInterests.length === 0) return true
+        // Si l'utilisateur a au moins un centre d'intérêt correspondant
+        const hasMatch = userInterests.some(ui => adInterests.some(ai => ai.includes(ui) || ui.includes(ai)))
+        // Pour les visiteurs non connectés, afficher également pour découverte
+        return hasMatch || userInterests.length === 0
+      }
+      return true
+    })
+  }, [activeRealAds, userInterests])
+
+  // Seules les vraies publicités créées depuis le Dashboard PUB sont affichées (aucune fausse pub)
+  const companies: FeaturedCompany[] = targetedAds.map(a => ({
     id: a.id,
     name: a.brandName,
     initials: a.brandInitials || a.brandName.slice(0, 2).toUpperCase(),
     category: a.category || 'Entreprise',
-    color: a.brandColor || '#2563eb',
-    gradient: a.gradient || 'from-blue-600 to-indigo-700',
+    color: a.bgColor || a.brandColor || '#2563eb',
+    bgColor: a.bgColor || a.brandColor || '#2563eb',
+    bgType: a.bgType || (a.bgMediaUrl ? 'media' : a.gradient ? 'gradient' : 'color'),
+    gradient: a.bgType === 'color' ? '' : (a.gradient || ''),
+    bgMediaUrl: a.bgMediaUrl || a.bgVideoUrl || '',
+    bgVideoUrl: a.bgVideoUrl || a.bgMediaUrl || '',
+    targetAudience: a.targetAudience || 'all',
+    targetInterests: a.targetInterests || [],
     url: a.ctaUrl || '#',
     tagline: a.tagline,
-    description: a.description
+    description: a.description,
+    brandLogo: a.brandLogo,
+    ctaLabel: a.ctaLabel || 'Visiter',
+    ctaTextColor: a.ctaTextColor || '#ffffff',
+    ctaBgColor: a.ctaBgColor || '#FF6B00',
   }))
 
-  // Rotation automatique douce pour le mode desktop
+  // Rotation automatique douce pour tous les modes (passe les publicités l'une après l'autre)
   useEffect(() => {
-    if (companies.length === 0) return
+    if (companies.length <= 1) return
     const timer = setInterval(() => {
       setCurrentAdIndex(prev => (prev + 1) % companies.length)
-    }, 8000)
+    }, 5000)
     return () => clearInterval(timer)
   }, [companies.length])
+
+  // Défilement automatique fluide vers la publicité active (les pubs passent l'une après l'autre sans jamais aller à la ligne)
+  useEffect(() => {
+    if (!mobileSliderRef.current || companies.length <= 1) return
+    const container = mobileSliderRef.current
+    const activeItem = container.children[currentAdIndex % companies.length] as HTMLElement
+    if (activeItem) {
+      const targetLeft = activeItem.offsetLeft - container.offsetLeft - (container.clientWidth / 2 - activeItem.clientWidth / 2)
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
+        behavior: 'smooth'
+      })
+    }
+  }, [currentAdIndex, companies.length])
 
   const [pros, setPros] = useState<RecommendedPro[]>([
     { id: '1', name: 'Dr. Marc Antoine', username: 'marcantoine', profession: 'Cardiologue & Chercheur', subscribersCount: 1420, isFollowing: false },
     { id: '2', name: 'Sophie Laurent', username: 'sophielaurent', profession: 'Experte FinTech & IA', subscribersCount: 3890, isFollowing: false }
   ])
 
-  const [events] = useState<UpcomingEvent[]>([
+  const [events, setEvents] = useState<UpcomingEvent[]>([
     { id: 'evt_1', title: 'Masterclass : Architecture Web & Sécurité', date: 'Demain à 18h00', category: 'Tech', isLive: true },
     { id: 'evt_2', title: 'Webinaire : Stratégies d’Investissement 2026', date: 'Samedi 14h00', category: 'Finance', isLive: false }
   ])
@@ -177,9 +204,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             })))
           }
         }
-      } catch {
-        // Fallback silently
-      }
+      } catch {}
     }
     fetchPros()
   }, [])
@@ -222,83 +247,156 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
 
   const [isInquiryModalOpen, setIsInquiryModalOpen] = useState(false)
 
-  // ── 📱 VUE MOBILE & TABLETTE : "Entreprises en vedette" ──
   const renderMobileFeaturedCompanies = () => (
-    <div className="w-full py-2">
-      <div className="flex items-center justify-between px-2 sm:px-1 mb-2.5">
-        <h3 className={`text-sm sm:text-base font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          Entreprises en vedette
-        </h3>
-      </div>
-
+    <div className="w-full py-1">
       {companies.length === 0 ? (
-        <div className={`rounded-2xl border p-4 text-center space-y-2 mx-1 ${isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'}`}>
-          <div className="w-10 h-10 rounded-full bg-blue-600/20 text-blue-500 flex items-center justify-center mx-auto font-bold text-sm">
-            📢
+        <div className={`rounded-2xl border p-3.5 text-center space-y-2 mx-1 ${isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'} shadow-sm`}>
+          <div className="w-9 h-9 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto text-sm font-bold">
+            🏢
           </div>
-          <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Espace Entreprises (PUB)</p>
+          <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Espace Entreprise(PUB)</p>
           <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>Promouvez votre marque auprès des professionnels EXILE.</p>
           <button
             onClick={() => setIsInquiryModalOpen(true)}
-            className="inline-block mt-1 px-4 py-1.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs transition-colors shadow-sm active:scale-95"
+            className="inline-block px-3.5 py-1.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs transition-colors shadow-sm active:scale-95"
           >
             📩 Faire une demande publicitaire
           </button>
         </div>
       ) : (
-        <div className="flex gap-2.5 sm:gap-3 overflow-x-auto scrollbar-hide px-1 pb-1 justify-start">
-          {companies.map(company => (
-            <div
-              key={company.id}
-              className={`${
-                companies.length <= 2 ? 'w-44 sm:w-52 flex-shrink-0' : 'flex-1 min-w-[145px] sm:min-w-[165px]'
-              } rounded-2xl border p-3 flex flex-col items-center text-center shadow-sm transition-transform active:scale-98 ${
-                isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
-              }`}
-            >
-              {/* Logo / Initiale Avatar Cercle */}
-              {company.brandLogo ? (
-                <img
-                  src={company.brandLogo}
-                  alt={company.name}
-                  className="w-12 h-12 rounded-full object-cover mb-2 shadow-sm border border-white/20"
-                />
-              ) : (
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-white font-extrabold text-sm mb-2 shadow-sm"
-                  style={{ backgroundColor: company.color || '#2563eb' }}
-                >
-                  {company.initials}
-                </div>
-              )}
-
-              {/* Nom + Badge vérifié bleu */}
-              <div className="flex items-center justify-center gap-1 w-full min-w-0">
-                <span className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  {company.name}
-                </span>
-                <CheckCircle2 size={13} className="text-blue-500 fill-blue-500 text-white flex-shrink-0" />
-              </div>
-
-              {/* Catégorie */}
-              <span className={`text-[10px] sm:text-[11px] truncate mb-3 ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
-                {company.category}
+        <div>
+          <div className="flex items-center justify-between px-2 sm:px-1 mb-2">
+            <h3 className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'} flex items-center gap-1.5`}>
+              <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                Espace Entreprise(PUB)
               </span>
-
-              {/* Bouton Visiter Pill */}
-              <a
-                href={company.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (company.url === '#') e.preventDefault()
-                }}
-                className="w-full py-1 px-3 rounded-full border border-[#FF6B00]/40 hover:border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00]/10 text-xs font-bold transition-all text-center"
-              >
-                Visiter
-              </a>
+            </h3>
+            {/* Indicateur d'animation synchronisé avec Desktop */}
+            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+              {companies.slice(0, 6).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentAdIndex(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === (currentAdIndex % companies.length)
+                      ? 'w-4 bg-orange-500'
+                      : isDark ? 'w-1.5 bg-zinc-700' : 'w-1.5 bg-gray-300'
+                  }`}
+                />
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Toujours sur UNE SEULE LIGNE horizontale (ne va JAMAIS à la ligne) — les publicités défilent et passent l'une après l'autre */}
+          <div
+            ref={mobileSliderRef}
+            className="flex flex-nowrap items-center gap-1.5 sm:gap-2 px-1 pb-1 overflow-x-auto no-scrollbar scroll-smooth"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            {companies.map((company, idx) => {
+              const isSelected = idx === (currentAdIndex % companies.length)
+              const hasMedia = Boolean(company.bgMediaUrl || company.bgVideoUrl)
+              const mediaUrl = company.bgMediaUrl || company.bgVideoUrl || ''
+              const isVideo = mediaUrl.startsWith('data:video') || mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm')
+              const hasGradient = Boolean(company.gradient)
+              const hasColor = Boolean(company.bgColor || company.color)
+
+              return (
+                <div
+                  key={company.id}
+                  onClick={() => {
+                    setCurrentAdIndex(idx)
+                    trackAdClick(company.id, company.url)
+                  }}
+                  style={!hasMedia && !hasGradient && hasColor ? { backgroundColor: company.bgColor || company.color } : undefined}
+                  className={`relative rounded-xl border p-1.5 flex flex-col items-center justify-between text-center shadow-sm transition-all duration-500 cursor-pointer overflow-hidden h-[98px] sm:h-[110px] select-none flex-shrink-0 w-[calc(25%-5px)] sm:w-[calc(16.666%-7px)] ${
+                    isSelected
+                      ? 'ring-2 ring-[#FF6B00] shadow-md shadow-orange-500/20 scale-[1.03] z-10 border-[#FF6B00]'
+                      : isDark
+                      ? 'border-zinc-800 hover:border-zinc-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  } ${
+                    hasGradient ? `bg-gradient-to-br ${company.gradient} text-white` : ''
+                  }`}
+                >
+                  {/* Arrière-plan Média Réel : GIF, Image ou Vidéo */}
+                  {hasMedia && (
+                    <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+                      {isVideo ? (
+                        <video
+                          src={mediaUrl}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={mediaUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-black/35 backdrop-blur-[0.5px]" />
+                    </div>
+                  )}
+
+                  {/* Pastille de pulsation dynamique sur la publicité active */}
+                  {isSelected && (
+                    <span className="absolute top-1 right-1 flex h-2 w-2 z-20">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                    </span>
+                  )}
+
+                  {/* Contenu compact de la boîte publicitaire */}
+                  <div className="relative z-10 w-full flex flex-col items-center justify-between h-full">
+                    {/* Logo ou Initiale */}
+                    {company.brandLogo ? (
+                      <img
+                        src={company.brandLogo}
+                        alt={company.name}
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover shadow-sm border border-white/30 flex-shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white font-black text-[10px] sm:text-xs shadow-sm ring-1 ring-white/20 flex-shrink-0"
+                        style={{ backgroundColor: (hasMedia || hasGradient) ? 'rgba(255,255,255,0.25)' : (company.color || '#2563eb') }}
+                      >
+                        {company.initials}
+                      </div>
+                    )}
+
+                    {/* Nom de la marque */}
+                    <div className="w-full px-0.5 my-0.5">
+                      <p className={`text-[10px] sm:text-[11px] font-black truncate leading-tight ${
+                        hasMedia || hasGradient || hasColor ? 'text-white drop-shadow-sm' : (isDark ? 'text-white' : 'text-zinc-900')
+                      }`}>
+                        {company.name}
+                      </p>
+                    </div>
+
+                    {/* Bouton CTA - Texte visible et couleurs dynamiques personnalisables */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        trackAdClick(company.id, company.url)
+                      }}
+                      style={{
+                        backgroundColor: company.ctaBgColor || '#FF6B00',
+                        color: company.ctaTextColor || '#ffffff'
+                      }}
+                      className="w-full py-0.5 px-1 rounded-md text-[9px] sm:text-[10px] font-extrabold truncate text-center shadow-sm active:scale-95 transition-all flex items-center justify-center"
+                    >
+                      <span className="truncate">{company.ctaLabel || 'Visiter'}</span>
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -341,19 +439,20 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             </button>
           </div>
         ) : (
-          <div className={`rounded-3xl border overflow-hidden shadow-sm transition-all ${
-            isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-gray-200'
-          }`}>
-            <div className="p-3.5 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+          <div
+            onClick={() => trackAdClick(activeAd.id, activeAd.url)}
+            className={`rounded-3xl border overflow-hidden shadow-sm transition-all h-[245px] flex flex-col justify-between cursor-pointer select-none group ${
+              isDark ? 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700' : 'bg-white border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            {/* En-tête Badge Espace Entreprise(PUB) */}
+            <div className="p-3 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                  Sponsorisé
-                </span>
-                <span className={`text-[11px] font-medium ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
-                  Espace Entreprise
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                  Espace Entreprise(PUB)
                 </span>
               </div>
-              <div className="flex gap-1">
+              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                 {companies.map((_, i) => (
                   <button
                     key={i}
@@ -368,41 +467,77 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
               </div>
             </div>
 
-            {/* Bannière Dégradé Visuelle */}
-            <div className={`p-4 bg-gradient-to-br ${activeAd.gradient || 'from-blue-600 to-indigo-700'} text-white relative overflow-hidden`}>
-              <div className="relative z-10 space-y-1.5">
+            {/* Bannière Visuelle (hauteur constante et stable) */}
+            <div
+              style={!activeAd.bgMediaUrl && !activeAd.gradient ? { backgroundColor: activeAd.bgColor || activeAd.color || '#2563eb' } : undefined}
+              className={`flex-1 p-3.5 ${activeAd.gradient ? `bg-gradient-to-br ${activeAd.gradient}` : ''} text-white relative overflow-hidden flex flex-col justify-between`}
+            >
+              {/* Média de fond si configuré (GIF, Image ou Vidéo) */}
+              {activeAd.bgMediaUrl && (
+                <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+                  {(activeAd.bgMediaUrl.startsWith('data:video') || activeAd.bgMediaUrl.endsWith('.mp4') || activeAd.bgMediaUrl.endsWith('.webm')) ? (
+                    <video
+                      src={activeAd.bgMediaUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={activeAd.bgMediaUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[0.5px]" />
+                </div>
+              )}
+
+              <div className="relative z-10 space-y-1">
                 <div className="flex items-center gap-2">
                   {activeAd.brandLogo ? (
-                    <img src={activeAd.brandLogo} alt={activeAd.name} className="w-8 h-8 rounded-xl object-cover border border-white/20" />
+                    <img src={activeAd.brandLogo} alt={activeAd.name} className="w-8 h-8 rounded-xl object-cover border border-white/20 flex-shrink-0" />
                   ) : (
                     <div
-                      className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-sm"
-                      style={{ backgroundColor: activeAd.color }}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-sm flex-shrink-0"
+                      style={{ backgroundColor: (activeAd.bgVideoUrl || activeAd.gradient) ? 'rgba(255,255,255,0.25)' : activeAd.color }}
                     >
                       {activeAd.initials}
                     </div>
                   )}
-                  <div>
-                    <h4 className="font-bold text-sm leading-tight text-white">{activeAd.name}</h4>
-                    <p className="text-[11px] text-white/80">{activeAd.category}</p>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-sm leading-tight text-white truncate">{activeAd.name}</h4>
+                    <p className="text-[10px] text-white/80 truncate">{activeAd.category}</p>
                   </div>
                 </div>
-                <p className="text-xs font-semibold pt-1 text-white/95">{activeAd.tagline}</p>
-                <p className="text-[11px] text-white/80 leading-relaxed line-clamp-2">{activeAd.description}</p>
+                {activeAd.tagline && (
+                  <p className="text-xs font-semibold pt-0.5 text-white/95 line-clamp-1">{activeAd.tagline}</p>
+                )}
+                {activeAd.description && (
+                  <p className="text-[11px] text-white/80 leading-relaxed line-clamp-2">{activeAd.description}</p>
+                )}
               </div>
             </div>
 
-            {/* CTA Pub */}
-            <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-between gap-2">
-              <a
-                href={activeAd.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-2 px-3 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold text-center transition-colors shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
+            {/* CTA Pub - Texte exact et couleurs dynamiques définies dans le Dashboard PUB */}
+            <div className="p-2.5 bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-between gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  trackAdClick(activeAd.id, activeAd.url)
+                }}
+                style={{
+                  backgroundColor: activeAd.ctaBgColor || '#FF6B00',
+                  color: activeAd.ctaTextColor || '#ffffff'
+                }}
+                className="w-full py-1.5 px-3 rounded-xl text-xs font-bold text-center transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95 group-hover:shadow-md"
               >
-                <span>Visiter le catalogue</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+                <span className="truncate">{activeAd.ctaLabel || 'Visiter'}</span>
+                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+              </button>
             </div>
           </div>
         )}

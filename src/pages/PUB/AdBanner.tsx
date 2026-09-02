@@ -26,8 +26,17 @@ export interface Ad {
   description: string;          // détail (max 120 chars)
   ctaLabel: string;             // texte bouton ex: "Découvrir", "En savoir plus"
   ctaUrl: string;
+  ctaTextColor?: string;        // Couleur du texte du bouton ex: "#ffffff"
+  ctaBgColor?: string;          // Couleur de fond du bouton ex: "#FF6B00"
+  bgType?: 'color' | 'gradient' | 'media'; // Type de fond choisi
+  bgColor?: string;             // Couleur de fond réelle hex ex: "#2563eb"
+  bgMediaUrl?: string;          // Média de fond : image, GIF, ou vidéo
+  bgVideoUrl?: string;          // Vidéo d'arrière-plan
+  userUuid?: string;            // UUID du propriétaire
   gradient: string;             // Tailwind gradient ex: "from-amber-500 to-orange-600"
   category: string;             // "Mode", "Tech", "Santé", etc.
+  targetAudience?: 'all' | 'interests'; // Diffusion ciblée
+  targetInterests?: string[];   // Liste des centres d'intérêt ciblés
   impressions: number;
   clicks: number;
   budget: number;               // budget total
@@ -52,6 +61,8 @@ interface AdBannerProps {
 // STOCKAGE RÉEL DES ANNONCES PUBLICITAIRES
 // ─────────────────────────────────────────────────────────────
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+
 export const getStoredAds = (): Ad[] => {
   try {
     if (typeof localStorage !== 'undefined') {
@@ -67,15 +78,132 @@ export const getStoredAds = (): Ad[] => {
   return []
 }
 
-export const saveStoredAds = (ads: Ad[]): void => {
+export const fetchRemoteAds = async (): Promise<Ad[]> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/pub/annonces/`)
+    if (res.ok) {
+      const remoteAds = await res.json()
+      if (Array.isArray(remoteAds)) {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('exile_ads', JSON.stringify(remoteAds))
+          window.dispatchEvent(new CustomEvent('exile_ads_updated', { detail: remoteAds }))
+        }
+        checkAndNotifyExpiredAds(remoteAds)
+        return remoteAds
+      }
+    }
+  } catch {}
+  const local = getStoredAds()
+  checkAndNotifyExpiredAds(local)
+  return local
+}
+
+export const saveStoredAds = async (ads: Ad[]): Promise<void> => {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('exile_ads', JSON.stringify(ads))
+      try {
+        localStorage.setItem('exile_ads', JSON.stringify(ads))
+      } catch {
+        // En cas de quota dépassé (vidéo / GIF volumineux en Base64), sauvegarder version allégée en local
+        try {
+          const lightweight = ads.map(a => ({
+            ...a,
+            bgMediaUrl: a.bgMediaUrl && a.bgMediaUrl.length > 500000 ? '' : a.bgMediaUrl,
+            bgVideoUrl: a.bgVideoUrl && a.bgVideoUrl.length > 500000 ? '' : a.bgVideoUrl
+          }))
+          localStorage.setItem('exile_ads', JSON.stringify(lightweight))
+        } catch {}
+      }
       window.dispatchEvent(new CustomEvent('exile_ads_updated', { detail: ads }))
     }
+    // Synchronisation serveur partagée intégrale dans la table PostgreSQL/SQLite
+    await fetch(`${API_BASE_URL}/pub/annonces/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaigns: ads })
+    }).catch(() => {})
   } catch (e) {
     console.error('Erreur lors de la sauvegarde des publicités:', e)
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// IDENTIFICATION UUID & CLIC UNIQUE EN TEMPS RÉEL SANS DOUBLONS
+// ─────────────────────────────────────────────────────────────
+
+export const getUserUUID = (): string => {
+  try {
+    const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+    if (profile?.id) return String(profile.id)
+    if (profile?.uuid) return String(profile.uuid)
+  } catch {}
+  let guestUuid = typeof localStorage !== 'undefined' ? localStorage.getItem('exile_client_uuid') : null
+  if (!guestUuid && typeof localStorage !== 'undefined') {
+    guestUuid = 'guest_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now()
+    localStorage.setItem('exile_client_uuid', guestUuid)
+  }
+  return guestUuid || 'guest_user'
+}
+
+export const trackAdClick = (adId: string, targetUrl?: string): void => {
+  const userUuid = getUserUUID()
+  const clickKey = `exile_ad_click_${adId}_${userUuid}`
+  const alreadyClicked = typeof localStorage !== 'undefined' && localStorage.getItem(clickKey) === '1'
+
+  if (!alreadyClicked) {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(clickKey, '1')
+    }
+
+    // 1. Incrémenter en local et notifier
+    const ads = getStoredAds()
+    const updated = ads.map(a => {
+      if (a.id === adId) {
+        return { ...a, clicks: (a.clicks || 0) + 1 }
+      }
+      return a
+    })
+    saveStoredAds(updated)
+
+    // 2. Transmettre au backend pour synchronisation en temps réel avec le dashboard
+    fetch(`${API_BASE_URL}/pub/annonces/click/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ad_id: adId, user_uuid: userUuid })
+    }).catch(() => {})
+  }
+
+  // 3. Ouvrir l'URL cible
+  if (targetUrl && targetUrl !== '#' && targetUrl !== 'https://') {
+    window.open(targetUrl, '_blank', 'noopener,noreferrer')
+  }
+}
+
+export const checkAndNotifyExpiredAds = (ads: Ad[]): void => {
+  if (typeof localStorage === 'undefined') return
+  const now = new Date()
+  const myUuid = getUserUUID()
+
+  ads.forEach(ad => {
+    // Vérifier si la date de fin est dépassée ou statut terminé
+    const isPastEnd = ad.endDate ? new Date(ad.endDate) < now : false
+    if (ad.status === 'ended' || isPastEnd) {
+      const notifiedKey = `exile_ad_expired_notified_${ad.id}_${myUuid}`
+      if (localStorage.getItem(notifiedKey) !== '1') {
+        localStorage.setItem(notifiedKey, '1')
+
+        import('../../services/pubNotificationService').then(({ triggerPubNotification }) => {
+          triggerPubNotification({
+            type: 'campaign_ended',
+            brandName: ad.brandName,
+            adId: ad.id,
+            endDate: ad.endDate,
+            userUuid: ad.userUuid || myUuid
+          })
+        }).catch(() => {})
+      }
+    }
+  })
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -109,7 +109,7 @@ export default function VideoFeed() {
       }
     },
     {
-      cacheKey: 'pro:videos:feed:v6',
+      cacheKey: 'pro:videos:feed:v7',
       cacheTime: 15 * 1000,
       refetchOnMount: true,
     }

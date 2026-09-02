@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw } from "lucide-react";
 import { type Ad, type AdStatus, getStoredAds, saveStoredAds } from "./AdBanner";
 import { useTheme } from "../../contexts/ThemeContext";
+import { triggerPubNotification } from "../../services/pubNotificationService";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
@@ -164,8 +165,16 @@ interface CampaignFormData {
   description: string;
   ctaLabel: string;
   ctaUrl: string;
+  ctaTextColor: string;
+  ctaBgColor: string;
+  bgType: "color" | "gradient" | "media";
+  bgColor: string;
+  bgMediaUrl: string;
+  bgVideoUrl: string;
   gradient: string;
   category: string;
+  targetAudience: "all" | "interests";
+  targetInterests: string[];
   budget: string;
   currency: string;
   exchangeRate: string;
@@ -174,11 +183,22 @@ interface CampaignFormData {
   endDate: string;
 }
 
+const INTERESTS_LIST = [
+  "Technologie", "Entrepreneuriat", "Design & Création", 
+  "Musique & Audio", "Finance & Crypto", "Santé & Bien-être", 
+  "E-commerce", "Éducation", "Mode & Lifestyle"
+];
+
 const EMPTY_FORM: CampaignFormData = {
   brandName: "", brandInitials: "", brandColor: "#2563eb", brandLogo: "",
   tagline: "", description: "", ctaLabel: "En savoir plus",
-  ctaUrl: "https://", gradient: GRADIENT_OPTIONS[0].value,
-  category: CATEGORY_OPTIONS[0], budget: "1000",
+  ctaUrl: "https://", ctaTextColor: "#ffffff", ctaBgColor: "#FF6B00",
+  bgType: "gradient", bgColor: "#2563eb", bgMediaUrl: "", bgVideoUrl: "",
+  gradient: GRADIENT_OPTIONS[0].value,
+  category: CATEGORY_OPTIONS[0],
+  targetAudience: "all",
+  targetInterests: [],
+  budget: "1000",
   currency: "HTG", exchangeRate: "1 USD = 132 HTG",
   targetViews: "10000",
   startDate: new Date().toISOString().split("T")[0],
@@ -199,6 +219,7 @@ function CampaignModal({
   resolvedTheme?: string | undefined;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<CampaignFormData>(
     initial
       ? {
@@ -210,8 +231,16 @@ function CampaignModal({
           description: initial.description || "",
           ctaLabel: initial.ctaLabel || "En savoir plus",
           ctaUrl: initial.ctaUrl || "https://",
-          gradient: initial.gradient || GRADIENT_OPTIONS[0].value,
+          ctaTextColor: initial.ctaTextColor || "#ffffff",
+          ctaBgColor: initial.ctaBgColor || "#FF6B00",
+          bgType: initial.bgType || (initial.bgMediaUrl ? "media" : initial.gradient ? "gradient" : "color"),
+          bgColor: initial.bgColor || initial.brandColor || "#2563eb",
+          bgMediaUrl: initial.bgMediaUrl || initial.bgVideoUrl || "",
+          bgVideoUrl: initial.bgVideoUrl || initial.bgMediaUrl || "",
+          gradient: initial.gradient || "",
           category: initial.category || CATEGORY_OPTIONS[0],
+          targetAudience: initial.targetAudience || "all",
+          targetInterests: initial.targetInterests || [],
           budget: String(initial.budget || "1000"),
           currency: initial.currency || "HTG",
           exchangeRate: initial.exchangeRate || "1 USD = 132 HTG",
@@ -228,6 +257,27 @@ function CampaignModal({
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: undefined }));
     setSubmitError(null);
+  };
+
+  // Importer un média d'arrière-plan (GIF, Vidéo, Image de toute extension)
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 30 * 1024 * 1024) {
+        setSubmitError("Le fichier ne doit pas dépasser 30 Mo");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const res = event.target.result as string;
+          set("bgMediaUrl", res);
+          set("bgVideoUrl", res);
+          set("bgType", "media");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Importer un logo personnalisé (File Picker)
@@ -432,21 +482,291 @@ function CampaignModal({
                     className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-medium mb-2 block">Couleur du fond</label>
-                <div className="flex flex-wrap gap-2">
-                  {GRADIENT_OPTIONS.map(g => (
-                    <button key={g.value} onClick={() => set("gradient", g.value)}
-                      className={`relative w-10 h-10 rounded-xl bg-gradient-to-br ${g.value} transition-transform hover:scale-110 ${form.gradient === g.value ? "ring-2 ring-offset-2 ring-blue-500 scale-110" : ""}`}
-                      aria-label={g.label} title={g.label}
-                    >
-                      {form.gradient === g.value && (
-                        <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">✓</span>
-                      )}
-                    </button>
-                  ))}
+
+              {/* Personnalisation des Couleurs du Bouton */}
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Couleur du Fond du Bouton</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={form.ctaBgColor || "#FF6B00"}
+                      onChange={e => set("ctaBgColor", e.target.value)}
+                      className="w-10 h-10 rounded-xl border-0 cursor-pointer p-0 bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={form.ctaBgColor || "#FF6B00"}
+                      onChange={e => set("ctaBgColor", e.target.value)}
+                      placeholder="#FF6B00"
+                      className={`flex-1 px-3 py-2 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-white' : 'border-zinc-200 bg-zinc-50 text-zinc-900'}`}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Couleur du Texte du Bouton</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={form.ctaTextColor || "#ffffff"}
+                      onChange={e => set("ctaTextColor", e.target.value)}
+                      className="w-10 h-10 rounded-xl border-0 cursor-pointer p-0 bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={form.ctaTextColor || "#ffffff"}
+                      onChange={e => set("ctaTextColor", e.target.value)}
+                      placeholder="#ffffff"
+                      className={`flex-1 px-3 py-2 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-white' : 'border-zinc-200 bg-zinc-50 text-zinc-900'}`}
+                    />
+                  </div>
                 </div>
               </div>
+
+              {/* Sélecteur de style d'arrière-plan complet : Couleur Unie, Dégradé, ou Média GIF/Image/Vidéo */}
+              <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Arrière-Plan (Couleur de Fond / Média)
+                  </label>
+                  <div className="flex rounded-xl p-1 bg-zinc-100 dark:bg-zinc-800 gap-1 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        set("bgType", "color");
+                        set("gradient", "");
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        form.bgType === "color"
+                          ? "bg-white dark:bg-zinc-700 text-[#FF6B00] shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Couleur Unie
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        set("bgType", "gradient");
+                        if (!form.gradient) set("gradient", GRADIENT_OPTIONS[0].value);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        form.bgType === "gradient"
+                          ? "bg-white dark:bg-zinc-700 text-[#FF6B00] shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Dégradé
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => set("bgType", "media")}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        form.bgType === "media"
+                          ? "bg-white dark:bg-zinc-700 text-[#FF6B00] shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      GIF / Image / Vidéo
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mode 1: Couleur Unie Réelle */}
+                {form.bgType === "color" && (
+                  <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold block">Sélectionnez la couleur de fond réelle (appliquée sans filtre) *</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={form.bgColor || form.brandColor || "#2563eb"}
+                        onChange={e => {
+                          set("bgColor", e.target.value);
+                          set("brandColor", e.target.value);
+                          set("gradient", "");
+                        }}
+                        className="w-12 h-12 rounded-2xl border-0 cursor-pointer p-0 bg-transparent shadow-sm"
+                      />
+                      <input
+                        type="text"
+                        value={form.bgColor || form.brandColor || "#2563eb"}
+                        onChange={e => {
+                          set("bgColor", e.target.value);
+                          set("brandColor", e.target.value);
+                          set("gradient", "");
+                        }}
+                        placeholder="#2563eb"
+                        className={`flex-1 px-3.5 py-2.5 rounded-xl border text-xs font-mono font-bold ${
+                          resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-white' : 'border-zinc-200 bg-white text-zinc-900'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Mode 2: Dégradé */}
+                {form.bgType === "gradient" && (
+                  <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold block">Choisissez un dégradé de fond</label>
+                    <div className="flex flex-wrap gap-2.5">
+                      {GRADIENT_OPTIONS.map(g => (
+                        <button
+                          key={g.value}
+                          type="button"
+                          onClick={() => set("gradient", g.value)}
+                          className={`relative w-11 h-11 rounded-xl bg-gradient-to-br ${g.value} transition-transform hover:scale-110 shadow-sm ${
+                            form.gradient === g.value ? "ring-2 ring-offset-2 ring-[#FF6B00] scale-110" : ""
+                          }`}
+                          title={g.label}
+                        >
+                          {form.gradient === g.value && (
+                            <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Mode 3: Média d'arrière-plan (GIF, Vidéo, Image) */}
+                {form.bgType === "media" && (
+                  <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-3 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold block">
+                      Importer un GIF animé, une Image ou une Vidéo (toute extension acceptée)
+                    </label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        type="file"
+                        ref={videoFileInputRef}
+                        onChange={handleMediaUpload}
+                        accept="image/*,video/*,.gif,.mp4,.webm,.png,.jpg,.jpeg,.webp"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => videoFileInputRef.current?.click()}
+                        className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all active:scale-95"
+                      >
+                        <Upload size={14} />
+                        <span>📁 Téléverser un GIF, Image ou Vidéo</span>
+                      </button>
+
+                      {(form.bgMediaUrl || form.bgVideoUrl) && (
+                        <div className="flex items-center gap-2 bg-black/10 dark:bg-white/10 p-1.5 rounded-xl">
+                          {((form.bgMediaUrl || form.bgVideoUrl).startsWith('data:video') || (form.bgMediaUrl || form.bgVideoUrl).endsWith('.mp4') || (form.bgMediaUrl || form.bgVideoUrl).endsWith('.webm')) ? (
+                            <video src={form.bgMediaUrl || form.bgVideoUrl} className="w-12 h-9 rounded-lg object-cover" autoPlay muted loop />
+                          ) : (
+                            <img src={form.bgMediaUrl || form.bgVideoUrl} alt="Aperçu Média" className="w-12 h-9 rounded-lg object-cover" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              set("bgMediaUrl", "");
+                              set("bgVideoUrl", "");
+                            }}
+                            className="text-xs text-red-400 hover:underline px-1 font-semibold"
+                          >
+                            Retirer
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={form.bgMediaUrl || form.bgVideoUrl}
+                      onChange={e => {
+                        set("bgMediaUrl", e.target.value);
+                        set("bgVideoUrl", e.target.value);
+                      }}
+                      placeholder="Ou collez l'URL directe (ex: https://.../anim.gif ou .mp4)"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border ${
+                        resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-300' : 'border-zinc-200 bg-white text-zinc-700'
+                      } text-xs focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Section : Ciblage d'Audience Réel */}
+          <fieldset>
+            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>
+              🎯 Ciblage d'Audience (Diffusion Réelle)
+            </legend>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => set("targetAudience", "all")}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    form.targetAudience === "all"
+                      ? "border-[#FF6B00] bg-orange-500/10 ring-1 ring-[#FF6B00]"
+                      : resolvedTheme === 'dark' ? "border-zinc-800 bg-zinc-800/40 hover:bg-zinc-800" : "border-zinc-200 bg-white hover:bg-zinc-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-base">🌐</span>
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">Tous les visiteurs</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 leading-tight">
+                    Sans aucun filtrage. Diffusée à 100% des utilisateurs connectés et non-connectés.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => set("targetAudience", "interests")}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    form.targetAudience === "interests"
+                      ? "border-[#FF6B00] bg-orange-500/10 ring-1 ring-[#FF6B00]"
+                      : resolvedTheme === 'dark' ? "border-zinc-800 bg-zinc-800/40 hover:bg-zinc-800" : "border-zinc-200 bg-white hover:bg-zinc-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-base">🎯</span>
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">Par Centres d'intérêt</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 leading-tight">
+                    Ciblage fin selon les profils et catégories d'intérêt sélectionnés.
+                  </p>
+                </button>
+              </div>
+
+              {/* Sélection des centres d'intérêt si ciblage actif */}
+              {form.targetAudience === "interests" && (
+                <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2 animate-in fade-in duration-200">
+                  <label className="text-xs font-semibold block text-zinc-700 dark:text-zinc-300">
+                    Sélectionnez les catégories d'intérêt ciblées :
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {INTERESTS_LIST.map(interest => {
+                      const isSelected = form.targetInterests.includes(interest);
+                      return (
+                        <button
+                          key={interest}
+                          type="button"
+                          onClick={() => {
+                            const next = isSelected
+                              ? form.targetInterests.filter(i => i !== interest)
+                              : [...form.targetInterests, interest];
+                            setForm(f => ({ ...f, targetInterests: next }));
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                            isSelected
+                              ? "bg-[#FF6B00] text-white border-[#FF6B00] shadow-sm"
+                              : resolvedTheme === 'dark'
+                              ? "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
+                              : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                          }`}
+                        >
+                          {isSelected ? "✓ " : "+ "}{interest}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </fieldset>
 
@@ -600,6 +920,24 @@ export default function AdDashboard() {
   const [filter, setFilter] = useState<AdStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("L'image ne doit pas dépasser 5 Mo");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setPlatformLogo(dataUrl);
+      localStorage.setItem('exile_pub_platform_logo', dataUrl);
+      showToast("✓ Logo importé depuis votre appareil avec succès !");
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Synchroniser les demandes d'entreprises en direct
   useEffect(() => {
@@ -833,7 +1171,32 @@ export default function AdDashboard() {
   }), [ads]);
 
   const handleSave = (data: any) => {
-    if (modal.editing) {
+    const isNew = modal.isConverting || !modal.editing || !ads.some(a => a.id === modal.editing?.id);
+    if (isNew) {
+      const newAd: Ad = {
+        id: modal.editing?.id || `ad_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        ...data,
+        brandColor: data.brandColor || "#2563eb",
+        impressions: 0,
+        clicks: 0,
+        spent: 0,
+        status: "active",
+        budget: Number(data.budget || 1000),
+        targetViews: Number(data.targetViews || 10000),
+      };
+      const next = [newAd, ...ads];
+      updateAds(next);
+      setActiveTab('ads');
+      showToast("🚀 Nouvelle campagne lancée & active dans le feed accueil !");
+
+      // Déclencher la notification d'activation avec le logo PUB
+      triggerPubNotification({
+        type: 'campaign_active',
+        brandName: newAd.brandName,
+        adId: newAd.id,
+        userUuid: newAd.userUuid
+      });
+    } else {
       const next = ads.map((a) =>
         a.id === modal.editing!.id
           ? {
@@ -846,21 +1209,6 @@ export default function AdDashboard() {
       );
       updateAds(next);
       showToast("✓ Campagne mise à jour avec succès");
-    } else {
-      const newAd: Ad = {
-        id: `ad_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        ...data,
-        brandColor: data.brandColor || "#2563eb",
-        impressions: 0,
-        clicks: 0,
-        spent: 0,
-        status: "active",
-        budget: Number(data.budget || 1000),
-        targetViews: Number(data.targetViews || 10000),
-      };
-      const next = [newAd, ...ads];
-      updateAds(next);
-      showToast("🚀 Nouvelle campagne lancée & enregistrée !");
     }
     setModal({ open: false });
   };
@@ -884,6 +1232,15 @@ export default function AdDashboard() {
         );
         updateAds(next);
         showToast(isPausing ? "Campagne mise en pause" : "Campagne réactivée !");
+
+        // Déclencher la notification correspondante
+        triggerPubNotification({
+          type: isPausing ? 'campaign_paused' : 'campaign_resumed',
+          brandName: ad.brandName,
+          adId: ad.id,
+          userUuid: ad.userUuid
+        });
+
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       },
     });
@@ -1455,23 +1812,43 @@ export default function AdDashboard() {
                       EXILE
                     </div>
                   )}
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-2.5">
                     <input
                       type="text"
                       value={platformLogo}
                       onChange={e => setPlatformLogo(e.target.value)}
-                      placeholder="Collez l'URL de votre logo d'entreprise (https://...)"
+                      placeholder="Collez l'URL ou importez depuis votre appareil..."
                       className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00]`}
                     />
-                    {platformLogo && (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setPlatformLogo('')}
-                        className="text-xs text-red-400 hover:underline"
+                        onClick={() => logoFileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
                       >
-                        Revenir au logo par défaut
+                        <Upload size={13} />
+                        <span>📁 Importer un logo depuis mon stockage</span>
                       </button>
-                    )}
+                      <input
+                        type="file"
+                        ref={logoFileInputRef}
+                        onChange={handleLogoFileUpload}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      {platformLogo && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPlatformLogo('');
+                            localStorage.removeItem('exile_pub_platform_logo');
+                          }}
+                          className="text-xs text-red-400 hover:underline"
+                        >
+                          Supprimer le logo
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

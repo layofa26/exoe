@@ -158,7 +158,7 @@ export const ProSidebar = (): JSX.Element | null => {
             <button
               onClick={() => {
                 setShowMobileActionMenu(false)
-                navigate('/pub/d4sh-m4n4g3r_adm!n99')
+                navigate('/pub/demande')
               }}
               className={`w-full p-3.5 rounded-2xl flex items-center gap-3.5 transition-all text-left ${
                 isDark ? 'bg-zinc-800/60 hover:bg-zinc-800 text-zinc-100' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'

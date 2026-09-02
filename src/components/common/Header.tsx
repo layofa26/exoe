@@ -7,6 +7,7 @@ import { useRecentSearches } from '../../hooks/useRecentSearches'
 import { unwrapList } from '../../services/videoApi'
 import type { NavLinkType } from '../../types'
 import { notificationService, type AppNotification } from '../../services/notificationService'
+import { syncRemotePubNotifications } from '../../services/pubNotificationService'
 import {
   User,
   LogOut,
@@ -27,11 +28,13 @@ import {
   Video as VideoIcon,
   Calendar as CalendarIcon,
   Sparkles,
-  Megaphone
+  Megaphone,
+  Radio,
+  ArrowRight
 } from 'lucide-react'
 import { UploadVideo } from '../video/UploadVideo'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 export const Header = (): JSX.Element => {
   const { isAuthenticated, user, logout, hasModuleAccess } = useAuth()
@@ -131,6 +134,7 @@ export const Header = (): JSX.Element => {
       }
     }
     syncNotifications()
+    syncRemotePubNotifications()
 
     const handleNotifAdded = (e: any) => {
       if (e.detail) {
@@ -431,8 +435,8 @@ export const Header = (): JSX.Element => {
             </Link>
           </div>
 
-          {/* Navigation - Centrée EXACTEMENT au milieu sur Desktop, Tablette et Mobile (Ajustement hauteur mobile) */}
-          <nav className="absolute left-1/2 -translate-x-1/2 flex items-center space-x-3 sm:space-x-6 md:space-x-8 z-10 pointer-events-auto mt-1.5 lg:mt-0">
+          {/* Navigation - Centrée sur Desktop/Tablette et descendue plus bas sur Mobile pour ne pas coller à l'icône de recherche */}
+          <nav className="absolute left-[46%] sm:left-1/2 -translate-x-1/2 flex items-center space-x-2.5 sm:space-x-6 md:space-x-8 z-10 pointer-events-auto top-[62%] sm:top-1/2 -translate-y-1/2 lg:mt-0">
             {navLinks.map((link) => (
               link.show && (
                 <div key={link.to} className="relative group">
@@ -928,7 +932,7 @@ export const Header = (): JSX.Element => {
 
                       <button
                         onClick={() => {
-                          navigate('/pub/d4sh-m4n4g3r_adm!n99')
+                          navigate('/pub/demande')
                           setShowPublishMenu(false)
                         }}
                         className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors group"
@@ -1015,23 +1019,32 @@ export const Header = (): JSX.Element => {
                                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-700/50' : 'hover:bg-gray-50'
                               }`}
                             >
-                              <div className={`p-2 rounded-xl flex-shrink-0 ${
-                                notif.type === 'message'
-                                  ? 'bg-blue-500/10 text-blue-500'
-                                  : notif.type === 'request_accepted'
-                                  ? 'bg-emerald-500/10 text-emerald-500'
-                                  : notif.type === 'system'
-                                  ? 'bg-purple-500/10 text-purple-500'
-                                  : 'bg-amber-500/10 text-amber-500'
-                              }`}>
-                                {notif.type === 'message' ? (
-                                  <MessageSquare className="w-4 h-4" />
-                                ) : notif.type === 'request_accepted' ? (
-                                  <CheckCircle className="w-4 h-4" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4" />
-                                )}
-                              </div>
+                              {/* Logo ou icône de notification */}
+                              {notif.iconUrl || (notif.data?.isPub && localStorage.getItem('exile_pub_platform_logo')) ? (
+                                <img
+                                  src={notif.iconUrl || localStorage.getItem('exile_pub_platform_logo') || ''}
+                                  alt="PUB"
+                                  className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
+                                />
+                              ) : (
+                                <div className={`p-2 rounded-xl flex-shrink-0 ${
+                                  notif.type === 'message'
+                                    ? 'bg-blue-500/10 text-blue-500'
+                                    : notif.type === 'request_accepted'
+                                    ? 'bg-emerald-500/10 text-emerald-500'
+                                    : notif.type === 'system'
+                                    ? 'bg-purple-500/10 text-purple-500'
+                                    : 'bg-amber-500/10 text-amber-500'
+                                }`}>
+                                  {notif.type === 'message' ? (
+                                    <MessageSquare className="w-4 h-4" />
+                                  ) : notif.type === 'request_accepted' ? (
+                                    <CheckCircle className="w-4 h-4" />
+                                  ) : (
+                                    <AlertCircle className="w-4 h-4" />
+                                  )}
+                                </div>
+                              )}
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-1 mb-0.5">
@@ -1047,6 +1060,24 @@ export const Header = (): JSX.Element => {
                                 <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">
                                   {notif.message}
                                 </p>
+
+                                {/* Bouton d'action personnalisé (ex: Faire encore une demande) */}
+                                {(notif.actionButton || notif.data?.actionButton) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      notificationService.markAsRead(notif.id)
+                                      setShowNotifications(false)
+                                      const url = notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl || '/pub/demande'
+                                      navigate(url)
+                                    }}
+                                    className="mt-2 px-3 py-1 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-[11px] font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                                  >
+                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || 'Faire encore une demande'}</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </button>
+                                )}
+
                                 <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1 block">
                                   {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>

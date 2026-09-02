@@ -40,6 +40,7 @@ import Settings from './pages/ModuleProfessional/Settings'
 import PrivacySettings from './pages/ModuleProfessional/PrivacySettings'
 import { MyDrafts } from './pages/ModuleProfessional/MyDrafts'
 import AdDashboard from './pages/PUB/AdDashboard'
+import AdInquiryPage from './pages/PUB/AdInquiryPage'
 
 // Module Social
 import SocialFeed from './pages/ModuleSocial/SocialFeed'
@@ -237,7 +238,8 @@ function App(): JSX.Element {
                   <Route path="video/:videoId" element={<VideoPage />} />
                 </Route>
                 
-                {/* Module PUB (Sécurisé) */}
+                {/* Module PUB */}
+                <Route path="/pub/demande" element={<AdInquiryPage />} />
                 <Route path="/pub" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />
                 <Route path="/pub/d4sh-m4n4g3r_adm!n99" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />
                 <Route path="/pub/ads" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />

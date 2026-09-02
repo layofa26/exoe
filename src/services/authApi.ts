@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD 
 const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
   ? API_BASE_URL.replace('/api', '/api/v1') 
   : API_BASE_URL
-const API_TIMEOUT = 12000 // 12 seconds timeout
+const API_TIMEOUT = 45000 // 45 seconds timeout (handles Render cold start seamlessly)
 
 // Helper functions for cookie management (for reading httpOnly cookies set by backend)
 const getCookie = (name: string): string | null => {
