@@ -80,6 +80,9 @@ export const getStoredAds = (): Ad[] => {
 
 export const fetchRemoteAds = async (): Promise<Ad[]> => {
   try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('exile_custom_ads')
+    }
     const res = await fetch(`${API_BASE_URL}/pub/annonces/`)
     if (res.ok) {
       const remoteAds = await res.json()

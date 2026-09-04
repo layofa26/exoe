@@ -128,11 +128,12 @@ export const Header = (): JSX.Element => {
   const notifRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    notificationService.setUserUuid(user?.uuid || (user as any)?.id)
+  }, [user?.uuid, (user as any)?.id])
+
+  useEffect(() => {
     const syncNotifications = () => {
-      const stored = JSON.parse(localStorage.getItem('exile_notifications') || '[]')
-      if (stored.length > 0) {
-        setNotifications(stored)
-      }
+      setNotifications(notificationService.getNotifications())
     }
     syncNotifications()
     syncRemotePubNotifications()
@@ -160,14 +161,17 @@ export const Header = (): JSX.Element => {
       window.removeEventListener('storage', syncNotifications)
       unsubscribe()
     }
-  }, [])
+  }, [user?.uuid, (user as any)?.id])
 
-  // Fermer le menu notification lors d'un clic extérieur
+  // Fermer le menu notification lors d'un clic extérieur (en protégeant le portail mobile)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setShowNotifications(false)
-      }
+      const target = event.target as HTMLElement | null
+      if (!target) return
+      // Ne jamais fermer lors d'un clic dans le portail mobile des notifications
+      if (target.closest('[data-notif-portal]')) return
+      if (notifRef.current && notifRef.current.contains(target)) return
+      setShowNotifications(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -514,14 +518,14 @@ export const Header = (): JSX.Element => {
             </Link>
           </div>
 
-          {/* Navigation - Centrée sur Desktop/Tablette et descendue plus bas sur Mobile pour ne pas coller à l'icône de recherche */}
-          <nav className="absolute left-[46%] sm:left-1/2 -translate-x-1/2 flex items-center space-x-2.5 sm:space-x-6 md:space-x-8 z-10 pointer-events-auto top-[62%] sm:top-1/2 -translate-y-1/2 lg:mt-0">
+          {/* Navigation - Parfaitement centrée avec espacement optimisé pour mobile et desktop */}
+          <nav className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center space-x-2 sm:space-x-4 md:space-x-8 z-10 pointer-events-auto">
             {navLinks.map((link) => (
               link.show && (
                 <div key={link.to} className="relative group">
                   <Link
                     to={link.disabled ? '#' : link.to}
-                    className={`relative text-[13.5px] sm:text-sm md:text-base font-extrabold tracking-tight transition-colors whitespace-nowrap ${
+                    className={`relative text-[12.5px] sm:text-sm md:text-base font-extrabold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-1.5 ${
                       isActive(link.to)
                         ? 'text-[#FF6B00]'
                         : link.disabled
@@ -1045,7 +1049,7 @@ export const Header = (): JSX.Element => {
 
                   {/* Mobile Notification Modal (Portal dans document.body pour plein écran réel sans interférence CSS) */}
                   {showNotifications && typeof document !== 'undefined' && createPortal(
-                    <div className="fixed inset-0 z-[99999] w-screen h-screen bg-white dark:bg-zinc-950 flex flex-col sm:hidden animate-in fade-in duration-200">
+                    <div data-notif-portal="true" className="fixed inset-0 z-[99999] w-screen h-screen bg-white dark:bg-zinc-950 flex flex-col sm:hidden animate-in fade-in duration-200">
                       {/* En-tête Mobile */}
                       <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-950">
                         <div className="flex items-center gap-2">
@@ -1059,7 +1063,8 @@ export const Header = (): JSX.Element => {
                         <div className="flex items-center gap-3">
                           {notifications.length > 0 && (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 notificationService.markAllAsRead()
                                 setNotifications(notificationService.getNotifications())
                               }}
@@ -1070,7 +1075,8 @@ export const Header = (): JSX.Element => {
                             </button>
                           )}
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               setShowNotifications(false)
                               setNotifSearchQuery('')
                             }}
@@ -1082,20 +1088,24 @@ export const Header = (): JSX.Element => {
                       </div>
 
                       {/* Barre de Recherche Notifications (Mobile) */}
-                      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50/70 dark:bg-zinc-900/50 flex-shrink-0">
-                        <div className="relative flex items-center">
-                          <Search className="absolute left-3 w-4 h-4 text-gray-400 dark:text-zinc-500 pointer-events-none" />
+                      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50 dark:bg-zinc-900/70 flex-shrink-0">
+                        <div className="relative flex items-center" onClick={(e) => e.stopPropagation()}>
+                          <Search className="absolute left-3 w-4 h-4 text-gray-400 dark:text-zinc-400 pointer-events-none" />
                           <input
                             type="text"
                             value={notifSearchQuery}
+                            onClick={(e) => e.stopPropagation()}
                             onChange={(e) => setNotifSearchQuery(e.target.value)}
                             placeholder="Rechercher une notification..."
-                            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/40"
                           />
                           {notifSearchQuery && (
                             <button
-                              onClick={() => setNotifSearchQuery('')}
-                              className="absolute right-2.5 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setNotifSearchQuery('')
+                              }}
+                              className="absolute right-2.5 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400 dark:text-zinc-400"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -1103,7 +1113,7 @@ export const Header = (): JSX.Element => {
                         </div>
 
                         {/* Onglets Filtres de Catégories (Mobile) */}
-                        <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar pb-0.5">
+                        <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar pb-0.5" onClick={(e) => e.stopPropagation()}>
                           {[
                             { key: 'all', label: 'Toutes' },
                             { key: 'message', label: 'Messages' },
@@ -1113,11 +1123,14 @@ export const Header = (): JSX.Element => {
                           ].map((tab) => (
                             <button
                               key={tab.key}
-                              onClick={() => setNotifCategoryFilter(tab.key as NotificationCategory)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setNotifCategoryFilter(tab.key as NotificationCategory)
+                              }}
                               className={`px-3 py-1 text-[11px] font-bold rounded-full whitespace-nowrap transition-all ${
                                 notifCategoryFilter === tab.key
                                   ? 'bg-[#FF6B00] text-white shadow-sm'
-                                  : 'bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border border-gray-200/80 dark:border-zinc-700'
+                                  : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border border-gray-200/80 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-700/60'
                               }`}
                             >
                               {tab.label}

@@ -125,17 +125,48 @@ class NotificationService {
   private listeners: Set<NotificationListener> = new Set()
   private notifications: AppNotification[] = []
   private pollTimer: any = null
+  private currentUserUuid: string = ''
 
   constructor() {
-    this.loadFromStorage()
+    this.initUser()
     this.startBackendSync()
+  }
+
+  private initUser() {
+    try {
+      // Purger l'ancien stockage global non partitionné pour éliminer les vieux résidus
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('exile_notifications')
+        const storedUser = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+        this.currentUserUuid = storedUser?.uuid || storedUser?.id || ''
+      }
+    } catch {
+      this.currentUserUuid = ''
+    }
+    this.loadFromStorage()
+  }
+
+  public setUserUuid(uuid?: string) {
+    const newUuid = uuid || ''
+    if (this.currentUserUuid !== newUuid) {
+      this.currentUserUuid = newUuid
+      this.loadFromStorage()
+      this.syncWithBackend()
+    }
+  }
+
+  private getStorageKey(): string {
+    return this.currentUserUuid ? `exile_notifications_${this.currentUserUuid}` : 'exile_notifications_guest'
   }
 
   private loadFromStorage() {
     try {
-      const stored = localStorage.getItem('exile_notifications')
+      const key = this.getStorageKey()
+      const stored = localStorage.getItem(key)
       if (stored) {
         this.notifications = JSON.parse(stored)
+      } else {
+        this.notifications = []
       }
     } catch {
       this.notifications = []
@@ -144,7 +175,8 @@ class NotificationService {
 
   private saveToStorage() {
     try {
-      localStorage.setItem('exile_notifications', JSON.stringify(this.notifications.slice(0, 100)))
+      const key = this.getStorageKey()
+      localStorage.setItem(key, JSON.stringify(this.notifications.slice(0, 100)))
       window.dispatchEvent(new CustomEvent('exile_notifications_updated'))
     } catch {
       // Ignorer erreur de stockage
@@ -173,7 +205,10 @@ class NotificationService {
 
   public async syncWithBackend() {
     try {
-      const res = await fetch(`${API_BASE_URL}/notifications/`, {
+      const url = this.currentUserUuid
+        ? `${API_BASE_URL}/notifications/?user_uuid=${encodeURIComponent(this.currentUserUuid)}`
+        : `${API_BASE_URL}/notifications/`
+      const res = await fetch(url, {
         headers: { Accept: 'application/json' }
       })
       if (!res.ok) return
@@ -223,6 +258,7 @@ class NotificationService {
     const fullNotification: AppNotification = {
       ...notification,
       id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      userUuid: this.currentUserUuid || (notification as any).userUuid || '',
       createdAt: new Date().toISOString(),
       read: false
     }
