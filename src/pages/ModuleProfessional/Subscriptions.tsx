@@ -126,9 +126,20 @@ export const Subscriptions = (): JSX.Element => {
   const [toast, setToast] = useState('')
 
   // Charger les favoris depuis exile_favorites (synchronisé avec l'accueil)
+  const getFavoritesKey = useCallback(() => {
+    try {
+      const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+      const uid = profile?.id || localStorage.getItem('exile_client_uuid')
+      return uid ? `exile_favorites_${uid}` : 'exile_favorites'
+    } catch {
+      return 'exile_favorites'
+    }
+  }, [])
+
   const loadFavorites = useCallback((): FavoriteVideo[] => {
     try {
-      const savedFavs = localStorage.getItem('exile_favorites')
+      const key = getFavoritesKey()
+      const savedFavs = localStorage.getItem(key) || localStorage.getItem('exile_favorites')
       if (savedFavs) {
         const parsed = JSON.parse(savedFavs)
         if (Array.isArray(parsed)) return parsed
@@ -137,7 +148,7 @@ export const Subscriptions = (): JSX.Element => {
     } catch {
       return []
     }
-  }, [])
+  }, [getFavoritesKey])
 
   const [favorites, setFavorites] = useState<FavoriteVideo[]>(loadFavorites)
 
@@ -182,7 +193,14 @@ export const Subscriptions = (): JSX.Element => {
       }
     },
     {
-      cacheKey: 'pro:subscriptions:all',
+      cacheKey: (() => {
+        try {
+          const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+          return `pro:subscriptions:all:${profile?.id || localStorage.getItem('exile_client_uuid') || 'guest'}`
+        } catch {
+          return 'pro:subscriptions:all:guest'
+        }
+      })(),
       cacheTime: 5 * 60 * 1000,
       initialData: defaultSubscriptions
     }
@@ -220,7 +238,7 @@ export const Subscriptions = (): JSX.Element => {
     if (exists) {
       updated = favorites.filter(f => String(f.videoId || (f as any).id) !== vId)
       setFavorites(updated)
-      localStorage.setItem('exile_favorites', JSON.stringify(updated))
+      localStorage.setItem(getFavoritesKey(), JSON.stringify(updated))
       showToast('Retiré des favoris')
     } else {
       const newFav: FavoriteVideo = {
@@ -236,7 +254,7 @@ export const Subscriptions = (): JSX.Element => {
       }
       updated = [newFav, ...favorites]
       setFavorites(updated)
-      localStorage.setItem('exile_favorites', JSON.stringify(updated))
+      localStorage.setItem(getFavoritesKey(), JSON.stringify(updated))
       showToast('❤️ Ajouté aux favoris !')
     }
 

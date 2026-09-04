@@ -93,7 +93,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
     }
   }, [])
 
-  const activeRealAds = realAds.filter(a => a.status === 'active')
+  const activeRealAds = realAds.filter(a => !a.status || a.status === 'active')
 
   const userProfile = useMemo(() => {
     try {

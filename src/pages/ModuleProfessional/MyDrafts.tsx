@@ -41,7 +41,14 @@ export const MyDrafts = () => {
       return []
     },
     {
-      cacheKey: 'pro:videos:drafts',
+      cacheKey: (() => {
+        try {
+          const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
+          return `pro:videos:drafts:${profile?.id || localStorage.getItem('exile_client_uuid') || 'guest'}`;
+        } catch {
+          return 'pro:videos:drafts:guest';
+        }
+      })(),
       cacheTime: 3 * 60 * 1000,
       initialData: []
     }

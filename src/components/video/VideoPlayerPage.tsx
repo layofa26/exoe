@@ -11,7 +11,6 @@ import { useToast } from '../../hooks/useToast';
 import { fmtNum, formatYouTubeDate } from '../../utils/format';
 import { DotsMenu } from './DotsMenu';
 import { ContactModal } from '../modals/ContactModal';
-import { VoiceComment } from '../common/VoiceComment';
 import { useAccueilAlgo } from '../../algoPro/signals/useAccueilAlgo';
 import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -489,27 +488,6 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
     }));
   };
 
-  const handleVoiceCommentSend = async (blob: Blob, duration: number) => {
-    const fakeAudioUrl = URL.createObjectURL(blob);
-    const newComment: Comment = {
-      id: `voice-${Date.now()}`,
-      authorName: isAnonymous ? 'Anonyme' : (storedProfile?.name || 'Moi'),
-      initials: isAnonymous ? '?' : ((storedProfile?.name?.charAt(0) || 'M').toUpperCase()),
-      color: '#FF6B00',
-      text: '',
-      ago: 'À l\'instant',
-      likes: 0,
-      liked: false,
-      disliked: false,
-      replies: [],
-      audioUrl: fakeAudioUrl,
-      audioDuration: duration,
-      expiresAt: new Date(Date.now() + 72 * 3600 * 1000).toISOString()
-    };
-    setComments(prev => [newComment, ...prev]);
-    show('Message vocal publié (72h)');
-  };
-
   const renderComment = (c: Comment, isMobilePanel: boolean = false) => {
     const hasReplies = c.replies && c.replies.length > 0;
     const isExpanded = expandedReplies.has(c.id);
@@ -698,12 +676,6 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
           />
           <span className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Commenter en anonyme</span>
         </label>
-        <VoiceComment
-          onSend={handleVoiceCommentSend}
-          maxDuration={30}
-          autoDeleteAfter={72}
-          commentId={`voice-${video.id}`}
-        />
       </div>
     </div>
   );

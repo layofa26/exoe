@@ -24,7 +24,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useQuery } from '../../hooks/useQuery'
 import { cacheService } from '../../services/cacheService'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 interface MyVideo {
   id: string
@@ -95,7 +95,14 @@ export const MyVideos = (): JSX.Element => {
       }))
     },
     {
-      cacheKey: 'pro:videos:my',
+      cacheKey: (() => {
+        try {
+          const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
+          return `pro:videos:my:${profile?.id || localStorage.getItem('exile_client_uuid') || 'guest'}`;
+        } catch {
+          return 'pro:videos:my:guest';
+        }
+      })(),
       cacheTime: 3 * 60 * 1000,
       initialData: []
     }
