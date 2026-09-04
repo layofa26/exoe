@@ -5,7 +5,7 @@ import {
   Briefcase, Plus, Edit2, Lock, X,
   Users, Video, MessageSquare,
   TrendingUp, Settings, Camera, Heart, ArrowLeft,
-  ChevronDown, Award, Sparkles
+  ChevronDown, Award, Sparkles, Menu
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -850,8 +850,11 @@ const Profile = () => {
               <button
                 onClick={() => handleNavigate('/pro/settings')}
                 className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
+                title="Paramètres"
               >
-                <Settings className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+                {/* Icône à 3 barres sur mobile et engrenage sur desktop */}
+                <Menu className={`w-5 h-5 block sm:hidden ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+                <Settings className={`w-4 h-4 sm:w-5 sm:h-5 hidden sm:block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
               </button>
             </div>
           </div>
@@ -904,9 +907,9 @@ const Profile = () => {
             {/* Profile Header - Pro Responsive layout (Mobile, Tablet, Desktop) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
               {/* Left column - Profile info */}
-              <div className={`lg:col-span-4 xl:col-span-4 ${resolvedTheme === 'dark' ? 'bg-zinc-800/95 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-3 sm:p-4 md:p-5 shadow-sm`}>
-                {/* Banner Section */}
-                <div className="relative group mb-3 sm:mb-4">
+              <div className={`lg:col-span-4 xl:col-span-4 ${resolvedTheme === 'dark' ? 'bg-zinc-800/95 border-zinc-700' : 'bg-white border-gray-200'} border rounded-2xl p-0 sm:p-4 md:p-5 shadow-sm overflow-hidden`}>
+                {/* Banner Section - Pleine largeur sur mobile */}
+                <div className="relative group mb-3 sm:mb-4 w-full">
                   {(() => {
                     const rawBanner = profile?.banner_url || profile?.banner
                     const bannerUrl = !bannerError && rawBanner 
@@ -916,7 +919,7 @@ const Profile = () => {
                       : null
 
                     return (
-                      <div className={`w-full h-36 sm:h-44 md:h-52 lg:h-44 ${bannerUrl ? 'bg-zinc-900 dark:bg-black' : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700'} rounded-xl overflow-hidden border border-gray-200 dark:border-zinc-700 shadow-md relative`}>
+                      <div className={`w-full h-40 sm:h-44 md:h-52 lg:h-44 ${bannerUrl ? 'bg-zinc-900 dark:bg-black' : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700'} rounded-none sm:rounded-xl overflow-hidden border-b sm:border border-gray-200 dark:border-zinc-700 shadow-md relative`}>
                         {bannerUrl ? (
                           <img 
                             src={bannerUrl} 
@@ -953,7 +956,7 @@ const Profile = () => {
                   />
                 </div>
 
-                <div className="flex flex-col items-center gap-2 sm:gap-3 -mt-10 sm:-mt-12 md:-mt-14 px-3 sm:px-0">
+                <div className="flex flex-col items-center gap-2 sm:gap-3 -mt-10 sm:-mt-12 md:-mt-14 px-4 sm:px-0 pb-4 sm:pb-0">
                   {/* Photo centrée avec upload - chevauchant la bannière */}
                   <div className="relative group">
                     {(() => {

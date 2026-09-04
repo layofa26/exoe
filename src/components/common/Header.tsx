@@ -431,7 +431,7 @@ export const Header = (): JSX.Element => {
           {/* Logo - Gauche */}
           <div className="flex-shrink-0 flex items-center z-10">
             <Link to="/" className="flex items-center">
-              <img src="/logo_exile_SVG.svg" alt="EXILE" className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14" />
+              <img src="/logo_exile_SVG.svg" alt="EXILE" className="w-13 h-13 sm:w-16 sm:h-16 md:w-16 md:h-16 object-contain" />
             </Link>
           </div>
 
@@ -442,7 +442,7 @@ export const Header = (): JSX.Element => {
                 <div key={link.to} className="relative group">
                   <Link
                     to={link.disabled ? '#' : link.to}
-                    className={`relative text-xs sm:text-sm md:text-base font-bold transition-colors whitespace-nowrap ${
+                    className={`relative text-[13.5px] sm:text-sm md:text-base font-extrabold tracking-tight transition-colors whitespace-nowrap ${
                       isActive(link.to)
                         ? 'text-[#FF6B00]'
                         : link.disabled
@@ -710,7 +710,7 @@ export const Header = (): JSX.Element => {
                       className="lg:hidden p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"
                       title="Rechercher"
                     >
-                      <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <Search className="w-5 h-5 sm:w-5 sm:h-5" />
                     </button>
 
                     {/* Filter Type Floating Menu */}
@@ -956,7 +956,7 @@ export const Header = (): JSX.Element => {
                     className="relative p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                     title="Notifications"
                   >
-                    <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <Bell className="w-5 h-5 sm:w-5 sm:h-5" />
                     {(unreadCount > 0 || newRequestsCount > 0) && (
                       <span className="absolute top-1 right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
                         {unreadCount + newRequestsCount > 9 ? '9+' : unreadCount + newRequestsCount}
@@ -964,40 +964,46 @@ export const Header = (): JSX.Element => {
                     )}
                   </button>
 
-                  {/* Notification Dropdown */}
+                  {/* Notification Dropdown / Plein Écran sans espace sur Mobile */}
                   {showNotifications && (
-                    <div className={`absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl shadow-2xl py-2 z-50 border ${
-                      resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'
-                    } animate-in fade-in zoom-in-95 duration-150`}>
-                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-zinc-700/60">
+                    <div className="fixed inset-0 z-[150] w-full h-full bg-white dark:bg-zinc-950 flex flex-col sm:absolute sm:inset-auto sm:right-0 sm:mt-2 sm:w-96 sm:h-auto sm:max-h-[520px] sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-200 dark:sm:border-zinc-700 animate-in fade-in sm:zoom-in-95 duration-150">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-sm">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-gray-900 dark:text-white">Notifications</span>
+                          <span className="text-base sm:text-sm font-black text-gray-900 dark:text-white">Notifications</span>
                           {unreadCount > 0 && (
-                            <span className="px-2 py-0.5 text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
+                            <span className="px-2 py-0.5 text-xs sm:text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
                               {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
-                        {notifications.length > 0 && (
+                        <div className="flex items-center gap-2.5">
+                          {notifications.length > 0 && (
+                            <button
+                              onClick={() => {
+                                notificationService.markAllAsRead()
+                                setNotifications(notificationService.getNotifications())
+                              }}
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                            >
+                              <CheckCheck className="w-3.5 h-3.5" />
+                              <span className="hidden xs:inline">Tout marquer comme lu</span>
+                            </button>
+                          )}
                           <button
-                            onClick={() => {
-                              notificationService.markAllAsRead()
-                              setNotifications(notificationService.getNotifications())
-                            }}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            onClick={() => setShowNotifications(false)}
+                            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-500 sm:hidden"
                           >
-                            <CheckCheck className="w-3.5 h-3.5" />
-                            Tout marquer comme lu
+                            <X className="w-5 h-5" />
                           </button>
-                        )}
+                        </div>
                       </div>
 
-                      <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-700/40">
+                      <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800/60 no-scrollbar">
                         {notifications.length === 0 ? (
-                          <div className="py-8 px-4 text-center">
-                            <Bell className="w-8 h-8 mx-auto text-gray-300 dark:text-zinc-600 mb-2" />
-                            <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">Aucune notification</p>
-                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">Vous serez notifié dès qu'il y aura du nouveau.</p>
+                          <div className="py-16 px-4 text-center">
+                            <Bell className="w-10 h-10 mx-auto text-gray-300 dark:text-zinc-600 mb-2.5 opacity-60" />
+                            <p className="text-sm font-bold text-gray-700 dark:text-zinc-300">Aucune notification</p>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-1">Vous serez notifié dès qu'il y aura du nouveau.</p>
                           </div>
                         ) : (
                           notifications.map((notif) => (
@@ -1007,16 +1013,22 @@ export const Header = (): JSX.Element => {
                                 notificationService.markAsRead(notif.id)
                                 setNotifications(notificationService.getNotifications())
                                 setShowNotifications(false)
-                                if (notif.type === 'message') {
+                                if (notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl) {
+                                  navigate(notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl)
+                                } else if (notif.type === 'campaign_active' || notif.data?.isPub) {
+                                  navigate('/pro')
+                                } else if (notif.type === 'message') {
                                   navigate('/pro/conversations')
-                                } else if (notif.type === 'request_accepted' || notif.type === 'new_contact') {
+                                } else if (notif.type === 'request_accepted' || notif.type === 'new_contact' || notif.type === 'inquiry_received') {
                                   navigate('/pro/demandes')
+                                } else if (notif.data?.url) {
+                                  navigate(notif.data.url)
                                 }
                               }}
-                              className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
+                              className={`p-4 sm:p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
                                 !notif.read
                                   ? resolvedTheme === 'dark' ? 'bg-blue-950/30 hover:bg-blue-900/30' : 'bg-blue-50/70 hover:bg-blue-100/60'
-                                  : resolvedTheme === 'dark' ? 'hover:bg-zinc-700/50' : 'hover:bg-gray-50'
+                                  : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/60' : 'hover:bg-gray-50'
                               }`}
                             >
                               {/* Logo ou icône de notification */}
@@ -1024,7 +1036,7 @@ export const Header = (): JSX.Element => {
                                 <img
                                   src={notif.iconUrl || localStorage.getItem('exile_pub_platform_logo') || ''}
                                   alt="PUB"
-                                  className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
+                                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
                                 />
                               ) : (
                                 <div className={`p-2 rounded-xl flex-shrink-0 ${
@@ -1037,18 +1049,18 @@ export const Header = (): JSX.Element => {
                                     : 'bg-amber-500/10 text-amber-500'
                                 }`}>
                                   {notif.type === 'message' ? (
-                                    <MessageSquare className="w-4 h-4" />
+                                    <MessageSquare className="w-5 h-5 sm:w-4 sm:h-4" />
                                   ) : notif.type === 'request_accepted' ? (
-                                    <CheckCircle className="w-4 h-4" />
+                                    <CheckCircle className="w-5 h-5 sm:w-4 sm:h-4" />
                                   ) : (
-                                    <AlertCircle className="w-4 h-4" />
+                                    <AlertCircle className="w-5 h-5 sm:w-4 sm:h-4" />
                                   )}
                                 </div>
                               )}
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-1 mb-0.5">
-                                  <p className={`text-xs font-semibold truncate ${
+                                  <p className={`text-xs sm:text-xs font-bold truncate ${
                                     !notif.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-zinc-300'
                                   }`}>
                                     {notif.title}
@@ -1061,7 +1073,7 @@ export const Header = (): JSX.Element => {
                                   {notif.message}
                                 </p>
 
-                                {/* Bouton d'action personnalisé (ex: Faire encore une demande) */}
+                                {/* Bouton d'action personnalisé */}
                                 {(notif.actionButton || notif.data?.actionButton) && (
                                   <button
                                     onClick={(e) => {
@@ -1071,14 +1083,14 @@ export const Header = (): JSX.Element => {
                                       const url = notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl || '/pub/demande'
                                       navigate(url)
                                     }}
-                                    className="mt-2 px-3 py-1 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-[11px] font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                                    className="mt-2.5 px-3.5 py-1 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-[11px] font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
                                   >
                                     <span>{notif.actionButton?.label || notif.data?.actionButton?.label || 'Faire encore une demande'}</span>
                                     <ArrowRight className="w-3 h-3" />
                                   </button>
                                 )}
 
-                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1 block">
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1.5 block">
                                   {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
@@ -1096,7 +1108,7 @@ export const Header = (): JSX.Element => {
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
                     className="flex items-center space-x-2 p-1 md:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
                   >
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-zinc-800 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm overflow-hidden shadow-sm ring-1 ring-white/10 flex-shrink-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-zinc-800 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden shadow-sm ring-1 ring-white/10 flex-shrink-0">
                       {headerAvatar && !headerAvatarError && isOnline ? (
                         <img
                           src={headerAvatar}

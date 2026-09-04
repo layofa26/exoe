@@ -442,9 +442,9 @@ export default function VideoFeed() {
                         onContact={handleContact}
                         onProfileClick={handleProfileClick}
                       />
-                      {/* SectionPub après 2 vidéos sur Mobile/Tablette */}
+                      {/* SectionPub après 2 vidéos sur Mobile/Tablette - Espacement net et fluide */}
                       {idx === 1 && (
-                        <div className="col-span-full py-2">
+                        <div className="col-span-full py-0.5 my-1 sm:my-1.5">
                           <SectionPub />
                         </div>
                       )}

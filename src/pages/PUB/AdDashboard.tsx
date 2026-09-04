@@ -1127,16 +1127,17 @@ export default function AdDashboard() {
     const syncWithBackend = async () => {
       try {
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
-        if (token) {
-          await fetch(`${API_BASE_URL}/pub/annonces/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ campaigns: nextAds })
-          })
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
         }
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+        await fetch(`${API_BASE_URL}/pub/annonces/`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ campaigns: nextAds })
+        })
       } catch {}
     }
     syncWithBackend()

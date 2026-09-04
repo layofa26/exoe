@@ -127,27 +127,31 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
   }, [activeRealAds, userInterests])
 
   // Seules les vraies publicités créées depuis le Dashboard PUB sont affichées (aucune fausse pub)
-  const companies: FeaturedCompany[] = targetedAds.map(a => ({
-    id: a.id,
-    name: a.brandName,
-    initials: a.brandInitials || a.brandName.slice(0, 2).toUpperCase(),
-    category: a.category || 'Entreprise',
-    color: a.bgColor || a.brandColor || '#2563eb',
-    bgColor: a.bgColor || a.brandColor || '#2563eb',
-    bgType: a.bgType || (a.bgMediaUrl ? 'media' : a.gradient ? 'gradient' : 'color'),
-    gradient: a.bgType === 'color' ? '' : (a.gradient || ''),
-    bgMediaUrl: a.bgMediaUrl || a.bgVideoUrl || '',
-    bgVideoUrl: a.bgVideoUrl || a.bgMediaUrl || '',
-    targetAudience: a.targetAudience || 'all',
-    targetInterests: a.targetInterests || [],
-    url: a.ctaUrl || '#',
-    tagline: a.tagline,
-    description: a.description,
-    brandLogo: a.brandLogo,
-    ctaLabel: a.ctaLabel || 'Visiter',
-    ctaTextColor: a.ctaTextColor || '#ffffff',
-    ctaBgColor: a.ctaBgColor || '#FF6B00',
-  }))
+  const companies: FeaturedCompany[] = targetedAds.map(a => {
+    const rawMedia = a.bgMediaUrl || a.bgVideoUrl || (a as any).bg_media_url || ''
+    const hasMedia = Boolean(rawMedia && rawMedia.trim().length > 0)
+    return {
+      id: a.id,
+      name: a.brandName,
+      initials: a.brandInitials || a.brandName.slice(0, 2).toUpperCase(),
+      category: a.category || 'Entreprise',
+      color: a.bgColor || a.brandColor || '#2563eb',
+      bgColor: a.bgColor || a.brandColor || '#2563eb',
+      bgType: hasMedia ? 'media' : (a.bgType || (a.gradient ? 'gradient' : 'color')),
+      gradient: hasMedia || a.bgType === 'color' ? '' : (a.gradient || ''),
+      bgMediaUrl: rawMedia,
+      bgVideoUrl: rawMedia,
+      targetAudience: a.targetAudience || 'all',
+      targetInterests: a.targetInterests || [],
+      url: a.ctaUrl || '#',
+      tagline: a.tagline,
+      description: a.description,
+      brandLogo: a.brandLogo,
+      ctaLabel: a.ctaLabel || 'Visiter',
+      ctaTextColor: a.ctaTextColor || '#ffffff',
+      ctaBgColor: a.ctaBgColor || '#FF6B00',
+    }
+  })
 
   // Rotation automatique douce pour tous les modes (passe les publicités l'une après l'autre)
   useEffect(() => {
@@ -296,10 +300,9 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             {companies.map((company, idx) => {
               const isSelected = idx === (currentAdIndex % companies.length)
               const hasMedia = Boolean(company.bgMediaUrl || company.bgVideoUrl)
-              const mediaUrl = company.bgMediaUrl || company.bgVideoUrl || ''
               const isVideo = mediaUrl.startsWith('data:video') || mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm')
-              const hasGradient = Boolean(company.gradient)
-              const hasColor = Boolean(company.bgColor || company.color)
+              const hasGradient = Boolean(company.gradient) && !hasMedia
+              const hasColor = Boolean(company.bgColor || company.color) && !hasMedia && !hasGradient
 
               return (
                 <div
@@ -316,7 +319,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                       ? 'border-zinc-800 hover:border-zinc-700'
                       : 'border-gray-200 hover:border-gray-300'
                   } ${
-                    hasGradient ? `bg-gradient-to-br ${company.gradient} text-white` : ''
+                    hasGradient && !hasMedia ? `bg-gradient-to-br ${company.gradient} text-white` : ''
                   }`}
                 >
                   {/* Arrière-plan Média Réel : GIF, Image ou Vidéo */}
@@ -470,7 +473,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             {/* Bannière Visuelle (hauteur constante et stable) */}
             <div
               style={!activeAd.bgMediaUrl && !activeAd.gradient ? { backgroundColor: activeAd.bgColor || activeAd.color || '#2563eb' } : undefined}
-              className={`flex-1 p-3.5 ${activeAd.gradient ? `bg-gradient-to-br ${activeAd.gradient}` : ''} text-white relative overflow-hidden flex flex-col justify-between`}
+              className={`flex-1 p-3.5 ${activeAd.gradient && !activeAd.bgMediaUrl ? `bg-gradient-to-br ${activeAd.gradient}` : ''} text-white relative overflow-hidden flex flex-col justify-between`}
             >
               {/* Média de fond si configuré (GIF, Image ou Vidéo) */}
               {activeAd.bgMediaUrl && (
