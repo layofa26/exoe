@@ -166,13 +166,18 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
   useEffect(() => {
     if (!mobileSliderRef.current || companies.length <= 1) return
     const container = mobileSliderRef.current
+    if (!container || !container.children) return
     const activeItem = container.children[currentAdIndex % companies.length] as HTMLElement
-    if (activeItem) {
+    if (activeItem && typeof activeItem.offsetLeft === 'number') {
       const targetLeft = activeItem.offsetLeft - container.offsetLeft - (container.clientWidth / 2 - activeItem.clientWidth / 2)
-      container.scrollTo({
-        left: Math.max(0, targetLeft),
-        behavior: 'smooth'
-      })
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({
+          left: Math.max(0, targetLeft),
+          behavior: 'smooth'
+        })
+      } else {
+        container.scrollLeft = Math.max(0, targetLeft)
+      }
     }
   }, [currentAdIndex, companies.length])
 

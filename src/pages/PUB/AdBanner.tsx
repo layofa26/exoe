@@ -521,10 +521,3 @@ export function AdInjector({
 }
 
 // ─────────────────────────────────────────────────────────────
-// COMPOSANT : SectionPub (retrocompatible avec VideoFeed)
-// ─────────────────────────────────────────────────────────────
-// RE-EXPORT SectionPub
-// ─────────────────────────────────────────────────────────────
-
-export { default } from './SectionPub'
-
