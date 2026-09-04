@@ -68,8 +68,8 @@ export default function AdInquiryPage() {
   }
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-900'} py-8 px-4 sm:px-6`}>
-      <div className="max-w-xl mx-auto space-y-6">
+    <div className={`min-h-screen w-full ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-900'} py-3 sm:py-8 px-2 sm:px-6`}>
+      <div className="w-full max-w-xl mx-auto space-y-4 sm:space-y-6">
         
         {/* En-tête avec bouton retour */}
         <div className="flex items-center justify-between gap-4">
@@ -89,7 +89,7 @@ export default function AdInquiryPage() {
         </div>
 
         {/* Titre & Description */}
-        <div className={`p-6 rounded-3xl border shadow-sm ${isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'}`}>
+        <div className={`p-4 sm:p-6 rounded-2xl sm:rounded-3xl border shadow-sm ${isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'}`}>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-bold">
               <Megaphone size={24} />

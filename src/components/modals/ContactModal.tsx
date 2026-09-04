@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   X, 
   Send, 
@@ -38,6 +38,20 @@ export const ContactModal = ({
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+      document.body.classList.add('contact-modal-open')
+    } else {
+      document.body.style.overflow = ''
+      document.body.classList.remove('contact-modal-open')
+    }
+    return () => {
+      document.body.style.overflow = ''
+      document.body.classList.remove('contact-modal-open')
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -92,11 +106,20 @@ export const ContactModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm pointer-events-auto"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md pointer-events-auto animate-in fade-in duration-150"
       onClick={onClose}
     >
+      <style>{`
+        body.contact-modal-open .feed-video-card,
+        body.contact-modal-open .video-player-container,
+        body.contact-modal-open main,
+        body.contact-modal-open .pro-feed-container {
+          filter: blur(8px) brightness(0.6) !important;
+          transition: filter 0.2s ease-in-out !important;
+        }
+      `}</style>
       <div
-        className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto pointer-events-auto`}
+        className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] overflow-y-auto pointer-events-auto flex flex-col justify-between sm:justify-start`}
         onClick={handleContainerClick}
       >
         {/* Header */}

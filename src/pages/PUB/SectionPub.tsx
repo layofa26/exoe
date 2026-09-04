@@ -780,7 +780,7 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
 
   return (
     <div
-      className="fixed inset-0 z-[999999] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[999999] bg-black/75 backdrop-blur-md sm:backdrop-blur-lg flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
       style={{ isolation: 'isolate', transform: 'translateZ(0)' }}
     >
       <style>{`
@@ -793,12 +793,14 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
           pointer-events: none !important;
         }
         body.pub-inquiry-modal-open .feed-video-card,
-        body.pub-inquiry-modal-open .video-player-container {
-          filter: blur(10px) brightness(0.5) !important;
+        body.pub-inquiry-modal-open .video-player-container,
+        body.pub-inquiry-modal-open main,
+        body.pub-inquiry-modal-open .pro-feed-container {
+          filter: blur(8px) brightness(0.6) !important;
           transition: filter 0.2s ease-in-out !important;
         }
       `}</style>
-      <div className={`w-full max-w-lg rounded-3xl border ${isDark ? 'bg-zinc-900 text-white border-zinc-800' : 'bg-white text-zinc-900 border-zinc-200'} p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative z-10 shadow-black/90`}>
+      <div className={`w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg rounded-none sm:rounded-3xl border-0 sm:border ${isDark ? 'bg-zinc-900 text-white border-zinc-800' : 'bg-white text-zinc-900 border-zinc-200'} p-4 sm:p-6 shadow-2xl space-y-4 overflow-y-auto relative z-10 shadow-black/90`}>
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/30 flex items-center justify-center font-bold text-base shadow-sm">

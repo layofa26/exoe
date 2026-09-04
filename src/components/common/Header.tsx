@@ -964,45 +964,45 @@ export const Header = (): JSX.Element => {
                     )}
                   </button>
 
-                  {/* Notification Dropdown / Plein Écran sans espace sur Mobile */}
-                  {showNotifications && (
-                    <div className="fixed inset-0 z-[150] w-full h-full bg-white dark:bg-zinc-950 flex flex-col sm:absolute sm:inset-auto sm:right-0 sm:mt-2 sm:w-96 sm:h-auto sm:max-h-[520px] sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-200 dark:sm:border-zinc-700 animate-in fade-in sm:zoom-in-95 duration-150">
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-sm">
+                  {/* Mobile Notification Modal (Portal dans document.body pour plein écran réel sans interférence CSS) */}
+                  {showNotifications && typeof document !== 'undefined' && createPortal(
+                    <div className="fixed inset-0 z-[99999] w-screen h-screen bg-white dark:bg-zinc-950 flex flex-col sm:hidden animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-950">
                         <div className="flex items-center gap-2">
-                          <span className="text-base sm:text-sm font-black text-gray-900 dark:text-white">Notifications</span>
+                          <span className="text-lg font-black text-gray-900 dark:text-white">Notifications</span>
                           {unreadCount > 0 && (
-                            <span className="px-2 py-0.5 text-xs sm:text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
+                            <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
                               {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-3">
                           {notifications.length > 0 && (
                             <button
                               onClick={() => {
                                 notificationService.markAllAsRead()
                                 setNotifications(notificationService.getNotifications())
                               }}
-                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold"
                             >
-                              <CheckCheck className="w-3.5 h-3.5" />
-                              <span className="hidden xs:inline">Tout marquer comme lu</span>
+                              <CheckCheck className="w-4 h-4" />
+                              Tout marquer comme lu
                             </button>
                           )}
                           <button
                             onClick={() => setShowNotifications(false)}
-                            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-500 sm:hidden"
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-zinc-300"
                           >
-                            <X className="w-5 h-5" />
+                            <X className="w-6 h-6" />
                           </button>
                         </div>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800/60 no-scrollbar">
+                      <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800/60 pb-20 no-scrollbar">
                         {notifications.length === 0 ? (
-                          <div className="py-16 px-4 text-center">
-                            <Bell className="w-10 h-10 mx-auto text-gray-300 dark:text-zinc-600 mb-2.5 opacity-60" />
-                            <p className="text-sm font-bold text-gray-700 dark:text-zinc-300">Aucune notification</p>
+                          <div className="py-24 px-4 text-center">
+                            <Bell className="w-12 h-12 mx-auto text-gray-300 dark:text-zinc-600 mb-3 opacity-60" />
+                            <p className="text-base font-bold text-gray-700 dark:text-zinc-300">Aucune notification</p>
                             <p className="text-xs text-gray-400 dark:text-zinc-500 mt-1">Vous serez notifié dès qu'il y aura du nouveau.</p>
                           </div>
                         ) : (
@@ -1025,18 +1025,146 @@ export const Header = (): JSX.Element => {
                                   navigate(notif.data.url)
                                 }
                               }}
-                              className={`p-4 sm:p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
+                              className={`p-4 flex items-start gap-3.5 cursor-pointer transition-colors ${
                                 !notif.read
                                   ? resolvedTheme === 'dark' ? 'bg-blue-950/30 hover:bg-blue-900/30' : 'bg-blue-50/70 hover:bg-blue-100/60'
                                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/60' : 'hover:bg-gray-50'
                               }`}
                             >
-                              {/* Logo ou icône de notification */}
+                              {/* Logo ou icône */}
                               {notif.iconUrl || (notif.data?.isPub && localStorage.getItem('exile_pub_platform_logo')) ? (
                                 <img
                                   src={notif.iconUrl || localStorage.getItem('exile_pub_platform_logo') || ''}
                                   alt="PUB"
-                                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
+                                  className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
+                                />
+                              ) : (
+                                <div className={`p-2.5 rounded-xl flex-shrink-0 ${
+                                  notif.type === 'message'
+                                    ? 'bg-blue-500/10 text-blue-500'
+                                    : notif.type === 'request_accepted'
+                                    ? 'bg-emerald-500/10 text-emerald-500'
+                                    : notif.type === 'system'
+                                    ? 'bg-purple-500/10 text-purple-500'
+                                    : 'bg-amber-500/10 text-amber-500'
+                                }`}>
+                                  {notif.type === 'message' ? (
+                                    <MessageSquare className="w-5 h-5" />
+                                  ) : notif.type === 'request_accepted' ? (
+                                    <CheckCircle className="w-5 h-5" />
+                                  ) : (
+                                    <AlertCircle className="w-5 h-5" />
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <p className={`text-sm font-bold truncate ${
+                                    !notif.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-zinc-300'
+                                  }`}>
+                                    {notif.title}
+                                  </p>
+                                  {!notif.read && (
+                                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                                  {notif.message}
+                                </p>
+
+                                {(notif.actionButton || notif.data?.actionButton) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      notificationService.markAsRead(notif.id)
+                                      setShowNotifications(false)
+                                      const url = notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl || '/pub/demande'
+                                      navigate(url)
+                                    }}
+                                    className="mt-2.5 px-4 py-1.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                                  >
+                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || 'Faire encore une demande'}</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-2 block">
+                                  {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>,
+                    document.body
+                  )}
+
+                  {/* Desktop/Tablet Notification Dropdown */}
+                  {showNotifications && (
+                    <div className="hidden sm:flex flex-col absolute right-0 mt-2 w-96 max-h-[520px] rounded-2xl shadow-2xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 z-50 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-zinc-700/60 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">Notifications</span>
+                          {unreadCount > 0 && (
+                            <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
+                              {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        {notifications.length > 0 && (
+                          <button
+                            onClick={() => {
+                              notificationService.markAllAsRead()
+                              setNotifications(notificationService.getNotifications())
+                            }}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                          >
+                            <CheckCheck className="w-3.5 h-3.5" />
+                            Tout marquer comme lu
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-700/40">
+                        {notifications.length === 0 ? (
+                          <div className="py-8 px-4 text-center">
+                            <Bell className="w-8 h-8 mx-auto text-gray-300 dark:text-zinc-600 mb-2 opacity-60" />
+                            <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">Aucune notification</p>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">Vous serez notifié dès qu'il y aura du nouveau.</p>
+                          </div>
+                        ) : (
+                          notifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              onClick={() => {
+                                notificationService.markAsRead(notif.id)
+                                setNotifications(notificationService.getNotifications())
+                                setShowNotifications(false)
+                                if (notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl) {
+                                  navigate(notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl)
+                                } else if (notif.type === 'campaign_active' || notif.data?.isPub) {
+                                  navigate('/pro')
+                                } else if (notif.type === 'message') {
+                                  navigate('/pro/conversations')
+                                } else if (notif.type === 'request_accepted' || notif.type === 'new_contact' || notif.type === 'inquiry_received') {
+                                  navigate('/pro/demandes')
+                                } else if (notif.data?.url) {
+                                  navigate(notif.data.url)
+                                }
+                              }}
+                              className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
+                                !notif.read
+                                  ? resolvedTheme === 'dark' ? 'bg-blue-950/30 hover:bg-blue-900/30' : 'bg-blue-50/70 hover:bg-blue-100/60'
+                                  : resolvedTheme === 'dark' ? 'hover:bg-zinc-700/50' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              {notif.iconUrl || (notif.data?.isPub && localStorage.getItem('exile_pub_platform_logo')) ? (
+                                <img
+                                  src={notif.iconUrl || localStorage.getItem('exile_pub_platform_logo') || ''}
+                                  alt="PUB"
+                                  className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
                                 />
                               ) : (
                                 <div className={`p-2 rounded-xl flex-shrink-0 ${
@@ -1049,18 +1177,18 @@ export const Header = (): JSX.Element => {
                                     : 'bg-amber-500/10 text-amber-500'
                                 }`}>
                                   {notif.type === 'message' ? (
-                                    <MessageSquare className="w-5 h-5 sm:w-4 sm:h-4" />
+                                    <MessageSquare className="w-4 h-4" />
                                   ) : notif.type === 'request_accepted' ? (
-                                    <CheckCircle className="w-5 h-5 sm:w-4 sm:h-4" />
+                                    <CheckCircle className="w-4 h-4" />
                                   ) : (
-                                    <AlertCircle className="w-5 h-5 sm:w-4 sm:h-4" />
+                                    <AlertCircle className="w-4 h-4" />
                                   )}
                                 </div>
                               )}
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-1 mb-0.5">
-                                  <p className={`text-xs sm:text-xs font-bold truncate ${
+                                  <p className={`text-xs font-semibold truncate ${
                                     !notif.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-zinc-300'
                                   }`}>
                                     {notif.title}
@@ -1073,7 +1201,6 @@ export const Header = (): JSX.Element => {
                                   {notif.message}
                                 </p>
 
-                                {/* Bouton d'action personnalisé */}
                                 {(notif.actionButton || notif.data?.actionButton) && (
                                   <button
                                     onClick={(e) => {
@@ -1083,14 +1210,14 @@ export const Header = (): JSX.Element => {
                                       const url = notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl || '/pub/demande'
                                       navigate(url)
                                     }}
-                                    className="mt-2.5 px-3.5 py-1 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-[11px] font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                                    className="mt-2 px-3 py-1 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-[11px] font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
                                   >
                                     <span>{notif.actionButton?.label || notif.data?.actionButton?.label || 'Faire encore une demande'}</span>
                                     <ArrowRight className="w-3 h-3" />
                                   </button>
                                 )}
 
-                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1.5 block">
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1 block">
                                   {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
