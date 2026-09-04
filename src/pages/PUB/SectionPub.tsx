@@ -304,7 +304,8 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
           >
             {companies.map((company, idx) => {
               const isSelected = idx === (currentAdIndex % companies.length)
-              const hasMedia = Boolean(company.bgMediaUrl || company.bgVideoUrl)
+              const mediaUrl = company.bgMediaUrl || company.bgVideoUrl || ''
+              const hasMedia = Boolean(mediaUrl && mediaUrl.trim().length > 0)
               const isVideo = mediaUrl.startsWith('data:video') || mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm')
               const hasGradient = Boolean(company.gradient) && !hasMedia
               const hasColor = Boolean(company.bgColor || company.color) && !hasMedia && !hasGradient
