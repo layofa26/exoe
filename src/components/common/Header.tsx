@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -6,7 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useRecentSearches } from '../../hooks/useRecentSearches'
 import { unwrapList } from '../../services/videoApi'
 import type { NavLinkType } from '../../types'
-import { notificationService, type AppNotification } from '../../services/notificationService'
+import { notificationService, formatRelativeTime, getNotificationCategory, type AppNotification, type NotificationCategory } from '../../services/notificationService'
 import { syncRemotePubNotifications } from '../../services/pubNotificationService'
 import {
   User,
@@ -30,7 +30,8 @@ import {
   Sparkles,
   Megaphone,
   Radio,
-  ArrowRight
+  ArrowRight,
+  Trash2
 } from 'lucide-react'
 import { UploadVideo } from '../video/UploadVideo'
 
@@ -173,6 +174,84 @@ export const Header = (): JSX.Element => {
   }, [])
 
   const unreadCount = notifications.filter(n => !n.read).length
+
+  // État de recherche et filtrage pour les notifications
+  const [notifSearchQuery, setNotifSearchQuery] = useState('')
+  const [notifCategoryFilter, setNotifCategoryFilter] = useState<NotificationCategory>('all')
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((notif) => {
+      // 1. Filtrage par onglet de catégorie
+      if (notifCategoryFilter !== 'all') {
+        const cat = getNotificationCategory(notif)
+        if (cat !== notifCategoryFilter) return false
+      }
+      // 2. Recherche textuelle dans le titre et le contenu
+      if (notifSearchQuery.trim()) {
+        const q = notifSearchQuery.toLowerCase()
+        const titleMatch = (notif.title || '').toLowerCase().includes(q)
+        const msgMatch = (notif.message || '').toLowerCase().includes(q)
+        if (!titleMatch && !msgMatch) return false
+      }
+      return true
+    })
+  }, [notifications, notifCategoryFilter, notifSearchQuery])
+
+  // Routage dynamique et intelligent des clics selon le type précis de notification
+  const handleNotificationClick = (notif: AppNotification) => {
+    notificationService.markAsRead(notif.id)
+    setNotifications(notificationService.getNotifications())
+    setShowNotifications(false)
+
+    // 1. Bouton d'action avec URL explicite
+    if (notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl) {
+      navigate(notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl)
+      return
+    }
+
+    // 2. Notification de campagne publicitaire active / clic PUB -> scroll avec halo
+    if (notif.type === 'campaign_active' || notif.data?.isPub || notif.data?.adId) {
+      const adId = notif.data?.adId || notif.data?.id || ''
+      navigate(`/pro?highlightAd=${encodeURIComponent(adId)}`)
+      return
+    }
+
+    // 3. Demande publicitaire reçue -> panneau des demandes
+    if (notif.type === 'inquiry_received') {
+      navigate('/pro/demandes')
+      return
+    }
+
+    // 4. Campagne terminée / relancer une pub
+    if (notif.type === 'campaign_ended') {
+      const adId = notif.data?.adId || notif.data?.id || ''
+      navigate(`/pub/demande?prefill=${encodeURIComponent(adId)}`)
+      return
+    }
+
+    // 5. Message direct -> ouvrir la conversation ciblée
+    if (notif.type === 'message') {
+      const convId = notif.data?.conversationId
+      if (convId) {
+        navigate(`/pro/conversations?id=${encodeURIComponent(convId)}`)
+      } else {
+        navigate('/pro/conversations')
+      }
+      return
+    }
+
+    // 6. Demandes de contact (reçue, acceptée, nouveau contact)
+    if (notif.type === 'request_accepted' || notif.type === 'new_contact' || notif.type === 'request_received') {
+      navigate('/pro/demandes')
+      return
+    }
+
+    // 7. URL générique présente dans data
+    if (notif.data?.url) {
+      navigate(notif.data.url)
+      return
+    }
+  }
 
   // État pour le bouton + Publier
   const [showPublishMenu, setShowPublishMenu] = useState(false)
@@ -967,12 +1046,13 @@ export const Header = (): JSX.Element => {
                   {/* Mobile Notification Modal (Portal dans document.body pour plein écran réel sans interférence CSS) */}
                   {showNotifications && typeof document !== 'undefined' && createPortal(
                     <div className="fixed inset-0 z-[99999] w-screen h-screen bg-white dark:bg-zinc-950 flex flex-col sm:hidden animate-in fade-in duration-200">
+                      {/* En-tête Mobile */}
                       <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-950">
                         <div className="flex items-center gap-2">
                           <span className="text-lg font-black text-gray-900 dark:text-white">Notifications</span>
                           {unreadCount > 0 && (
                             <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
-                              {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
+                              {unreadCount}
                             </span>
                           )}
                         </div>
@@ -986,11 +1066,14 @@ export const Header = (): JSX.Element => {
                               className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold"
                             >
                               <CheckCheck className="w-4 h-4" />
-                              Tout marquer comme lu
+                              Tout lire
                             </button>
                           )}
                           <button
-                            onClick={() => setShowNotifications(false)}
+                            onClick={() => {
+                              setShowNotifications(false)
+                              setNotifSearchQuery('')
+                            }}
                             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-zinc-300"
                           >
                             <X className="w-6 h-6" />
@@ -998,34 +1081,80 @@ export const Header = (): JSX.Element => {
                         </div>
                       </div>
 
+                      {/* Barre de Recherche Notifications (Mobile) */}
+                      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50/70 dark:bg-zinc-900/50 flex-shrink-0">
+                        <div className="relative flex items-center">
+                          <Search className="absolute left-3 w-4 h-4 text-gray-400 dark:text-zinc-500 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={notifSearchQuery}
+                            onChange={(e) => setNotifSearchQuery(e.target.value)}
+                            placeholder="Rechercher une notification..."
+                            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                          />
+                          {notifSearchQuery && (
+                            <button
+                              onClick={() => setNotifSearchQuery('')}
+                              className="absolute right-2.5 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Onglets Filtres de Catégories (Mobile) */}
+                        <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar pb-0.5">
+                          {[
+                            { key: 'all', label: 'Toutes' },
+                            { key: 'message', label: 'Messages' },
+                            { key: 'pub', label: 'Publicités' },
+                            { key: 'request', label: 'Demandes' },
+                            { key: 'system', label: 'Système' }
+                          ].map((tab) => (
+                            <button
+                              key={tab.key}
+                              onClick={() => setNotifCategoryFilter(tab.key as NotificationCategory)}
+                              className={`px-3 py-1 text-[11px] font-bold rounded-full whitespace-nowrap transition-all ${
+                                notifCategoryFilter === tab.key
+                                  ? 'bg-[#FF6B00] text-white shadow-sm'
+                                  : 'bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border border-gray-200/80 dark:border-zinc-700'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Liste Déroulante Notifications (Mobile) */}
                       <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800/60 pb-20 no-scrollbar">
-                        {notifications.length === 0 ? (
+                        {filteredNotifications.length === 0 ? (
                           <div className="py-24 px-4 text-center">
                             <Bell className="w-12 h-12 mx-auto text-gray-300 dark:text-zinc-600 mb-3 opacity-60" />
-                            <p className="text-base font-bold text-gray-700 dark:text-zinc-300">Aucune notification</p>
-                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-1">Vous serez notifié dès qu'il y aura du nouveau.</p>
+                            <p className="text-base font-bold text-gray-700 dark:text-zinc-300">
+                              {notifSearchQuery ? 'Aucune notification trouvée' : 'Aucune notification'}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-1">
+                              {notifSearchQuery ? `Aucun résultat pour "${notifSearchQuery}"` : "Vous serez notifié dès qu'il y aura du nouveau."}
+                            </p>
+                            {notifSearchQuery && (
+                              <button
+                                onClick={() => {
+                                  setNotifSearchQuery('')
+                                  setNotifCategoryFilter('all')
+                                }}
+                                className="mt-3 text-xs font-bold text-blue-600 dark:text-blue-400 underline"
+                              >
+                                Réinitialiser les filtres
+                              </button>
+                            )}
                           </div>
                         ) : (
-                          notifications.map((notif) => (
+                          filteredNotifications.map((notif) => (
                             <div
                               key={notif.id}
-                              onClick={() => {
-                                notificationService.markAsRead(notif.id)
-                                setNotifications(notificationService.getNotifications())
-                                setShowNotifications(false)
-                                if (notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl) {
-                                  navigate(notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl)
-                                } else if (notif.type === 'campaign_active' || notif.data?.isPub) {
-                                  navigate('/pro')
-                                } else if (notif.type === 'message') {
-                                  navigate('/pro/conversations')
-                                } else if (notif.type === 'request_accepted' || notif.type === 'new_contact' || notif.type === 'inquiry_received') {
-                                  navigate('/pro/demandes')
-                                } else if (notif.data?.url) {
-                                  navigate(notif.data.url)
-                                }
-                              }}
-                              className={`p-4 flex items-start gap-3.5 cursor-pointer transition-colors ${
+                              onClick={() => handleNotificationClick(notif)}
+                              className={`p-4 flex items-start gap-3.5 cursor-pointer transition-colors relative group ${
                                 !notif.read
                                   ? resolvedTheme === 'dark' ? 'bg-blue-950/30 hover:bg-blue-900/30' : 'bg-blue-50/70 hover:bg-blue-100/60'
                                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/60' : 'hover:bg-gray-50'
@@ -1044,6 +1173,8 @@ export const Header = (): JSX.Element => {
                                     ? 'bg-blue-500/10 text-blue-500'
                                     : notif.type === 'request_accepted'
                                     ? 'bg-emerald-500/10 text-emerald-500'
+                                    : notif.type === 'campaign_active' || notif.data?.isPub
+                                    ? 'bg-orange-500/10 text-orange-500'
                                     : notif.type === 'system'
                                     ? 'bg-purple-500/10 text-purple-500'
                                     : 'bg-amber-500/10 text-amber-500'
@@ -1052,6 +1183,8 @@ export const Header = (): JSX.Element => {
                                     <MessageSquare className="w-5 h-5" />
                                   ) : notif.type === 'request_accepted' ? (
                                     <CheckCircle className="w-5 h-5" />
+                                  ) : notif.type === 'campaign_active' || notif.data?.isPub ? (
+                                    <Megaphone className="w-5 h-5" />
                                   ) : (
                                     <AlertCircle className="w-5 h-5" />
                                   )}
@@ -1065,9 +1198,23 @@ export const Header = (): JSX.Element => {
                                   }`}>
                                     {notif.title}
                                   </p>
-                                  {!notif.read && (
-                                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-shrink-0" />
-                                  )}
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {!notif.read && (
+                                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                                    )}
+                                    {/* Suppression individuelle */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        notificationService.deleteNotification(notif.id)
+                                        setNotifications(notificationService.getNotifications())
+                                      }}
+                                      title="Supprimer la notification"
+                                      className="p-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                                   {notif.message}
@@ -1089,8 +1236,8 @@ export const Header = (): JSX.Element => {
                                   </button>
                                 )}
 
-                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-2 block">
-                                  {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-2 block font-medium">
+                                  {formatRelativeTime(notif.createdAt)}
                                 </span>
                               </div>
                             </div>
@@ -1103,13 +1250,13 @@ export const Header = (): JSX.Element => {
 
                   {/* Desktop/Tablet Notification Dropdown */}
                   {showNotifications && (
-                    <div className="hidden sm:flex flex-col absolute right-0 mt-2 w-96 max-h-[520px] rounded-2xl shadow-2xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="hidden sm:flex flex-col absolute right-0 mt-2 w-96 max-h-[560px] rounded-2xl shadow-2xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-zinc-700/60 flex-shrink-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-gray-900 dark:text-white">Notifications</span>
                           {unreadCount > 0 && (
                             <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
-                              {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
+                              {unreadCount}
                             </span>
                           )}
                         </div>
@@ -1127,34 +1274,68 @@ export const Header = (): JSX.Element => {
                         )}
                       </div>
 
+                      {/* Barre de Recherche Notifications (Desktop) */}
+                      <div className="px-3.5 py-2.5 border-b border-gray-100 dark:border-zinc-700/60 bg-gray-50/70 dark:bg-zinc-850/60 flex-shrink-0">
+                        <div className="relative flex items-center">
+                          <Search className="absolute left-2.5 w-3.5 h-3.5 text-gray-400 dark:text-zinc-500 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={notifSearchQuery}
+                            onChange={(e) => setNotifSearchQuery(e.target.value)}
+                            placeholder="Rechercher..."
+                            className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-white dark:bg-zinc-750 border border-gray-200 dark:border-zinc-600/80 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                          />
+                          {notifSearchQuery && (
+                            <button
+                              onClick={() => setNotifSearchQuery('')}
+                              className="absolute right-2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Onglets Filtres de Catégories (Desktop) */}
+                        <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-0.5">
+                          {[
+                            { key: 'all', label: 'Toutes' },
+                            { key: 'message', label: 'Messages' },
+                            { key: 'pub', label: 'Pubs' },
+                            { key: 'request', label: 'Demandes' },
+                            { key: 'system', label: 'Système' }
+                          ].map((tab) => (
+                            <button
+                              key={tab.key}
+                              onClick={() => setNotifCategoryFilter(tab.key as NotificationCategory)}
+                              className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full whitespace-nowrap transition-all ${
+                                notifCategoryFilter === tab.key
+                                  ? 'bg-[#FF6B00] text-white shadow-xs'
+                                  : 'bg-white dark:bg-zinc-700 text-gray-600 dark:text-zinc-300 border border-gray-200/80 dark:border-zinc-600'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-700/40">
-                        {notifications.length === 0 ? (
+                        {filteredNotifications.length === 0 ? (
                           <div className="py-8 px-4 text-center">
                             <Bell className="w-8 h-8 mx-auto text-gray-300 dark:text-zinc-600 mb-2 opacity-60" />
-                            <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">Aucune notification</p>
-                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">Vous serez notifié dès qu'il y aura du nouveau.</p>
+                            <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">
+                              {notifSearchQuery ? 'Aucune notification trouvée' : 'Aucune notification'}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
+                              {notifSearchQuery ? `Aucun résultat pour "${notifSearchQuery}"` : "Vous serez notifié dès qu'il y aura du nouveau."}
+                            </p>
                           </div>
                         ) : (
-                          notifications.map((notif) => (
+                          filteredNotifications.map((notif) => (
                             <div
                               key={notif.id}
-                              onClick={() => {
-                                notificationService.markAsRead(notif.id)
-                                setNotifications(notificationService.getNotifications())
-                                setShowNotifications(false)
-                                if (notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl) {
-                                  navigate(notif.data?.actionButton?.actionUrl || notif.actionButton?.actionUrl)
-                                } else if (notif.type === 'campaign_active' || notif.data?.isPub) {
-                                  navigate('/pro')
-                                } else if (notif.type === 'message') {
-                                  navigate('/pro/conversations')
-                                } else if (notif.type === 'request_accepted' || notif.type === 'new_contact' || notif.type === 'inquiry_received') {
-                                  navigate('/pro/demandes')
-                                } else if (notif.data?.url) {
-                                  navigate(notif.data.url)
-                                }
-                              }}
-                              className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
+                              onClick={() => handleNotificationClick(notif)}
+                              className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors group relative ${
                                 !notif.read
                                   ? resolvedTheme === 'dark' ? 'bg-blue-950/30 hover:bg-blue-900/30' : 'bg-blue-50/70 hover:bg-blue-100/60'
                                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-700/50' : 'hover:bg-gray-50'
@@ -1172,6 +1353,8 @@ export const Header = (): JSX.Element => {
                                     ? 'bg-blue-500/10 text-blue-500'
                                     : notif.type === 'request_accepted'
                                     ? 'bg-emerald-500/10 text-emerald-500'
+                                    : notif.type === 'campaign_active' || notif.data?.isPub
+                                    ? 'bg-orange-500/10 text-orange-500'
                                     : notif.type === 'system'
                                     ? 'bg-purple-500/10 text-purple-500'
                                     : 'bg-amber-500/10 text-amber-500'
@@ -1180,6 +1363,8 @@ export const Header = (): JSX.Element => {
                                     <MessageSquare className="w-4 h-4" />
                                   ) : notif.type === 'request_accepted' ? (
                                     <CheckCircle className="w-4 h-4" />
+                                  ) : notif.type === 'campaign_active' || notif.data?.isPub ? (
+                                    <Megaphone className="w-4 h-4" />
                                   ) : (
                                     <AlertCircle className="w-4 h-4" />
                                   )}
@@ -1193,9 +1378,23 @@ export const Header = (): JSX.Element => {
                                   }`}>
                                     {notif.title}
                                   </p>
-                                  {!notif.read && (
-                                    <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
-                                  )}
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {!notif.read && (
+                                      <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
+                                    )}
+                                    {/* Bouton de suppression individuelle */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        notificationService.deleteNotification(notif.id)
+                                        setNotifications(notificationService.getNotifications())
+                                      }}
+                                      title="Supprimer la notification"
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-500 transition-all"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">
                                   {notif.message}
@@ -1217,8 +1416,8 @@ export const Header = (): JSX.Element => {
                                   </button>
                                 )}
 
-                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1 block">
-                                  {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1 block font-medium">
+                                  {formatRelativeTime(notif.createdAt)}
                                 </span>
                               </div>
                             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Users,
   Calendar,
@@ -68,6 +68,9 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
   const isDark = resolvedTheme === 'dark'
+
+  const [searchParams] = useSearchParams()
+  const highlightAdId = searchParams.get('highlightAd') || searchParams.get('adId')
 
   const [realAds, setRealAds] = useState<Ad[]>(() => getStoredAds())
   const [currentAdIndex, setCurrentAdIndex] = useState(0)
@@ -152,6 +155,22 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
       ctaBgColor: a.ctaBgColor || '#FF6B00',
     }
   })
+
+  // Sélection et focalisation immédiate si une notification renvoie vers une publicité spécifique
+  useEffect(() => {
+    if (highlightAdId && companies.length > 0) {
+      const targetIdx = companies.findIndex(c => String(c.id) === String(highlightAdId))
+      if (targetIdx !== -1) {
+        setCurrentAdIndex(targetIdx)
+        if (mobileSliderRef.current) {
+          const targetEl = mobileSliderRef.current.children[targetIdx] as HTMLElement
+          if (targetEl && typeof targetEl.scrollIntoView === 'function') {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+          }
+        }
+      }
+    }
+  }, [highlightAdId, companies])
 
   // Rotation automatique douce pour tous les modes (passe les publicités l'une après l'autre)
   useEffect(() => {
@@ -304,6 +323,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
           >
             {companies.map((company, idx) => {
               const isSelected = idx === (currentAdIndex % companies.length)
+              const isTargetHighlighted = Boolean(highlightAdId && String(company.id) === String(highlightAdId))
               const mediaUrl = company.bgMediaUrl || company.bgVideoUrl || ''
               const hasMedia = Boolean(mediaUrl && mediaUrl.trim().length > 0)
               const isVideo = mediaUrl.startsWith('data:video') || mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm')
@@ -313,13 +333,16 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
               return (
                 <div
                   key={company.id}
+                  id={`exile-ad-${company.id}`}
                   onClick={() => {
                     setCurrentAdIndex(idx)
                     trackAdClick(company.id, company.url)
                   }}
                   style={!hasMedia && !hasGradient && hasColor ? { backgroundColor: company.bgColor || company.color } : undefined}
                   className={`relative rounded-xl border p-1.5 flex flex-col items-center justify-between text-center shadow-sm transition-all duration-500 cursor-pointer overflow-hidden h-[98px] sm:h-[110px] select-none flex-shrink-0 w-[calc(25%-5px)] sm:w-[calc(16.666%-7px)] ${
-                    isSelected
+                    isTargetHighlighted
+                      ? 'ring-4 ring-[#FF6B00] shadow-xl shadow-orange-500/50 scale-[1.06] z-20 border-[#FF6B00] animate-pulse'
+                      : isSelected
                       ? 'ring-2 ring-[#FF6B00] shadow-md shadow-orange-500/20 scale-[1.03] z-10 border-[#FF6B00]'
                       : isDark
                       ? 'border-zinc-800 hover:border-zinc-700'
