@@ -6,7 +6,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw } from "lucide-react";
+import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw, Loader2 } from "lucide-react";
 import { type Ad, type AdStatus, getStoredAds, saveStoredAds, fetchRemoteAds } from "./AdBanner";
 import { useTheme } from "../../contexts/ThemeContext";
 import { triggerPubNotification } from "../../services/pubNotificationService";
@@ -253,20 +253,49 @@ function CampaignModal({
   const [errors, setErrors] = useState<Partial<CampaignFormData>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
   const set = (k: keyof CampaignFormData, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: undefined }));
     setSubmitError(null);
   };
 
-  // Importer un média d'arrière-plan (GIF, Vidéo, Image de toute extension)
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Importer un média d'arrière-plan (GIF, Vidéo, Image) vers Supabase Storage
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 30 * 1024 * 1024) {
-        setSubmitError("Le fichier ne doit pas dépasser 30 Mo");
-        return;
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      setSubmitError("Le fichier ne doit pas dépasser 50 Mo");
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    setSubmitError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${API_BASE_URL}/pub/annonces/upload/`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.url) {
+          set("bgMediaUrl", json.url);
+          set("bgVideoUrl", json.url);
+          set("bgType", "media");
+          setIsUploadingMedia(false);
+          return;
+        }
       }
+      throw new Error("Échec de l'upload distant");
+    } catch {
+      // Fallback base64 local si le réseau échoue
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -275,24 +304,49 @@ function CampaignModal({
           set("bgVideoUrl", res);
           set("bgType", "media");
         }
+        setIsUploadingMedia(false);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Importer un logo personnalisé (File Picker)
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Importer un logo personnalisé vers Supabase Storage
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        setSubmitError("L'image du logo est trop lourde (max 3Mo)");
-        return;
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setSubmitError("L'image du logo est trop lourde (max 10Mo)");
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setSubmitError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${API_BASE_URL}/pub/annonces/upload/`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.url) {
+          set("brandLogo", json.url);
+          setIsUploadingLogo(false);
+          return;
+        }
       }
+      throw new Error("Échec upload logo");
+    } catch {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
           set("brandLogo", event.target.result as string);
         }
+        setIsUploadingLogo(false);
       };
       reader.readAsDataURL(file);
     }
@@ -412,13 +466,14 @@ function CampaignModal({
                   />
                   <button
                     type="button"
+                    disabled={isUploadingLogo}
                     onClick={() => fileInputRef.current?.click()}
                     className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-colors ${
                       resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-300 text-zinc-800 hover:bg-zinc-200'
-                    }`}
+                    } disabled:opacity-50`}
                   >
-                    <Upload size={14} />
-                    <span>Téléverser mon logo image</span>
+                    {isUploadingLogo ? <Loader2 size={14} className="animate-spin text-[#FF6B00]" /> : <Upload size={14} />}
+                    <span>{isUploadingLogo ? "Téléversement Supabase..." : "Téléverser mon logo image"}</span>
                   </button>
 
                   {form.brandLogo && (
@@ -644,11 +699,12 @@ function CampaignModal({
                       />
                       <button
                         type="button"
+                        disabled={isUploadingMedia}
                         onClick={() => videoFileInputRef.current?.click()}
-                        className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all active:scale-95"
+                        className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-sm transition-all active:scale-95"
                       >
-                        <Upload size={14} />
-                        <span>📁 Téléverser un GIF, Image ou Vidéo</span>
+                        {isUploadingMedia ? <Loader2 size={14} className="animate-spin text-white" /> : <Upload size={14} />}
+                        <span>{isUploadingMedia ? "Téléversement Supabase en cours..." : "📁 Téléverser un GIF, Image ou Vidéo"}</span>
                       </button>
 
                       {(form.bgMediaUrl || form.bgVideoUrl) && (
@@ -922,21 +978,41 @@ export default function AdDashboard() {
   const [toast, setToast] = useState<string | null>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("L'image ne doit pas dépasser 5 Mo");
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("L'image ne doit pas dépasser 10 Mo");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setPlatformLogo(dataUrl);
-      localStorage.setItem('exile_pub_platform_logo', dataUrl);
-      showToast("✓ Logo importé depuis votre appareil avec succès !");
-    };
-    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_BASE_URL}/pub/annonces/upload/`, {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.url) {
+          setPlatformLogo(json.url);
+          localStorage.setItem('exile_pub_platform_logo', json.url);
+          showToast("✓ Logo téléversé sur Supabase et synchronisé !");
+          return;
+        }
+      }
+      throw new Error("Upload distant échoué");
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setPlatformLogo(dataUrl);
+        localStorage.setItem('exile_pub_platform_logo', dataUrl);
+        showToast("✓ Logo importé localement");
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Synchroniser les demandes d'entreprises en direct
@@ -1109,12 +1185,46 @@ export default function AdDashboard() {
     onConfirm: () => {},
   });
 
+<<<<<<< HEAD
   // Charger la liste distante au montage pour ne jamais écraser la base avec un état local obsolète
   useEffect(() => {
     fetchRemoteAds().then(remote => {
       if (Array.isArray(remote)) setAds(remote)
     })
   }, [])
+=======
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Charger automatiquement les annonces et les demandes depuis le serveur en direct
+  const refreshFromServer = async () => {
+    setIsRefreshing(true);
+    try {
+      // 1. Charger les annonces distantes depuis le backend Render
+      const remoteAds = await fetchRemoteAds();
+      if (Array.isArray(remoteAds) && remoteAds.length > 0) {
+        setAds(remoteAds);
+      }
+
+      // 2. Charger les demandes d'entreprises (inquiries)
+      const inqRes = await fetch(`${API_BASE_URL}/pub/annonces/inquiry/`);
+      if (inqRes.ok) {
+        const inqData = await inqRes.json();
+        if (Array.isArray(inqData)) {
+          setInquiries(inqData);
+          localStorage.setItem('exile_pub_inquiries', JSON.stringify(inqData));
+        }
+      }
+    } catch (e) {
+      console.error("Erreur synchronisation serveur Dashboard PUB:", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshFromServer();
+  }, []);
+>>>>>>> 8dc7c8a (feat(pub): auto sync dashboard on mount, refresh button, upload media to Supabase)
 
   // Synchroniser avec les évènements externes
   useEffect(() => {
@@ -1406,6 +1516,18 @@ export default function AdDashboard() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={refreshFromServer}
+            disabled={isRefreshing}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
+              resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200'
+            } disabled:opacity-50`}
+            title="Actualiser depuis le serveur"
+          >
+            <RefreshCw size={15} className={isRefreshing ? "animate-spin text-[#FF6B00]" : ""} />
+            <span className="hidden sm:inline">Actualiser</span>
+          </button>
+
           <button
             onClick={handleLockDashboard}
             className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
