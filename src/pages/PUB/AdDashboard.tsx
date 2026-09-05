@@ -1185,14 +1185,6 @@ export default function AdDashboard() {
     onConfirm: () => {},
   });
 
-<<<<<<< HEAD
-  // Charger la liste distante au montage pour ne jamais écraser la base avec un état local obsolète
-  useEffect(() => {
-    fetchRemoteAds().then(remote => {
-      if (Array.isArray(remote)) setAds(remote)
-    })
-  }, [])
-=======
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Charger automatiquement les annonces et les demandes depuis le serveur en direct
@@ -1224,7 +1216,6 @@ export default function AdDashboard() {
   useEffect(() => {
     refreshFromServer();
   }, []);
->>>>>>> 8dc7c8a (feat(pub): auto sync dashboard on mount, refresh button, upload media to Supabase)
 
   // Synchroniser avec les évènements externes
   useEffect(() => {
