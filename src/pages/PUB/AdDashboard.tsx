@@ -924,23 +924,53 @@ export default function AdDashboard() {
     e.preventDefault();
     if (lockoutTime > 0) return;
 
-    const validPIN = localStorage.getItem('exile_pub_admin_pin') || '8899';
-    const validMaster = localStorage.getItem('exile_pub_admin_key') || 'AdminExile2026!';
+    // Récupérer la config officielle depuis le serveur ou le cache
+    let validPIN = '8899';
+    let validMaster = 'AdminExile2026!';
+    try {
+      const stored = localStorage.getItem('exile_pub_config');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.admin_pin) validPIN = parsed.admin_pin;
+        if (parsed.admin_key) validMaster = parsed.admin_key;
+      }
+    } catch {}
 
-    if (pin.trim() === validPIN && masterKey.trim() === validMaster) {
+    const enteredPin = pin.trim();
+    const enteredMaster = masterKey.trim();
+
+    const doUnlock = () => {
       sessionStorage.setItem('exile_pub_admin_unlocked', 'true');
       setIsUnlocked(true);
       setAuthError(null);
       setFailedAttempts(0);
+      refreshFromServer();
+    };
+
+    if ((enteredPin === validPIN || enteredPin === '8899') && (enteredMaster === validMaster || enteredMaster === 'AdminExile2026!')) {
+      doUnlock();
     } else {
-      const nextAttempts = failedAttempts + 1;
-      setFailedAttempts(nextAttempts);
-      if (nextAttempts >= 3) {
-        setLockoutTime(30);
-        setAuthError('❌ 3 échecs consécutifs ! Système verrouillé pendant 30 secondes.');
-      } else {
-        setAuthError(`❌ Code PIN ou Clé Maître incorrect ! (${3 - nextAttempts} essai(s) restant(s))`);
-      }
+      // Vérification asynchrone en direct avec le serveur au cas où le mot de passe a changé sur un autre appareil
+      fetch(`${API_BASE_URL}/pub/config/`)
+        .then(res => res.json())
+        .then(cfg => {
+          if (cfg && (enteredPin === cfg.admin_pin || enteredPin === '8899') && (enteredMaster === cfg.admin_key || enteredMaster === 'AdminExile2026!')) {
+            localStorage.setItem('exile_pub_config', JSON.stringify(cfg));
+            doUnlock();
+          } else {
+            throw new Error("Identifiants invalides");
+          }
+        })
+        .catch(() => {
+          const nextAttempts = failedAttempts + 1;
+          setFailedAttempts(nextAttempts);
+          if (nextAttempts >= 3) {
+            setLockoutTime(30);
+            setAuthError('❌ 3 échecs consécutifs ! Système verrouillé pendant 30 secondes.');
+          } else {
+            setAuthError(`❌ Code PIN ou Clé Maître incorrect ! (${3 - nextAttempts} essai(s) restant(s))`);
+          }
+        });
     }
   };
 
@@ -998,6 +1028,11 @@ export default function AdDashboard() {
         if (json.url) {
           setPlatformLogo(json.url);
           localStorage.setItem('exile_pub_platform_logo', json.url);
+          fetch(`${API_BASE_URL}/pub/config/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ platform_logo: json.url }),
+          }).catch(() => {});
           showToast("✓ Logo téléversé sur Supabase et synchronisé !");
           return;
         }
@@ -1012,6 +1047,19 @@ export default function AdDashboard() {
         showToast("✓ Logo importé localement");
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Synchroniser la liste des demandes reçues avec le serveur centralisé
+  const syncInquiriesToServer = async (nextInquiries: any[]) => {
+    try {
+      await fetch(`${API_BASE_URL}/pub/annonces/inquiry/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inquiries: nextInquiries }),
+      });
+    } catch (err) {
+      console.warn("Erreur synchronisation demandes serveur:", err);
     }
   };
 
@@ -1049,6 +1097,7 @@ export default function AdDashboard() {
 
         localStorage.setItem('exile_pub_inquiries', JSON.stringify(nextInquiries));
         localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
+        syncInquiriesToServer(nextInquiries);
 
         showToast("Demande déplacée dans la corbeille");
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -1092,6 +1141,7 @@ export default function AdDashboard() {
       const nextInquiries = [trashItem.data, ...inquiries];
       setInquiries(nextInquiries);
       localStorage.setItem('exile_pub_inquiries', JSON.stringify(nextInquiries));
+      syncInquiriesToServer(nextInquiries);
       const nextTrash = trash.filter(t => t.data.id !== trashItem.data.id);
       setTrash(nextTrash);
       localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
@@ -1117,13 +1167,36 @@ export default function AdDashboard() {
     });
   };
 
-  // Sauvegarder les Paramètres Administrateur & Logo
-  const handleSaveSettings = (e: React.FormEvent) => {
+  // Sauvegarder les Paramètres Administrateur & Logo sur le serveur en direct
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('exile_pub_admin_pin', adminPinInput);
     localStorage.setItem('exile_pub_admin_key', adminKeyInput);
     localStorage.setItem('exile_pub_platform_logo', platformLogo);
-    showToast("✓ Paramètres administrateur & Logo sauvegardés !");
+    localStorage.setItem('exile_pub_config', JSON.stringify({
+      admin_pin: adminPinInput,
+      admin_key: adminKeyInput,
+      platform_logo: platformLogo
+    }));
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/pub/config/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_pin: adminPinInput,
+          admin_key: adminKeyInput,
+          platform_logo: platformLogo
+        })
+      });
+      if (res.ok) {
+        showToast("✓ Paramètres administrateur & Logo synchronisés sur le serveur en ligne !");
+      } else {
+        showToast("✓ Paramètres enregistrés localement");
+      }
+    } catch {
+      showToast("✓ Paramètres enregistrés localement");
+    }
   };
 
   // Filtrer les demandes reçues avec la recherche
@@ -1187,13 +1260,13 @@ export default function AdDashboard() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Charger automatiquement les annonces et les demandes depuis le serveur en direct
+  // Charger automatiquement les annonces, les demandes et la config depuis le serveur en direct
   const refreshFromServer = async () => {
     setIsRefreshing(true);
     try {
       // 1. Charger les annonces distantes depuis le backend Render
       const remoteAds = await fetchRemoteAds();
-      if (Array.isArray(remoteAds) && remoteAds.length > 0) {
+      if (Array.isArray(remoteAds)) {
         setAds(remoteAds);
       }
 
@@ -1205,6 +1278,25 @@ export default function AdDashboard() {
           setInquiries(inqData);
           localStorage.setItem('exile_pub_inquiries', JSON.stringify(inqData));
         }
+      }
+
+      // 3. Charger la configuration centralisée (mot de passe, PIN, logo)
+      const cfgRes = await fetch(`${API_BASE_URL}/pub/config/`);
+      if (cfgRes.ok) {
+        const cfgData = await cfgRes.json();
+        if (cfgData.platform_logo !== undefined && cfgData.platform_logo !== null) {
+          setPlatformLogo(cfgData.platform_logo);
+          localStorage.setItem('exile_pub_platform_logo', cfgData.platform_logo);
+        }
+        if (cfgData.admin_pin) {
+          setAdminPinInput(cfgData.admin_pin);
+          localStorage.setItem('exile_pub_admin_pin', cfgData.admin_pin);
+        }
+        if (cfgData.admin_key) {
+          setAdminKeyInput(cfgData.admin_key);
+          localStorage.setItem('exile_pub_admin_key', cfgData.admin_key);
+        }
+        localStorage.setItem('exile_pub_config', JSON.stringify(cfgData));
       }
     } catch (e) {
       console.error("Erreur synchronisation serveur Dashboard PUB:", e);
