@@ -6,7 +6,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw, Loader2 } from "lucide-react";
+import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw, Loader2, MousePointerClick, Eye, TrendingUp, DollarSign, Calendar, Target, ExternalLink } from "lucide-react";
 import { type Ad, type AdStatus, getStoredAds, saveStoredAds, fetchRemoteAds } from "./AdBanner";
 import { useTheme } from "../../contexts/ThemeContext";
 import { triggerPubNotification } from "../../services/pubNotificationService";
@@ -1368,13 +1368,26 @@ export default function AdDashboard() {
     });
   }, [ads, filter, searchQuery]);
 
-  const globalStats = useMemo(() => ({
-    totalImpressions: ads.reduce((s, a) => s + a.impressions, 0),
-    totalClicks:      ads.reduce((s, a) => s + a.clicks, 0),
-    totalBudget:      ads.reduce((s, a) => s + a.budget, 0),
-    totalSpent:       ads.reduce((s, a) => s + a.spent, 0),
-    active:           ads.filter((a) => a.status === "active").length,
-  }), [ads]);
+  const globalStats = useMemo(() => {
+    const totalImpressions = ads.reduce((s, a) => s + (a.impressions || 0), 0);
+    const totalClicks = ads.reduce((s, a) => s + (a.clicks || 0), 0);
+    const totalBudget = ads.reduce((s, a) => s + (Number(a.budget) || 0), 0);
+    const totalSpent = ads.reduce((s, a) => {
+      const b = Number(a.budget) || 0;
+      const t = Number(a.targetViews) || 10000;
+      const im = Number(a.impressions) || 0;
+      const recorded = Number(a.spent) || 0;
+      const auto = t > 0 ? Math.min(b, (im / t) * b) : 0;
+      return s + (recorded > 0 ? recorded : auto);
+    }, 0);
+    return {
+      totalImpressions,
+      totalClicks,
+      totalBudget,
+      totalSpent,
+      active: ads.filter((a) => a.status === "active").length,
+    };
+  }, [ads]);
 
   const handleSave = (data: any) => {
     const isNew = modal.isConverting || !modal.editing || !ads.some(a => a.id === modal.editing?.id);
@@ -1752,79 +1765,221 @@ export default function AdDashboard() {
                   </button>
                 </div>
               ) : (
-                filtered.map((ad) => (
+              filtered.map((ad) => {
+                const impressions = Number(ad.impressions) || 0;
+                const targetViews = Number(ad.targetViews) || 10000;
+                const clicks = Number(ad.clicks) || 0;
+                const budget = Number(ad.budget) || 0;
+                const autoSpent = targetViews > 0 ? Math.min(budget, (impressions / targetViews) * budget) : 0;
+                const spent = ad.spent > 0 ? Number(ad.spent) : Math.round(autoSpent * 100) / 100;
+                const remainingBudget = Math.max(0, budget - spent);
+                const viewsProgress = Math.min(100, Math.round((impressions / (targetViews || 1)) * 100));
+                const budgetProgress = Math.min(100, Math.round((spent / (budget || 1)) * 100));
+                const adCtr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + "%" : "0.00%";
+
+                return (
                   <div
                     key={ad.id}
-                    className={`p-5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm transition-all hover:border-zinc-400/50`}
+                    className={`p-6 rounded-3xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'} shadow-sm transition-all hover:border-zinc-500/40 space-y-4`}
                   >
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      {ad.brandLogo ? (
-                        <img
-                          src={ad.brandLogo}
-                          alt={ad.brandName}
-                          className="w-12 h-12 rounded-2xl object-cover border border-white/20 shadow-md flex-shrink-0"
-                        />
-                      ) : (
-                        <div
-                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-extrabold text-sm shadow-md flex-shrink-0"
-                          style={{ backgroundColor: ad.brandColor || "#2563eb" }}
+                    {/* 1. Header de la Campagne & Actions */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-zinc-200 dark:border-zinc-800/80">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        {ad.brandLogo ? (
+                          <img
+                            src={ad.brandLogo}
+                            alt={ad.brandName}
+                            className="w-13 h-13 rounded-2xl object-cover border border-white/20 shadow-md flex-shrink-0"
+                            style={{ width: "52px", height: "52px" }}
+                          />
+                        ) : (
+                          <div
+                            className="w-13 h-13 rounded-2xl flex items-center justify-center text-white font-extrabold text-base shadow-md flex-shrink-0"
+                            style={{ width: "52px", height: "52px", backgroundColor: ad.brandColor || "#2563eb" }}
+                          >
+                            {ad.brandInitials}
+                          </div>
+                        )}
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-extrabold text-base sm:text-lg tracking-tight truncate">{ad.brandName}</h3>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${getStatusColors(resolvedTheme, ad.status)}`}>
+                              {STATUS_LABELS[ad.status]}
+                            </span>
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700 font-semibold">
+                              {ad.category}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-400 mt-0.5 truncate">{ad.tagline}</p>
+                        </div>
+                      </div>
+
+                      {/* Boutons d'Action */}
+                      <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+                        {ad.ctaUrl && (
+                          <a
+                            href={ad.ctaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors flex items-center gap-1.5 ${
+                              resolvedTheme === 'dark' ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800' : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100'
+                            }`}
+                            title="Tester le lien"
+                          >
+                            <ExternalLink size={13} />
+                            <span className="hidden md:inline">Visiter</span>
+                          </a>
+                        )}
+
+                        <button
+                          onClick={() => requestToggleStatus(ad)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                            ad.status === "active"
+                              ? "border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                              : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                          }`}
                         >
-                          {ad.brandInitials}
-                        </div>
-                      )}
+                          {ad.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+                          <span>{ad.status === "active" ? "Mettre en pause" : "Activer"}</span>
+                        </button>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-sm sm:text-base truncate">{ad.brandName}</h3>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${getStatusColors(resolvedTheme, ad.status)}`}>
-                            {STATUS_LABELS[ad.status]}
+                        <button
+                          onClick={() => requestEditAd(ad)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors flex items-center gap-1.5 ${
+                            resolvedTheme === 'dark' ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'border-zinc-300 hover:bg-zinc-100 text-zinc-700'
+                          }`}
+                        >
+                          <Edit3 size={13} />
+                          <span>Modifier</span>
+                        </button>
+
+                        <button
+                          onClick={() => requestDeleteAd(ad)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-colors flex items-center gap-1.5"
+                        >
+                          <Trash2 size={13} />
+                          <span>Supprimer</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. STATISTIQUES DÉTAILLÉES : CLICS, BUDGET, DÉPENSÉ, SOLDE, IMPRESSIONS */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+                      {/* NOMBRE DE CLICS */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Nombre de Clics</span>
+                          <MousePointerClick size={15} className="text-indigo-400" />
+                        </div>
+                        <p className="text-xl font-black text-indigo-400">{fmtNum(clicks)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">CTR: <span className="text-emerald-400 font-bold">{adCtr}</span></p>
+                      </div>
+
+                      {/* BUDGET ALLOUÉ */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Budget Alloué</span>
+                          <DollarSign size={15} className="text-emerald-400" />
+                        </div>
+                        <p className="text-xl font-black text-emerald-400">{fmtCurrency(budget, ad.currency)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">Devise: {ad.currency || 'HTG'}</p>
+                      </div>
+
+                      {/* MONTANT DÉPENSÉ */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Dépensé</span>
+                          <TrendingUp size={15} className="text-blue-400" />
+                        </div>
+                        <p className="text-xl font-black text-blue-400">{fmtCurrency(spent, ad.currency)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">{budgetProgress}% du budget</p>
+                      </div>
+
+                      {/* SOLDE RESTANT */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Budget Restant</span>
+                          <span className="text-xs">💰</span>
+                        </div>
+                        <p className="text-xl font-black text-amber-400">{fmtCurrency(remainingBudget, ad.currency)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">Disponible</p>
+                      </div>
+
+                      {/* IMPRESSIONS / OBJECTIF VUES */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1 col-span-2 sm:col-span-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Impressions Vues</span>
+                          <Eye size={15} className="text-cyan-400" />
+                        </div>
+                        <p className="text-xl font-black text-cyan-400">{fmtNum(impressions)} <span className="text-xs text-zinc-500 font-normal">/ {fmtNum(targetViews)}</span></p>
+                        <p className="text-[10px] text-zinc-500 font-medium">{viewsProgress}% objectif</p>
+                      </div>
+                    </div>
+
+                    {/* 3. BARRES DE PROGRESSION VISUELLES (VUES & BUDGET) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      {/* Progression des Vues */}
+                      <div className={`p-3 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-zinc-50 border-zinc-200'} space-y-1.5`}>
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-zinc-400 flex items-center gap-1.5">
+                            <Target size={13} className="text-cyan-400" />
+                            <span>Diffusion des Vues (AlgoPro)</span>
                           </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
-                            {ad.category}
+                          <span className="text-cyan-400">{viewsProgress}% ({fmtNum(impressions)} / {fmtNum(targetViews)})</span>
+                        </div>
+                        <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: `${viewsProgress}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Progression du Budget Consommé */}
+                      <div className={`p-3 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-zinc-50 border-zinc-200'} space-y-1.5`}>
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-zinc-400 flex items-center gap-1.5">
+                            <DollarSign size={13} className="text-emerald-400" />
+                            <span>Consommation du Budget</span>
+                          </span>
+                          <span className={budgetProgress > 90 ? "text-red-400" : budgetProgress > 60 ? "text-amber-400" : "text-emerald-400"}>
+                            {budgetProgress}% ({fmtCurrency(spent, ad.currency)} / {fmtCurrency(budget, ad.currency)})
                           </span>
                         </div>
-
-                        <p className="text-xs text-zinc-400 mt-1 truncate">{ad.tagline}</p>
-                        
-                        <div className="flex items-center gap-4 mt-2 text-[11px] text-zinc-500 flex-wrap">
-                          <span>🎯 Objectif Vues (AlgoPro): <strong className="text-blue-400">{fmtNum(ad.impressions)} / {fmtNum(ad.targetViews)}</strong></span>
-                          <span>💰 Budget: <strong className="text-emerald-400">{fmtCurrency(ad.budget, ad.currency)}</strong></span>
-                          {ad.exchangeRate && <span>💱 Taux: {ad.exchangeRate}</span>}
+                        <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              budgetProgress > 90 ? "bg-red-500" : budgetProgress > 60 ? "bg-amber-500" : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${budgetProgress}%` }}
+                          />
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 border-zinc-800 pt-3 md:pt-0">
-                      <button
-                        onClick={() => requestToggleStatus(ad)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors flex items-center gap-1 ${
-                          ad.status === "active"
-                            ? "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                            : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                        }`}
-                      >
-                        {ad.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
-                        <span>{ad.status === "active" ? "Mettre en pause" : "Activer"}</span>
-                      </button>
+                    {/* 4. DÉTAILS DE DIFFUSION (Dates, Taux de change, Cible) */}
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1 flex-wrap gap-2 border-t border-zinc-200 dark:border-zinc-800/60">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={13} className="text-zinc-400" />
+                          <span>Période: <strong>{ad.startDate || 'Immédiat'}</strong> {ad.endDate ? `au ${ad.endDate}` : '(Illimitée)'}</span>
+                        </span>
+                        {ad.exchangeRate && (
+                          <span>💱 Taux: <strong>{ad.exchangeRate}</strong></span>
+                        )}
+                        <span>🎯 Audience: <strong>{ad.targetAudience === 'interests' && ad.targetInterests?.length ? ad.targetInterests.join(', ') : 'Tous les utilisateurs'}</strong></span>
+                      </div>
 
-                      <button
-                        onClick={() => requestEditAd(ad)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-700 hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center gap-1"
-                      >
-                        <Edit3 size={14} />
-                        <span>Modifier</span>
-                      </button>
-
-                      <button
-                        onClick={() => requestDeleteAd(ad)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1"
-                      >
-                        <Trash2 size={14} />
-                        <span>Supprimer</span>
-                      </button>
+                      {ad.ctaUrl && (
+                        <span className="text-zinc-400 truncate max-w-xs">
+                          Lien: <span className="text-blue-400 font-mono">{ad.ctaUrl}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
           </>

@@ -183,6 +183,14 @@ export const trackAdClick = (adId: string, targetUrl?: string): void => {
   }
 }
 
+export const trackAdImpression = (adId: string): void => {
+  fetch(`${API_BASE_URL}/pub/annonces/impression/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad_id: adId })
+  }).catch(() => {})
+}
+
 export const checkAndNotifyExpiredAds = (ads: Ad[]): void => {
   if (typeof localStorage === 'undefined') return
   const now = new Date()
@@ -291,6 +299,7 @@ export function AdBanner({
       ([entry]) => {
         if (entry.isIntersecting && !impressionFired.current) {
           impressionFired.current = true;
+          trackAdImpression(ad.id);
           onImpression?.(ad.id);
         }
       },
