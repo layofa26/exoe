@@ -4,8 +4,7 @@ import { ArrowLeft, Megaphone, CheckCircle2, Send } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { triggerPubNotification } from '../../services/pubNotificationService'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+import { API_BASE_URL } from '../../config/api'
 
 export default function AdInquiryPage() {
   const { resolvedTheme } = useTheme()

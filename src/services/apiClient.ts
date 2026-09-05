@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+import { API_BASE_URL } from '../config/api'
 // Ensure API_BASE_URL always ends with /api/v1 for production URLs
 const FINAL_API_BASE_URL = API_BASE_URL.includes('/api/v1')
   ? API_BASE_URL
