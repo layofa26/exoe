@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
+import { API_BASE_URL } from "../../config/api";
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -61,8 +62,6 @@ interface AdBannerProps {
 // STOCKAGE RÉEL DES ANNONCES PUBLICITAIRES
 // ─────────────────────────────────────────────────────────────
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
-
 export const getStoredAds = (): Ad[] => {
   try {
     if (typeof localStorage !== 'undefined') {
@@ -101,7 +100,8 @@ export const fetchRemoteAds = async (): Promise<Ad[]> => {
   return local
 }
 
-export const saveStoredAds = async (ads: Ad[]): Promise<void> => {
+export const saveStoredAds = async (ads: Ad[], options: { sync?: boolean } = {}): Promise<void> => {
+  const { sync = true } = options
   try {
     if (typeof localStorage !== 'undefined') {
       try {
@@ -120,6 +120,7 @@ export const saveStoredAds = async (ads: Ad[]): Promise<void> => {
       window.dispatchEvent(new CustomEvent('exile_ads_updated', { detail: ads }))
     }
     // Synchronisation serveur partagée intégrale dans la table PostgreSQL/SQLite
+    if (!sync) return
     await fetch(`${API_BASE_URL}/pub/annonces/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

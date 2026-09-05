@@ -15,9 +15,8 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
-
 import { getStoredAds, fetchRemoteAds, trackAdClick, type Ad } from './AdBanner'
+import { API_BASE_URL } from '../../config/api'
 
 export interface FeaturedCompany {
   id: string

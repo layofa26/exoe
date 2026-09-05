@@ -7,11 +7,11 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw } from "lucide-react";
-import { type Ad, type AdStatus, getStoredAds, saveStoredAds } from "./AdBanner";
+import { type Ad, type AdStatus, getStoredAds, saveStoredAds, fetchRemoteAds } from "./AdBanner";
 import { useTheme } from "../../contexts/ThemeContext";
 import { triggerPubNotification } from "../../services/pubNotificationService";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
+import { API_BASE_URL } from "../../config/api";
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS
@@ -1109,6 +1109,13 @@ export default function AdDashboard() {
     onConfirm: () => {},
   });
 
+  // Charger la liste distante au montage pour ne jamais écraser la base avec un état local obsolète
+  useEffect(() => {
+    fetchRemoteAds().then(remote => {
+      if (Array.isArray(remote)) setAds(remote)
+    })
+  }, [])
+
   // Synchroniser avec les évènements externes
   useEffect(() => {
     const handleUpdate = () => setAds(getStoredAds())
@@ -1122,7 +1129,7 @@ export default function AdDashboard() {
 
   const updateAds = (nextAds: Ad[]) => {
     setAds(nextAds)
-    saveStoredAds(nextAds)
+    saveStoredAds(nextAds, { sync: false })
 
     const syncWithBackend = async () => {
       try {
@@ -1133,12 +1140,17 @@ export default function AdDashboard() {
         if (token) {
           headers['Authorization'] = `Bearer ${token}`
         }
-        await fetch(`${API_BASE_URL}/pub/annonces/`, {
+        const res = await fetch(`${API_BASE_URL}/pub/annonces/`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ campaigns: nextAds })
         })
-      } catch {}
+        if (!res.ok) {
+          showToast("⚠️ Publicité enregistrée localement mais non publiée (serveur indisponible)")
+        }
+      } catch {
+        showToast("⚠️ Publicité enregistrée localement mais non publiée (réseau indisponible)")
+      }
     }
     syncWithBackend()
   }

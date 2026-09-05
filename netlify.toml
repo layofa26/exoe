@@ -9,3 +9,5 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  VITE_API_BASE_URL = "https://exile-backend-9q6o.onrender.com/api/v1"
+  VITE_APP_URL = "https://exile-backend-9q6o.onrender.com"
