@@ -18,7 +18,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { VideoPlayer, guessVideoMimeType, toPlayableMimeType } from './VideoPlayer';
 import { videoApi, resolveMediaUrl, cleanUsername } from '../../services/videoApi';
 import { VideoPoster } from './VideoPoster';
-import { FeedVideoCard } from './FeedVideoCard';
 import { useVideoInteractions } from '../../hooks/useVideoInteractions';
 import { playbackPositionStore } from '../../utils/playbackPositionStore';
 
@@ -951,26 +950,48 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
               </div>
             )}
 
-            {/* ── 9. VIDÉOS SIMILAIRES SUR MOBILE & TABLETTE ── */}
+            {/* ── 9. VIDÉOS SIMILAIRES SUR MOBILE & TABLETTE (Cartes statiques avec miniatures) ── */}
             {isTabletOrBelow && related.length > 0 && (
-              <div className="mt-3 flex flex-col pb-16 -mx-2.5 sm:mx-0">
-                <h2 className={`text-[13px] sm:text-sm font-bold px-3 sm:px-0 py-1.5 ${isDark ? 'text-zinc-200' : 'text-gray-900'}`}>
+              <div className="mt-3 flex flex-col pb-16 px-1 sm:px-0">
+                <h2 className={`text-[13px] sm:text-sm font-bold px-1 py-1.5 ${isDark ? 'text-zinc-200' : 'text-gray-900'}`}>
                   Vidéos similaires
                 </h2>
-                {/* Mobile: 1 colonne pleine largeur; Tablette: 2 colonnes par ligne (sm:grid sm:grid-cols-2 sm:gap-3) */}
-                <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-3">
-                  {related.map((rv) => (
-                    <FeedVideoCard
-                      key={`rel-${rv.id}`}
-                      video={rv}
-                      onClick={() => handleSelectRelated(rv)}
-                      onContact={() => {
-                        setSelectedAuthorForContact(rv.author);
-                        setShowContactModal(true);
-                      }}
-                      onProfileClick={(authorId) => navigate(`/pro/profile/${authorId}`)}
-                    />
-                  ))}
+                {/* Mobile: 1 colonne; Tablette: 2 colonnes par ligne */}
+                <div className="flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-3">
+                  {related.map((rv) => {
+                    const thumb = rv.thumbnail || (rv as any).cover || (rv as any).cover_url || (rv as any).thumbnailUrl;
+                    return (
+                      <div
+                        key={`rel-m-${rv.id}`}
+                        className={`flex gap-3 p-2 rounded-xl cursor-pointer transition-all active:scale-[0.99] ${
+                          isDark ? 'bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/50' : 'bg-white hover:bg-gray-100 border border-gray-200 shadow-sm'
+                        }`}
+                        onClick={() => handleSelectRelated(rv)}
+                      >
+                        <div className="relative flex-shrink-0 w-32 sm:w-36 aspect-video rounded-lg overflow-hidden bg-black shadow-sm">
+                          <VideoPoster thumbnail={thumb} videoUrl={rv.videoUrl} title={rv.title} />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-7 h-7 rounded-full bg-black/50 backdrop-blur-xs flex items-center justify-center">
+                              <Play size={13} className="text-white fill-white ml-0.5" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                          <div>
+                            <h4 className={`font-semibold text-xs line-clamp-2 leading-snug mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                              {rv.title}
+                            </h4>
+                            <p className={`text-[11px] truncate ${isDark ? 'text-zinc-400' : 'text-gray-600'}`}>
+                              @{cleanUsername(rv.author?.username || rv.author?.name)}
+                            </p>
+                            <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+                              {fmtNum(rv.views || 0)} vues • {formatYouTubeDate(rv.postedAt || rv.createdAt || '')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -987,38 +1008,41 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
             </p>
 
             <div className="flex flex-col gap-2.5">
-              {related.map((rv) => (
-                <div
-                  key={rv.id}
-                  className={`flex gap-3 p-2 rounded-xl cursor-pointer transition-all ${
-                    isDark ? 'bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/50' : 'bg-white hover:bg-gray-100 border border-gray-200 shadow-sm'
-                  }`}
-                  onClick={() => handleSelectRelated(rv)}
-                >
-                  <div className="relative flex-shrink-0 w-36 aspect-video rounded-lg overflow-hidden bg-black shadow-sm">
-                    {rv.thumbnail || rv.videoUrl ? (
-                      <VideoPoster thumbnail={rv.thumbnail} videoUrl={rv.videoUrl} title={rv.title} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Play size={18} className="text-white/70" />
+              {related.map((rv) => {
+                const thumb = rv.thumbnail || (rv as any).cover || (rv as any).cover_url || (rv as any).thumbnailUrl;
+                return (
+                  <div
+                    key={rv.id}
+                    className={`flex gap-3 p-2 rounded-xl cursor-pointer transition-all ${
+                      isDark ? 'bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/50' : 'bg-white hover:bg-gray-100 border border-gray-200 shadow-sm'
+                    }`}
+                    onClick={() => handleSelectRelated(rv)}
+                  >
+                    <div className="relative flex-shrink-0 w-36 aspect-video rounded-lg overflow-hidden bg-black shadow-sm">
+                      {thumb || rv.videoUrl ? (
+                        <VideoPoster thumbnail={thumb} videoUrl={rv.videoUrl} title={rv.title} />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Play size={18} className="text-white/70" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                      <div>
+                        <h4 className={`font-semibold text-xs line-clamp-2 leading-snug mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          {rv.title}
+                        </h4>
+                        <p className={`text-[11px] truncate ${isDark ? 'text-zinc-400' : 'text-gray-600'}`}>
+                          @{cleanUsername(rv.author?.username || rv.author?.name)}
+                        </p>
+                        <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+                          {fmtNum(rv.views || 0)} vues • {formatYouTubeDate(rv.postedAt || rv.createdAt || '')}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                    <div>
-                      <h4 className={`font-semibold text-xs line-clamp-2 leading-snug mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {rv.title}
-                      </h4>
-                      <p className={`text-[11px] truncate ${isDark ? 'text-zinc-400' : 'text-gray-600'}`}>
-                        @{cleanUsername(rv.author?.username || rv.author?.name)}
-                      </p>
-                      <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
-                        {fmtNum(rv.views || 0)} vues • {formatYouTubeDate(rv.postedAt || rv.createdAt || '')}
-                      </p>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </aside>
         )}

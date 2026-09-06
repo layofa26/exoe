@@ -164,6 +164,51 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
       videoEl.src = objectUrl
     })
 
+  const createBrandedCoverFallback = (videoTitle: string): Promise<File | null> =>
+    new Promise((resolve) => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = 640
+        canvas.height = 360
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          const grad = ctx.createLinearGradient(0, 0, 640, 360)
+          grad.addColorStop(0, '#18181b')
+          grad.addColorStop(0.5, '#27272a')
+          grad.addColorStop(1, '#09090b')
+          ctx.fillStyle = grad
+          ctx.fillRect(0, 0, 640, 360)
+
+          ctx.beginPath()
+          ctx.arc(320, 160, 40, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgba(255, 107, 0, 0.9)'
+          ctx.fill()
+
+          ctx.beginPath()
+          ctx.moveTo(313, 145)
+          ctx.lineTo(333, 160)
+          ctx.lineTo(313, 175)
+          ctx.fillStyle = '#ffffff'
+          ctx.fill()
+
+          ctx.fillStyle = '#f4f4f5'
+          ctx.font = 'bold 22px system-ui, -apple-system, sans-serif'
+          ctx.textAlign = 'center'
+          ctx.fillText((videoTitle || 'EXILE Pro Video').slice(0, 45), 320, 240)
+
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(new File([blob], 'cover_auto.jpg', { type: 'image/jpeg' }))
+              return
+            }
+            resolve(null)
+          }, 'image/jpeg', 0.85)
+          return
+        }
+      } catch {}
+      resolve(null)
+    })
+
   const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -237,7 +282,11 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
       let finalCover = thumbnailFile
       if (!finalCover && videoFile) {
         const auto = await captureCoverFromVideo(videoFile)
-        if (auto) finalCover = auto.file
+        if (auto) {
+          finalCover = auto.file
+        } else {
+          finalCover = await createBrandedCoverFallback(title.trim())
+        }
       }
 
       const result = await videoApi.uploadVideo(

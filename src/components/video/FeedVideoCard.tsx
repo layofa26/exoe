@@ -416,7 +416,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
     }
   }
 
-  // IntersectionObserver pour Autoplay / Pause fluide sans saccades
+  // IntersectionObserver pour pause fluide lorsqu'on quitte l'écran (Autoplay désactivé pour économie critique de bande passante)
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -426,13 +426,8 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         const v = videoRef.current
         if (!v) return
 
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-          v.muted = true
-          const playPromise = v.play()
-          if (playPromise !== undefined) {
-            playPromise.catch(() => {})
-          }
-        } else if (entry.intersectionRatio < 0.25) {
+        // Ne JAMAIS lancer de lecture automatique au défilement
+        if (entry.intersectionRatio < 0.25) {
           if (!v.paused) {
             playbackPositionStore.set(video.id, v.currentTime)
             v.pause()
@@ -445,7 +440,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
     return () => obs.disconnect()
   }, [video.id])
 
-  // Clic sur la zone vidéo -> Navigation vers VideoPlayerPage avec mémorisation de position
+  // Clic sur la zone vidéo -> Navigation vers VideoPlayerPage ou lecture locale sur interaction explicite
   const handleVideoClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     const v = videoRef.current
@@ -453,7 +448,15 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
       playbackPositionStore.set(video.id, v.currentTime)
       if (!v.paused) v.pause()
     }
-    onClick?.()
+    if (onClick) {
+      onClick()
+    } else if (v) {
+      if (v.paused) {
+        v.play().catch(() => {})
+      } else {
+        v.pause()
+      }
+    }
   }, [onClick, video.id])
 
   // Activer / Désactiver le son (isoler pour ne pas déclencher la navigation)
@@ -602,7 +605,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
             width="100%"
             muted={isMuted}
             loop
-            preload="metadata"
+            preload="none"
             onLoadedMetadata={handleLoadedMetadata}
             onWaiting={() => setIsBuffering(true)}
             onPlaying={handlePlaying}
@@ -620,6 +623,15 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-600">
             <Play size={44} />
+          </div>
+        )}
+
+        {/* Bouton Play au centre si la vidéo n'est pas en cours de lecture */}
+        {videoUrl && !isPlaying && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+            <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-xl transition-transform transform group-hover:scale-110">
+              <Play size={22} className="text-white fill-white ml-0.5" />
+            </div>
           </div>
         )}
 

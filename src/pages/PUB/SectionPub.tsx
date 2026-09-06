@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   ExternalLink,
   CheckCircle2,
-  Building2
+  Building2,
+  Play
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -73,7 +74,12 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
 
   const [realAds, setRealAds] = useState<Ad[]>(() => getStoredAds())
   const [currentAdIndex, setCurrentAdIndex] = useState(0)
+  const [isPlayingAdVideo, setIsPlayingAdVideo] = useState(false)
   const mobileSliderRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setIsPlayingAdVideo(false)
+  }, [currentAdIndex])
 
   // Synchronisation distante + écoute des mises à jour en direct depuis le Dashboard PUB
   useEffect(() => {
@@ -354,19 +360,24 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                   {hasMedia && (
                     <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
                       {isVideo ? (
-                        <video
-                          src={mediaUrl}
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
+                        company.customAd?.imageUrl ? (
+                          <img
+                            src={company.customAd.imageUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-black flex items-center justify-center">
+                            <Play size={14} className="text-white/70" />
+                          </div>
+                        )
                       ) : (
                         <img
                           src={mediaUrl}
                           alt=""
                           className="w-full h-full object-cover"
+                          loading="lazy"
                         />
                       )}
                       <div className="absolute inset-0 bg-black/35 backdrop-blur-[0.5px]" />
@@ -505,24 +516,44 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             >
               {/* Média de fond si configuré (GIF, Image ou Vidéo) */}
               {activeAd.bgMediaUrl && (
-                <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+                <div className="absolute inset-0 z-0 overflow-hidden">
                   {(activeAd.bgMediaUrl.startsWith('data:video') || activeAd.bgMediaUrl.endsWith('.mp4') || activeAd.bgMediaUrl.endsWith('.webm')) ? (
-                    <video
-                      src={activeAd.bgMediaUrl}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
+                    isPlayingAdVideo ? (
+                      <video
+                        src={activeAd.bgMediaUrl}
+                        controls
+                        autoPlay
+                        loop
+                        playsInline
+                        preload="none"
+                        className="w-full h-full object-cover pointer-events-auto"
+                        onPause={() => setIsPlayingAdVideo(false)}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-black/60 flex items-center justify-center pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setIsPlayingAdVideo(true)
+                          }}
+                          className="px-3.5 py-1.5 rounded-full bg-black/75 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 border border-white/25 shadow-lg transition-all active:scale-95 cursor-pointer"
+                          aria-label="Regarder la vidéo publicitaire"
+                        >
+                          <Play size={13} className="fill-white" />
+                          <span>Regarder la vidéo</span>
+                        </button>
+                      </div>
+                    )
                   ) : (
                     <img
                       src={activeAd.bgMediaUrl}
                       alt=""
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover pointer-events-none"
+                      loading="lazy"
                     />
                   )}
-                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[0.5px]" />
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[0.5px] pointer-events-none" />
                 </div>
               )}
 
