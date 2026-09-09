@@ -927,14 +927,14 @@ const Settings = () => {
       </header>
 
       {/* Conteneur Principal Élargi (Max 1440px) */}
-      <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <main className="flex-1 w-full max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 lg:grid-cols-12 gap-4 md:gap-6 items-start">
           
           {/* ============================================================ */}
-          {/* COLONNE GAUCHE (SIDEBAR NAVIGATION) : 3 Cols sur Desktop     */}
+          {/* COLONNE GAUCHE (SIDEBAR NAVIGATION) : 5 Cols Tablet, 3-4 Desktop */}
           {/* ============================================================ */}
-          <aside className={`lg:col-span-4 xl:col-span-3 ${mobileShowContent ? 'hidden lg:block' : 'block'}`}>
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-3 sm:p-4 shadow-sm space-y-2 lg:sticky lg:top-24`}>
+          <aside className={`md:col-span-5 lg:col-span-4 xl:col-span-3 ${mobileShowContent ? 'hidden md:block' : 'block'}`}>
+            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-3 sm:p-4 shadow-sm space-y-2 md:sticky md:top-20 lg:top-24`}>
               
               {/* Carte Profil Rapide dans la Sidebar */}
               <div className={`p-3 rounded-xl mb-3 flex items-center gap-3 ${resolvedTheme === 'dark' ? 'bg-zinc-800/60' : 'bg-gray-50'}`}>
@@ -1138,12 +1138,12 @@ const Settings = () => {
           </aside>
 
           {/* ============================================================ */}
-          {/* COLONNE DROITE (CONTENU NOBLE) : 9 Cols sur Desktop           */}
+          {/* COLONNE DROITE (CONTENU NOBLE) : 7 Cols Tablet, 8-9 Desktop   */}
           {/* ============================================================ */}
-          <section className={`lg:col-span-8 xl:col-span-9 ${!mobileShowContent ? 'hidden lg:block' : 'block'}`}>
+          <section className={`md:col-span-7 lg:col-span-8 xl:col-span-9 ${!mobileShowContent ? 'hidden md:block' : 'block'}`}>
             
-            {/* Bouton Retour Mobile */}
-            <div className="lg:hidden mb-4">
+            {/* Bouton Retour Mobile (uniquement sur petit écran mobile < 768px) */}
+            <div className="md:hidden mb-4">
               <button
                 onClick={() => setMobileShowContent(false)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold ${
