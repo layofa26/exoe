@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProfessionalProfile } from '../../hooks/useProfessionalProfile';
@@ -36,6 +37,7 @@ import { ContactModal } from '../../components/modals/ContactModal';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
 
 export const PublicProfile = () => {
+  const { t, i18n } = useTranslation();
   const { resolvedTheme } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const { id } = useParams<{ id: string }>();
@@ -174,12 +176,12 @@ export const PublicProfile = () => {
         <div className={`p-8 rounded-3xl border text-center max-w-md ${
           resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
         } shadow-lg`}>
-          <p className="text-base font-semibold mb-4">Profil introuvable ou indisponible.</p>
+          <p className="text-base font-semibold mb-4">{t('common.error', 'Profil introuvable ou indisponible.')}</p>
           <button
             onClick={() => navigate(-1)}
             className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition-colors"
           >
-            Retour
+            {t('common.back', 'Retour')}
           </button>
         </div>
       </div>
@@ -203,7 +205,7 @@ export const PublicProfile = () => {
             } shadow-sm active:scale-95 flex items-center gap-2`}
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-xs sm:text-sm font-semibold">Retour</span>
+            <span className="text-xs sm:text-sm font-semibold">{t('common.back', 'Retour')}</span>
           </button>
 
           <button
@@ -213,10 +215,10 @@ export const PublicProfile = () => {
                 ? 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-white'
                 : 'bg-white border-gray-200 hover:bg-gray-100 text-gray-900'
             } shadow-sm active:scale-95 flex items-center gap-2`}
-            title="Partager ce profil"
+            title={t('common.share', 'Partager')}
           >
             <Share2 className="w-4 h-4" />
-            <span className="text-xs sm:text-sm font-semibold hidden sm:inline">Partager</span>
+            <span className="text-xs sm:text-sm font-semibold hidden sm:inline">{t('common.share', 'Partager')}</span>
           </button>
         </div>
 
@@ -253,7 +255,7 @@ export const PublicProfile = () => {
                   className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm ${
                     isOnline ? 'bg-emerald-500' : 'bg-gray-400'
                   }`}
-                  title={isOnline ? 'En ligne' : 'Hors ligne'}
+                  title={isOnline ? t('pro.conversations.online', 'En ligne') : t('pro.conversations.offline', 'Hors ligne')}
                 />
               </div>
 
@@ -261,7 +263,7 @@ export const PublicProfile = () => {
               <div className="flex items-center gap-1.5 mt-2">
                 <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                 <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
-                  {isOnline ? 'En ligne' : 'Hors ligne'}
+                  {isOnline ? t('pro.conversations.online', 'En ligne') : t('pro.conversations.offline', 'Hors ligne')}
                 </span>
               </div>
 
@@ -293,7 +295,7 @@ export const PublicProfile = () => {
                 }`}
               >
                 {isSubscribed ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                <span>{isSubscribed ? 'Abonné' : "S'abonner"}</span>
+                <span>{isSubscribed ? t('pro.profile.following', 'Abonné') : t('pro.profile.follow', "S'abonner")}</span>
               </button>
 
               <button
@@ -301,7 +303,7 @@ export const PublicProfile = () => {
                 className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
               >
                 <Send className="w-4 h-4" />
-                <span>Demande</span>
+                <span>{t('pro.modals.service', 'Demande')}</span>
               </button>
             </div>
 
@@ -309,10 +311,10 @@ export const PublicProfile = () => {
             <div className="pt-3 border-t border-gray-100 dark:border-zinc-800/80 space-y-3 text-xs sm:text-sm">
               <div>
                 <p className="font-semibold text-gray-400 dark:text-zinc-500 text-[11px] uppercase tracking-wider mb-1">
-                  À propos
+                  {t('pro.profile.about', 'À propos')}
                 </p>
                 <p className="text-gray-700 dark:text-zinc-300 leading-relaxed">
-                  {profile.bio || "Aucune biographie renseignée pour le moment."}
+                  {profile.bio || t('pro.profile.noBio', 'Aucune biographie rédigée.')}
                 </p>
               </div>
 
@@ -326,7 +328,7 @@ export const PublicProfile = () => {
               {profile.createdAt && (
                 <div className="flex items-center gap-2 text-gray-600 dark:text-zinc-400">
                   <Calendar className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                  <span>Membre depuis {new Date(profile.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                  <span>{t('pro.profile.memberSince', 'Membre depuis')} {new Date(profile.createdAt).toLocaleDateString(i18n.language || 'fr-FR', { month: 'long', year: 'numeric' })}</span>
                 </div>
               )}
 
@@ -345,7 +347,7 @@ export const PublicProfile = () => {
               <div className="pt-3 border-t border-gray-100 dark:border-zinc-800/80">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-gray-400 dark:text-zinc-500 text-[11px] uppercase tracking-wider">
-                    Compétences ({skillsList.length})
+                    {t('pro.profile.skills', 'Compétences')} ({skillsList.length})
                   </span>
                 </div>
 
@@ -371,7 +373,7 @@ export const PublicProfile = () => {
                         onClick={() => setIsSkillsExpanded(!isSkillsExpanded)}
                         className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-1"
                       >
-                        <span>{isSkillsExpanded ? 'Voir moins' : `+${skillsList.length - 2} autres compétences`}</span>
+                        <span>{isSkillsExpanded ? t('common.viewLess', 'Voir moins') : `+${skillsList.length - 2} ${t('pro.profile.otherSkills', 'autres compétences')}`}</span>
                         {isSkillsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </button>
 
@@ -408,7 +410,7 @@ export const PublicProfile = () => {
               } shadow-sm`}>
                 <div className="flex items-center justify-center gap-1.5 text-blue-500 mb-1">
                   <Users className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Abonnés</span>
+                  <span className="text-xs font-semibold">{t('pro.profile.subscribers', 'Abonnés')}</span>
                 </div>
                 <p className="text-xl sm:text-2xl font-extrabold">{subscribersCount}</p>
               </div>
@@ -418,7 +420,7 @@ export const PublicProfile = () => {
               } shadow-sm`}>
                 <div className="flex items-center justify-center gap-1.5 text-purple-500 mb-1">
                   <Video className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Vidéos</span>
+                  <span className="text-xs font-semibold">{t('pro.profile.videos', 'Vidéos')}</span>
                 </div>
                 <p className="text-xl sm:text-2xl font-extrabold">{videos?.length || 0}</p>
               </div>
@@ -428,7 +430,7 @@ export const PublicProfile = () => {
               } shadow-sm`}>
                 <div className="flex items-center justify-center gap-1.5 text-emerald-500 mb-1">
                   <CalendarDays className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Événements</span>
+                  <span className="text-xs font-semibold">{t('pro.events.title', 'Événements')}</span>
                 </div>
                 <p className="text-xl sm:text-2xl font-extrabold">{events?.length || 0}</p>
               </div>
@@ -447,7 +449,7 @@ export const PublicProfile = () => {
                 }`}
               >
                 <Video className="w-4 h-4" />
-                <span>Vidéos ({videos?.length || 0})</span>
+                <span>{t('pro.profile.videos', 'Vidéos')} ({videos?.length || 0})</span>
               </button>
 
               <button
@@ -459,7 +461,7 @@ export const PublicProfile = () => {
                 }`}
               >
                 <CalendarDays className="w-4 h-4" />
-                <span>Événements ({events?.length || 0})</span>
+                <span>{t('pro.events.title', 'Événements')} ({events?.length || 0})</span>
               </button>
             </div>
 
@@ -477,7 +479,7 @@ export const PublicProfile = () => {
                     resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-gray-200'
                   }`}>
                     <Video className="w-12 h-12 mx-auto mb-3 text-gray-400 opacity-50" />
-                    <p className="text-sm font-semibold">Aucune vidéo publique pour l'instant.</p>
+                    <p className="text-sm font-semibold">{t('pro.profile.noVideos', 'Aucune vidéo publique pour l\'instant.')}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -510,8 +512,8 @@ export const PublicProfile = () => {
                             {vid.title}
                           </h4>
                           <div className="flex items-center justify-between text-xs text-gray-500 dark:text-zinc-400 mt-2">
-                            <span>{vid.viewsCount || vid.views || 0} vues</span>
-                            <span>{new Date(vid.createdAt || vid.created_at).toLocaleDateString('fr-FR')}</span>
+                            <span>{vid.viewsCount || vid.views || 0} {t('pro.feed.views', 'vues')}</span>
+                            <span>{new Date(vid.createdAt || vid.created_at).toLocaleDateString(i18n.language || 'fr-FR')}</span>
                           </div>
                         </div>
                       </div>
@@ -534,7 +536,7 @@ export const PublicProfile = () => {
                     resolvedTheme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-gray-200'
                   }`}>
                     <CalendarDays className="w-12 h-12 mx-auto mb-3 text-gray-400 opacity-50" />
-                    <p className="text-sm font-semibold">Aucun événement à venir.</p>
+                    <p className="text-sm font-semibold">{t('pro.events.noEvents', 'Aucun événement trouvé.')}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -549,7 +551,7 @@ export const PublicProfile = () => {
                         <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">{ev.description}</p>
                         <div className="flex items-center gap-2 text-xs text-blue-500 font-semibold pt-1">
                           <Calendar className="w-3.5 h-3.5" />
-                          <span>{new Date(ev.date || ev.start_time).toLocaleDateString('fr-FR')}</span>
+                          <span>{new Date(ev.date || ev.start_time).toLocaleDateString(i18n.language || 'fr-FR')}</span>
                         </div>
                       </div>
                     ))}

@@ -34,10 +34,14 @@ import {
   Trash2
 } from 'lucide-react'
 import { UploadVideo } from '../video/UploadVideo'
+import { useTranslation } from 'react-i18next'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 export const Header = (): JSX.Element => {
+  const { t } = useTranslation()
   const { isAuthenticated, user, logout, hasModuleAccess } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const navigate = useNavigate()
@@ -390,16 +394,8 @@ export const Header = (): JSX.Element => {
 
       const professionals = unwrapList<any>(profilsData).map((p: any) => {
         const rawPhoto = p.photo_url || p.photo || p.avatar || ''
-        let resolvedPhoto = ''
-        if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto !== 'null' && rawPhoto !== 'undefined') {
-          if (rawPhoto.startsWith('http') || rawPhoto.startsWith('data:') || rawPhoto.startsWith('blob:')) {
-            resolvedPhoto = rawPhoto
-          } else if (rawPhoto.startsWith('/media/') || rawPhoto.startsWith('media/')) {
-            resolvedPhoto = `http://localhost:8000${rawPhoto.startsWith('/') ? rawPhoto : `/${rawPhoto}`}`
-          } else {
-            resolvedPhoto = `https://rmbvwaemgiijitumhnys.supabase.co/storage/v1/object/public/Exile_images/${rawPhoto.replace(/^\/+/, '')}`
-          }
-        }
+        const resolvedPhoto = resolveMediaUrl(rawPhoto)
+
 
         return {
           id: p.user ?? p.id,
@@ -503,8 +499,8 @@ export const Header = (): JSX.Element => {
   }
 
   const navLinks: NavLinkType[] = [
-    { to: '/pro', label: 'Professionnel', icon: Briefcase, show: true, module: 'pro' },
-    { to: '/social', label: 'Social', icon: Building2, show: true, module: 'social' },
+    { to: '/pro', label: t('nav.professional', 'Professionnel'), icon: Briefcase, show: true, module: 'pro' },
+    { to: '/social', label: t('nav.social', 'Social'), icon: Building2, show: true, module: 'social' },
   ]
 
   return (
@@ -581,7 +577,7 @@ export const Header = (): JSX.Element => {
                         <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
                         <input
                           type="text"
-                          placeholder="Rechercher..."
+                          placeholder={t('common.search', 'Rechercher...')}
                           value={searchQuery}
                           onChange={handleSearchChange}
                           className={`w-full pl-10 pr-10 py-2 rounded-lg border ${
@@ -617,19 +613,19 @@ export const Header = (): JSX.Element => {
                             onClick={() => { setFilterType('all'); setShowFilterMenu(false); searchQuery && handleSearch(searchQuery) }}
                             className={`w-full px-4 py-2 text-left text-sm ${filterType === 'all' ? 'bg-gray-50 dark:bg-zinc-800 text-orange-500 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                           >
-                            Tout
+                            {t('common.all', 'Tout')}
                           </button>
                           <button
                             onClick={() => { setFilterType('video'); setShowFilterMenu(false); searchQuery && handleSearch(searchQuery) }}
                             className={`w-full px-4 py-2 text-left text-sm ${filterType === 'video' ? 'bg-gray-50 dark:bg-zinc-800 text-orange-500 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                           >
-                            Vidéos
+                            {t('common.videos', 'Vidéos')}
                           </button>
                           <button
                             onClick={() => { setFilterType('professional'); setShowFilterMenu(false); searchQuery && handleSearch(searchQuery) }}
                             className={`w-full px-4 py-2 text-left text-sm ${filterType === 'professional' ? 'bg-gray-50 dark:bg-zinc-800 text-orange-500 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                           >
-                            Professionnels
+                            {t('common.professionals', 'Professionnels')}
                           </button>
                         </div>
                       )}
@@ -637,14 +633,14 @@ export const Header = (): JSX.Element => {
                       {/* Résultats de recherche */}
                       {searchLoading ? (
                         <div className="p-4 text-center text-sm text-gray-500 dark:text-zinc-400">
-                          Recherche en cours...
+                          {t('common.searching', 'Recherche en cours...')}
                         </div>
                       ) : !searchQuery ? (
                         recentSearches.length > 0 && (
                           <div className="mt-2 border-t border-gray-100 dark:border-zinc-800">
                             <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase flex items-center gap-2">
                               <History className="w-3 h-3" />
-                              Recherches récentes
+                              {t('common.recentSearches', 'Recherches récentes')}
                             </div>
                             {recentSearches.map((search, index) => (
                               <button
@@ -667,7 +663,7 @@ export const Header = (): JSX.Element => {
                             {searchResults.professionals.length > 0 && (
                               <div>
                                 <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                                  Professionnels
+                                  {t('common.professionals', 'Professionnels')}
                                 </div>
                                 {searchResults.professionals.map((pro: any) => (
                                   <button
@@ -684,7 +680,7 @@ export const Header = (): JSX.Element => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{pro.fullName || pro.username}</p>
-                                      <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || 'Professionnel'}</p>
+                                      <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || t('common.professional', 'Professionnel')}</p>
                                     </div>
                                   </button>
                                 ))}
@@ -693,7 +689,7 @@ export const Header = (): JSX.Element => {
                             {searchResults.videos.length > 0 && (
                               <div className="border-t border-gray-100 dark:border-zinc-800">
                                 <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                                  Vidéos
+                                  {t('common.videos', 'Vidéos')}
                                 </div>
                                 {searchResults.videos.map((video: any) => (
                                   <button
@@ -716,7 +712,7 @@ export const Header = (): JSX.Element => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{video.title}</p>
-                                      <p className="text-xs text-gray-500 dark:text-zinc-400">{video.views} vues</p>
+                                      <p className="text-xs text-gray-500 dark:text-zinc-400">{video.views} {t('common.views', 'vues')}</p>
                                     </div>
                                   </button>
                                 ))}
@@ -725,7 +721,7 @@ export const Header = (): JSX.Element => {
                           </div>
                         ) : (
                           <div className="p-4 text-center text-gray-500 dark:text-zinc-400 text-sm">
-                            Aucun résultat trouvé
+                            {t('common.noResultsFound', 'Aucun résultat trouvé')}
                           </div>
                         )
                       )}
@@ -753,7 +749,7 @@ export const Header = (): JSX.Element => {
                       <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`} />
                       <input
                         type="text"
-                        placeholder="Rechercher..."
+                        placeholder={t('common.search', 'Rechercher...')}
                         value={searchQuery}
                         onChange={handleSearchChange}
                         onFocus={() => setShowDropdown(true)}
@@ -802,9 +798,9 @@ export const Header = (): JSX.Element => {
                         resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'
                       }`}>
                         {[
-                          { id: 'all', label: 'Tout' },
-                          { id: 'video', label: 'Vidéos' },
-                          { id: 'professional', label: 'Professionnels' }
+                          { id: 'all', label: t('common.all', 'Tout') },
+                          { id: 'video', label: t('common.videos', 'Vidéos') },
+                          { id: 'professional', label: t('common.professionals', 'Professionnels') }
                         ].map((f) => (
                           <button
                             key={f.id}
@@ -832,14 +828,14 @@ export const Header = (): JSX.Element => {
                       } animate-in fade-in zoom-in-95 duration-100`}>
                         {searchLoading ? (
                           <div className="p-4 text-center text-xs text-gray-500 dark:text-zinc-400">
-                            Recherche en cours...
+                            {t('common.searching', 'Recherche en cours...')}
                           </div>
                         ) : !searchQuery ? (
                           recentSearches.length > 0 && (
                             <div>
                               <div className="px-3 py-1.5 text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase flex items-center gap-1.5">
                                 <History className="w-3 h-3" />
-                                <span>Recherches récentes</span>
+                                <span>{t('common.recentSearches', 'Recherches récentes')}</span>
                               </div>
                               {recentSearches.map((search, index) => (
                                 <button
@@ -862,7 +858,7 @@ export const Header = (): JSX.Element => {
                               {searchResults.professionals.length > 0 && (
                                 <div className="py-1">
                                   <div className="px-3 py-1 text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase">
-                                    Professionnels
+                                    {t('common.professionals', 'Professionnels')}
                                   </div>
                                   {searchResults.professionals.map((pro: any) => {
                                     const proUsername = pro.username?.startsWith('@') ? pro.username : `@${pro.username || 'Utilisateur'}`
@@ -885,7 +881,7 @@ export const Header = (): JSX.Element => {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{proUsername}</p>
-                                          <p className="text-[11px] text-gray-500 dark:text-zinc-400 truncate">{pro.profession || 'Professionnel'}</p>
+                                          <p className="text-[11px] text-gray-500 dark:text-zinc-400 truncate">{pro.profession || t('common.professional', 'Professionnel')}</p>
                                         </div>
                                       </button>
                                     )
@@ -895,7 +891,7 @@ export const Header = (): JSX.Element => {
                               {searchResults.videos.length > 0 && (
                                 <div className="py-1">
                                   <div className="px-3 py-1 text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase">
-                                    Vidéos
+                                    {t('common.videos', 'Vidéos')}
                                   </div>
                                   {searchResults.videos.map((video: any) => (
                                     <button
@@ -918,7 +914,7 @@ export const Header = (): JSX.Element => {
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{video.title}</p>
-                                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{video.views || 0} vues</p>
+                                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{video.views || 0} {t('common.views', 'vues')}</p>
                                       </div>
                                     </button>
                                   ))}
@@ -927,7 +923,7 @@ export const Header = (): JSX.Element => {
                             </div>
                           ) : (
                             <div className="p-4 text-center text-xs text-gray-500 dark:text-zinc-400">
-                              Aucun résultat trouvé
+                              {t('common.noResultsFound', 'Aucun résultat trouvé')}
                             </div>
                           )
                         )}
@@ -947,10 +943,10 @@ export const Header = (): JSX.Element => {
                       setShowPublishMenu(!showPublishMenu)
                     }}
                     className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl shadow-md font-semibold text-xs sm:text-sm transition-all duration-200 hover:shadow-orange-500/25 active:scale-95 flex-shrink-0"
-                    title="Publier du contenu ou créer un événement"
+                    title={t('header.publishMenu.title', "Publier du contenu ou créer un événement")}
                   >
                     <Plus className="w-4 h-4 stroke-[2.5]" />
-                    <span className="hidden sm:inline font-bold">Publier</span>
+                    <span className="hidden sm:inline font-bold">{t('common.publish', 'Publier')}</span>
                   </button>
 
                   {/* Publish Menu Dropdown */}
@@ -959,7 +955,7 @@ export const Header = (): JSX.Element => {
                       resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
                     } animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}>
                       <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800">
-                        <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">Création d'expertise</p>
+                        <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">{t('header.publishMenu.expertiseCreation', "Création d'expertise")}</p>
                       </div>
 
                       <button
@@ -973,8 +969,8 @@ export const Header = (): JSX.Element => {
                           <VideoIcon className="w-4 h-4" />
                         </div>
                         <div>
-                          <p className="font-semibold">Vidéo d'expertise</p>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Tutoriel, conseil, projet</p>
+                          <p className="font-semibold">{t('header.publishMenu.expertiseVideo', "Vidéo d'expertise")}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.expertiseVideoDesc', "Tutoriel, conseil, projet")}</p>
                         </div>
                       </button>
 
@@ -989,8 +985,8 @@ export const Header = (): JSX.Element => {
                           <CalendarIcon className="w-4 h-4" />
                         </div>
                         <div>
-                          <p className="font-semibold">Événement & Webinaire</p>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Conférence, atelier, masterclass</p>
+                          <p className="font-semibold">{t('header.publishMenu.eventWebinar', "Événement & Webinaire")}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.eventWebinarDesc', "Conférence, atelier, masterclass")}</p>
                         </div>
                       </button>
 
@@ -1006,10 +1002,10 @@ export const Header = (): JSX.Element => {
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <p className="font-semibold">Lancer un Live</p>
-                            <span className="px-1.5 py-0.2 bg-red-600 text-white text-[8px] font-bold rounded">DIRECT</span>
+                            <p className="font-semibold">{t('header.publishMenu.launchLive', "Lancer un Live")}</p>
+                            <span className="px-1.5 py-0.2 bg-red-600 text-white text-[8px] font-bold rounded">{t('common.live', "DIRECT")}</span>
                           </div>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Diffusion en direct et chat live</p>
+                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.launchLiveDesc', "Diffusion en direct et chat live")}</p>
                         </div>
                       </button>
 
@@ -1024,8 +1020,8 @@ export const Header = (): JSX.Element => {
                           <Megaphone className="w-4 h-4" />
                         </div>
                         <div>
-                          <p className="font-semibold">Campagne Publicitaire</p>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Promouvoir votre entreprise (PUB)</p>
+                          <p className="font-semibold">{t('header.publishMenu.adCampaign', "Campagne Publicitaire")}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.adCampaignDesc', "Promouvoir votre entreprise (PUB)")}</p>
                         </div>
                       </button>
                     </div>
@@ -1037,7 +1033,7 @@ export const Header = (): JSX.Element => {
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className="relative p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-                    title="Notifications"
+                    title={t('notifications.title', "Notifications")}
                   >
                     <Bell className="w-5 h-5 sm:w-5 sm:h-5" />
                     {(unreadCount > 0 || newRequestsCount > 0) && (
@@ -1053,7 +1049,7 @@ export const Header = (): JSX.Element => {
                       {/* En-tête Mobile */}
                       <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-950">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-black text-gray-900 dark:text-white">Notifications</span>
+                          <span className="text-lg font-black text-gray-900 dark:text-white">{t('notifications.title', 'Notifications')}</span>
                           {unreadCount > 0 && (
                             <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
                               {unreadCount}
@@ -1071,7 +1067,7 @@ export const Header = (): JSX.Element => {
                               className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold"
                             >
                               <CheckCheck className="w-4 h-4" />
-                              Tout lire
+                              {t('notifications.markAllAsRead', 'Tout lire')}
                             </button>
                           )}
                           <button
@@ -1096,7 +1092,7 @@ export const Header = (): JSX.Element => {
                             value={notifSearchQuery}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => setNotifSearchQuery(e.target.value)}
-                            placeholder="Rechercher une notification..."
+                            placeholder={t('notifications.searchPlaceholder', 'Rechercher une notification...')}
                             className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/40"
                           />
                           {notifSearchQuery && (
@@ -1115,11 +1111,11 @@ export const Header = (): JSX.Element => {
                         {/* Onglets Filtres de Catégories (Mobile) */}
                         <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar pb-0.5" onClick={(e) => e.stopPropagation()}>
                           {[
-                            { key: 'all', label: 'Toutes' },
-                            { key: 'message', label: 'Messages' },
-                            { key: 'pub', label: 'Publicités' },
-                            { key: 'request', label: 'Demandes' },
-                            { key: 'system', label: 'Système' }
+                            { key: 'all', label: t('notifications.tabs.all', 'Toutes') },
+                            { key: 'message', label: t('notifications.tabs.message', 'Messages') },
+                            { key: 'pub', label: t('notifications.tabs.pub', 'Publicités') },
+                            { key: 'request', label: t('notifications.tabs.request', 'Demandes') },
+                            { key: 'system', label: t('notifications.tabs.system', 'Système') }
                           ].map((tab) => (
                             <button
                               key={tab.key}
@@ -1145,10 +1141,10 @@ export const Header = (): JSX.Element => {
                           <div className="py-24 px-4 text-center">
                             <Bell className="w-12 h-12 mx-auto text-gray-300 dark:text-zinc-600 mb-3 opacity-60" />
                             <p className="text-base font-bold text-gray-700 dark:text-zinc-300">
-                              {notifSearchQuery ? 'Aucune notification trouvée' : 'Aucune notification'}
+                              {notifSearchQuery ? t('notifications.emptySearch', 'Aucune notification trouvée') : t('notifications.empty', 'Aucune notification')}
                             </p>
                             <p className="text-xs text-gray-400 dark:text-zinc-500 mt-1">
-                              {notifSearchQuery ? `Aucun résultat pour "${notifSearchQuery}"` : "Vous serez notifié dès qu'il y aura du nouveau."}
+                              {notifSearchQuery ? `${t('notifications.noResultsFor', 'Aucun résultat pour')} "${notifSearchQuery}"` : t('notifications.emptyDesc', "Vous serez notifié dès qu'il y aura du nouveau.")}
                             </p>
                             {notifSearchQuery && (
                               <button
@@ -1158,7 +1154,7 @@ export const Header = (): JSX.Element => {
                                 }}
                                 className="mt-3 text-xs font-bold text-blue-600 dark:text-blue-400 underline"
                               >
-                                Réinitialiser les filtres
+                                {t('notifications.resetFilters', 'Réinitialiser les filtres')}
                               </button>
                             )}
                           </div>
@@ -1222,7 +1218,7 @@ export const Header = (): JSX.Element => {
                                         notificationService.deleteNotification(notif.id)
                                         setNotifications(notificationService.getNotifications())
                                       }}
-                                      title="Supprimer la notification"
+                                      title={t('notifications.delete', 'Supprimer la notification')}
                                       className="p-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1244,7 +1240,7 @@ export const Header = (): JSX.Element => {
                                     }}
                                     className="mt-2.5 px-4 py-1.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
                                   >
-                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || 'Faire encore une demande'}</span>
+                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || t('notifications.makeAnotherInquiry', 'Faire encore une demande')}</span>
                                     <ArrowRight className="w-3.5 h-3.5" />
                                   </button>
                                 )}
@@ -1266,7 +1262,7 @@ export const Header = (): JSX.Element => {
                     <div className="hidden sm:flex flex-col absolute right-0 mt-2 w-96 max-h-[560px] rounded-2xl shadow-2xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-zinc-700/60 flex-shrink-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-gray-900 dark:text-white">Notifications</span>
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">{t('notifications.title', 'Notifications')}</span>
                           {unreadCount > 0 && (
                             <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
                               {unreadCount}
@@ -1282,7 +1278,7 @@ export const Header = (): JSX.Element => {
                             className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
                           >
                             <CheckCheck className="w-3.5 h-3.5" />
-                            Tout marquer comme lu
+                            {t('notifications.markAllAsRead', 'Tout marquer comme lu')}
                           </button>
                         )}
                       </div>
@@ -1295,7 +1291,7 @@ export const Header = (): JSX.Element => {
                             type="text"
                             value={notifSearchQuery}
                             onChange={(e) => setNotifSearchQuery(e.target.value)}
-                            placeholder="Rechercher..."
+                            placeholder={t('common.search', 'Rechercher...')}
                             className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-white dark:bg-zinc-750 border border-gray-200 dark:border-zinc-600/80 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                           />
                           {notifSearchQuery && (
@@ -1311,11 +1307,11 @@ export const Header = (): JSX.Element => {
                         {/* Onglets Filtres de Catégories (Desktop) */}
                         <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-0.5">
                           {[
-                            { key: 'all', label: 'Toutes' },
-                            { key: 'message', label: 'Messages' },
-                            { key: 'pub', label: 'Pubs' },
-                            { key: 'request', label: 'Demandes' },
-                            { key: 'system', label: 'Système' }
+                            { key: 'all', label: t('notifications.tabs.all', 'Toutes') },
+                            { key: 'message', label: t('notifications.tabs.message', 'Messages') },
+                            { key: 'pub', label: t('notifications.tabs.pub', 'Publicités') },
+                            { key: 'request', label: t('notifications.tabs.request', 'Demandes') },
+                            { key: 'system', label: t('notifications.tabs.system', 'Système') }
                           ].map((tab) => (
                             <button
                               key={tab.key}
@@ -1337,10 +1333,10 @@ export const Header = (): JSX.Element => {
                           <div className="py-8 px-4 text-center">
                             <Bell className="w-8 h-8 mx-auto text-gray-300 dark:text-zinc-600 mb-2 opacity-60" />
                             <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">
-                              {notifSearchQuery ? 'Aucune notification trouvée' : 'Aucune notification'}
+                              {notifSearchQuery ? t('notifications.emptySearch', 'Aucune notification trouvée') : t('notifications.empty', 'Aucune notification')}
                             </p>
                             <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
-                              {notifSearchQuery ? `Aucun résultat pour "${notifSearchQuery}"` : "Vous serez notifié dès qu'il y aura du nouveau."}
+                              {notifSearchQuery ? `${t('notifications.noResultsFor', 'Aucun résultat pour')} "${notifSearchQuery}"` : t('notifications.emptyDesc', "Vous serez notifié dès qu'il y aura du nouveau.")}
                             </p>
                           </div>
                         ) : (
@@ -1402,7 +1398,7 @@ export const Header = (): JSX.Element => {
                                         notificationService.deleteNotification(notif.id)
                                         setNotifications(notificationService.getNotifications())
                                       }}
-                                      title="Supprimer la notification"
+                                      title={t('notifications.delete', 'Supprimer la notification')}
                                       className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-500 transition-all"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1424,7 +1420,7 @@ export const Header = (): JSX.Element => {
                                     }}
                                     className="mt-2 px-3 py-1 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-[11px] font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
                                   >
-                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || 'Faire encore une demande'}</span>
+                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || t('notifications.makeAnotherInquiry', 'Faire encore une demande')}</span>
                                     <ArrowRight className="w-3 h-3" />
                                   </button>
                                 )}
@@ -1471,7 +1467,7 @@ export const Header = (): JSX.Element => {
                       resolvedTheme === 'dark' ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-gray-200'
                     }`}>
                       <div className="px-4 py-2 border-b border-gray-200 dark:border-zinc-700">
-                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400">Connecté en tant que</p>
+                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400">{t('pro.header.connectedAs', 'Connecté en tant que')}</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">@{displayName.replace(/^@/, '')}</p>
                       </div>
                       <Link
@@ -1479,14 +1475,14 @@ export const Header = (): JSX.Element => {
                         className="block px-4 py-2 text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700"
                         onClick={() => setShowProfileMenu(false)}
                       >
-                        Mon profil
+                        {t('pro.header.myProfile', 'Mon profil')}
                       </Link>
                       <Link
                         to="/pro/settings"
                         className="block px-4 py-2 text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700"
                         onClick={() => setShowProfileMenu(false)}
                       >
-                        Paramètres
+                        {t('pro.header.settings', 'Paramètres')}
                       </Link>
                       <hr className="my-2 border-gray-200 dark:border-zinc-700" />
                       <button
@@ -1496,7 +1492,7 @@ export const Header = (): JSX.Element => {
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-zinc-700"
                       >
-                        Déconnexion
+                        {t('pro.header.logout', 'Déconnexion')}
                       </button>
                     </div>
                   )}
@@ -1523,7 +1519,7 @@ export const Header = (): JSX.Element => {
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchChange}
-                placeholder="Rechercher..."
+                placeholder={t('common.search', 'Rechercher...')}
                 autoFocus
                 className={`w-full pl-12 pr-12 py-3 rounded-xl text-base ${
                   resolvedTheme === 'dark'
@@ -1545,7 +1541,7 @@ export const Header = (): JSX.Element => {
           <div className="flex-1 overflow-y-auto p-4">
             {searchLoading ? (
               <div className="text-center text-sm text-gray-500 dark:text-zinc-400">
-                Recherche en cours...
+                {t('common.searching', 'Recherche en cours...')}
               </div>
             ) : !searchQuery ? (
               recentSearches.length > 0 && (
@@ -1553,13 +1549,13 @@ export const Header = (): JSX.Element => {
                   <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <History className="w-3 h-3" />
-                      Recherches récentes
+                      {t('common.recentSearches', 'Recherches récentes')}
                     </div>
                     <button
                       onClick={() => clearRecentSearches()}
                       className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300"
                     >
-                      Effacer
+                      {t('common.clear', 'Effacer')}
                     </button>
                   </div>
                   {recentSearches.map((search, index) => (
@@ -1583,7 +1579,7 @@ export const Header = (): JSX.Element => {
                   {searchResults.professionals.length > 0 && (
                     <div className="mt-4">
                       <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                        Professionnels
+                        {t('common.professionals', 'Professionnels')}
                       </div>
                       {searchResults.professionals.map((pro: any) => (
                         <button
@@ -1607,7 +1603,7 @@ export const Header = (): JSX.Element => {
                             <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
                               {pro.username?.startsWith('@') ? pro.username : `@${pro.username || 'Utilisateur'}`}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || 'Professionnel'}</p>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || t('common.professional', 'Professionnel')}</p>
                           </div>
                         </button>
                       ))}
@@ -1617,7 +1613,7 @@ export const Header = (): JSX.Element => {
                   {searchResults.videos.length > 0 && (
                     <div className="mt-4">
                       <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                        Vidéos
+                        {t('common.videos', 'Vidéos')}
                       </div>
                       {searchResults.videos.map((video: any) => (
                         <button
@@ -1641,7 +1637,7 @@ export const Header = (): JSX.Element => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-base font-medium text-gray-900 dark:text-white truncate">{video.title}</p>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">{video.views} vues</p>
+                            <p className="text-sm text-gray-500 dark:text-zinc-400">{video.views} {t('common.views', 'vues')}</p>
                           </div>
                         </button>
                       ))}
@@ -1650,7 +1646,7 @@ export const Header = (): JSX.Element => {
                 </>
               ) : (
                 <div className="p-8 text-center text-gray-500 dark:text-zinc-400 text-base">
-                  Aucun résultat trouvé
+                  {t('common.noResultsFound', 'Aucun résultat trouvé')}
                 </div>
               )
             )}

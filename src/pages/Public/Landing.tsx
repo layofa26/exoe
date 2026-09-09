@@ -33,19 +33,20 @@ export const Landing = (): JSX.Element => {
 
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4 px-4">
             <Link
-              to="/register"
-              className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-white text-primary hover:bg-gray-100'} font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto`}
+              to="/pro"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto shadow-lg shadow-blue-600/30"
             >
-              <span>Commencer gratuitement</span>
+              <span>Accéder directement aux Vidéos Pro</span>
               <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </Link>
             <Link
-              to="/pricing"
-              className="border-2 border-white text-white font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl hover:bg-white/10 transition-colors w-full sm:w-auto"
+              to="/register"
+              className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 text-white hover:bg-zinc-700 border border-zinc-700' : 'bg-white text-primary hover:bg-gray-100'} font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto`}
             >
-              Voir les tarifs
+              <span>Créer un compte</span>
             </Link>
           </div>
+
         </div>
       </section>
 

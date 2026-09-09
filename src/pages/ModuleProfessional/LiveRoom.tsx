@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Users, MessageSquare, Send, Mic, MicOff, Video, VideoOff, PhoneOff, Maximize2, ArrowLeft,
@@ -18,6 +19,7 @@ interface Participant {
 }
 
 export default function LiveRoom() {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const { eventId } = useParams()
@@ -29,9 +31,9 @@ export default function LiveRoom() {
   const [showParticipantsTab, setShowParticipantsTab] = useState(false)
   
   const [chatMessages, setChatMessages] = useState([
-    { id: 1, user: 'Host', text: 'Bienvenue dans le direct ! Posez vos questions ici.', isHost: true, time: '14:32' },
-    { id: 2, user: 'Alice', text: 'Excellente qualité sonore et vidéo !', isHost: false, time: '14:35' },
-    { id: 3, user: 'Bob', text: 'Est-ce que le replay sera disponible ?', isHost: false, time: '14:36' },
+    { id: 1, user: 'Host', text: t('pro.live.welcomeChat', 'Bienvenue dans le direct ! Posez vos questions ici.'), isHost: true, time: '14:32' },
+    { id: 2, user: 'Alice', text: t('pro.live.chatAlice', 'Excellente qualité sonore et vidéo !'), isHost: false, time: '14:35' },
+    { id: 3, user: 'Bob', text: t('pro.live.chatBob', 'Est-ce que le replay sera disponible ?'), isHost: false, time: '14:36' },
   ])
   const [newMessage, setNewMessage] = useState('')
   const [isMuted, setIsMuted] = useState(false)
@@ -46,7 +48,7 @@ export default function LiveRoom() {
   // Host Controls & Participants State
   const [isHost] = useState(true) // Mode organisateur
   const [participants, setParticipants] = useState<Participant[]>([
-    { id: '1', name: 'Dr. Marc Antoine (Vous)', isHost: true, isSpeaker: true },
+    { id: '1', name: `Dr. Marc Antoine (${t('common.you', 'Vous')})`, isHost: true, isSpeaker: true },
     { id: '2', name: 'Sophie Laurent', isSpeaker: true },
     { id: '3', name: 'Pierre Durand', isHandRaised: true },
     { id: '4', name: 'Marie Martin', isHandRaised: false },
@@ -103,13 +105,13 @@ export default function LiveRoom() {
             videoRef.current.srcObject = mediaStream
           }
         }
-        showToast("🖥️ Partage d'écran activé")
+        showToast(t('pro.live.screenShareActive', "🖥️ Partage d'écran activé"))
       } else {
         setIsScreenSharing(false)
         if (mediaStream && videoRef.current) {
           videoRef.current.srcObject = mediaStream
         }
-        showToast("Partage d'écran arrêté")
+        showToast(t('pro.live.screenShareStopped', "Partage d'écran arrêté"))
       }
     } catch (err) {
       console.log('Partage d d\'écran annulé ou non supporté:', err)
@@ -121,29 +123,29 @@ export default function LiveRoom() {
     const nextState = !isHandRaised
     setIsHandRaised(nextState)
     if (nextState) {
-      showToast("✋ Vous avez levé la main pour parler")
+      showToast(t('pro.live.handRaisedUser', "✋ Vous avez levé la main pour parler"))
       setChatMessages(prev => [...prev, {
         id: Date.now(),
-        user: 'Système',
-        text: '✋ Un participant a levé la main pour demander la parole.',
+        user: t('common.system', 'Système'),
+        text: t('pro.live.handRaisedSystem', '✋ Un participant a levé la main pour demander la parole.'),
         isHost: true,
-        time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString(i18n.language || 'fr-FR', { hour: '2-digit', minute: '2-digit' })
       }])
     } else {
-      showToast("Main baissée")
+      showToast(t('pro.live.handLowered', "Main baissée"))
     }
   }
 
   // Inviter sur scène (Item 29)
   const handlePromoteToSpeaker = (id: string, name: string) => {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, isSpeaker: true, isHandRaised: false } : p))
-    showToast(`🎙️ ${name} est invité(e) sur scène !`)
+    showToast(`🎙️ ${name} ${t('pro.live.invitedToStage', 'est invité(e) sur scène !')}`)
   }
 
   // Expulser / Bloquer un participant (Item 30)
   const handleKickParticipant = (id: string, name: string) => {
     setParticipants(prev => prev.filter(p => p.id !== id))
-    showToast(`🚫 ${name} a été expulsé(e) du live.`)
+    showToast(`🚫 ${name} ${t('pro.live.kickedFromLive', 'a été expulsé(e) du live.')}`)
   }
 
   // Simule vre viewer count
@@ -169,10 +171,10 @@ export default function LiveRoom() {
     if (!isUserInLive) return
     setChatMessages(prev => [...prev, {
       id: Date.now(),
-      user: 'Moi',
+      user: t('common.me', 'Moi'),
       text: newMessage,
       isHost: false,
-      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString(i18n.language || 'fr-FR', { hour: '2-digit', minute: '2-digit' })
     }])
     setNewMessage('')
   }
@@ -217,11 +219,11 @@ export default function LiveRoom() {
               <div className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] text-white/60">
                 <span className="flex items-center gap-0.5 sm:gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  EN DIRECT
+                  {t('pro.sidebar.liveBadge', 'EN DIRECT')}
                 </span>
                 <span className="flex items-center gap-0.5 sm:gap-1">
                   <Users className="w-3 h-3" />
-                  {viewerCount} participants
+                  {viewerCount} {t('pro.live.participants', 'participants')}
                 </span>
               </div>
             </div>
@@ -234,7 +236,7 @@ export default function LiveRoom() {
               }`}
             >
               <Users size={14} />
-              <span className="hidden sm:inline">Participants ({participants.length})</span>
+              <span className="hidden sm:inline">{t('pro.live.participants', 'Participants')} ({participants.length})</span>
             </button>
             <button
               onClick={toggleFullscreen}
@@ -252,7 +254,7 @@ export default function LiveRoom() {
               <div className="w-20 h-20 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
                 <VideoOff className="w-8 h-8 text-zinc-400" />
               </div>
-              <p className="text-sm font-medium">Caméra désactivée</p>
+              <p className="text-sm font-medium">{t('pro.live.cameraOff', 'Caméra désactivée')}</p>
             </div>
           ) : (
             <video
@@ -268,7 +270,7 @@ export default function LiveRoom() {
           {isHandRaised && (
             <div className="absolute top-16 left-4 bg-amber-500/90 text-black px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 shadow-lg animate-bounce">
               <Hand size={14} />
-              Main levée
+              {t('pro.live.handRaised', 'Main levée')}
             </div>
           )}
 
@@ -298,7 +300,7 @@ export default function LiveRoom() {
               {/* Micro (Item 23) */}
               <button
                 onClick={() => setIsMuted(!isMuted)}
-                title={isMuted ? "Activer le micro" : "Désactiver le micro"}
+                title={isMuted ? t('pro.live.unmute', "Activer le micro") : t('pro.live.mute', "Désactiver le micro")}
                 className={`p-2.5 sm:p-3 rounded-full transition-all ${isMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white hover:bg-white/20'}`}
               >
                 {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
@@ -307,7 +309,7 @@ export default function LiveRoom() {
               {/* Caméra (Item 24) */}
               <button
                 onClick={() => setIsVideoOff(!isVideoOff)}
-                title={isVideoOff ? "Activer la caméra" : "Désactiver la caméra"}
+                title={isVideoOff ? t('pro.live.startVideo', "Activer la caméra") : t('pro.live.stopVideo', "Désactiver la caméra")}
                 className={`p-2.5 sm:p-3 rounded-full transition-all ${isVideoOff ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white hover:bg-white/20'}`}
               >
                 {isVideoOff ? <VideoOff size={18} /> : <Video size={18} />}
@@ -316,7 +318,7 @@ export default function LiveRoom() {
               {/* Partage d'écran (Item 26) */}
               <button
                 onClick={handleToggleScreenShare}
-                title="Partager l'écran"
+                title={t('pro.live.shareScreen', "Partager l'écran")}
                 className={`p-2.5 sm:p-3 rounded-full transition-all ${isScreenSharing ? 'bg-blue-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
               >
                 <Monitor size={18} />
@@ -325,7 +327,7 @@ export default function LiveRoom() {
               {/* Lever la main (Item 25) */}
               <button
                 onClick={handleToggleHandRaise}
-                title="Lever la main"
+                title={t('pro.live.raiseHand', "Lever la main")}
                 className={`p-2.5 sm:p-3 rounded-full transition-all ${isHandRaised ? 'bg-amber-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}
               >
                 <Hand size={18} />
@@ -349,7 +351,7 @@ export default function LiveRoom() {
             {/* Bouton Quitter (Item 22) */}
             <button
               onClick={handleLeaveLive}
-              title="Quitter le live"
+              title={t('pro.live.leaveLive', "Quitter le live")}
               className="p-2.5 sm:p-3 bg-red-600 hover:bg-red-700 rounded-full transition-colors"
             >
               <PhoneOff size={18} className="text-white" />
@@ -377,7 +379,7 @@ export default function LiveRoom() {
                 }`}
               >
                 <MessageSquare size={14} />
-                Chat Live
+                {t('pro.live.liveChat', 'Chat Live')}
               </button>
               <button
                 onClick={() => { setShowParticipantsTab(true); setIsChatOpen(false); }}
@@ -386,7 +388,7 @@ export default function LiveRoom() {
                 }`}
               >
                 <Users size={14} />
-                Participants ({participants.length})
+                {t('pro.live.participants', 'Participants')} ({participants.length})
               </button>
               <button
                 onClick={() => { setIsChatOpen(false); setShowParticipantsTab(false); }}
@@ -421,7 +423,7 @@ export default function LiveRoom() {
                       type="text"
                       value={newMessage}
                       onChange={e => setNewMessage(e.target.value)}
-                      placeholder="Écrivez un message..."
+                      placeholder={t('pro.conversations.typeMessage', 'Écrivez un message...')}
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-3 pr-10 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
                     />
                     <button
@@ -438,7 +440,9 @@ export default function LiveRoom() {
             {/* Content Tab 2: Participants Management (Items 29 & 30) */}
             {showParticipantsTab && (
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Gestion des Participants</p>
+                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                  {t('pro.live.manageParticipants', 'Gestion des Participants')}
+                </p>
                 {participants.map(p => (
                   <div key={p.id} className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs">
                     <div className="flex items-center gap-2 min-w-0">
@@ -448,7 +452,7 @@ export default function LiveRoom() {
                       <div className="min-w-0">
                         <p className="font-bold text-white truncate">{p.name}</p>
                         <p className="text-[10px] text-zinc-400">
-                          {p.isHost ? '👑 Hôte' : p.isSpeaker ? '🎙️ Intervenant' : '👀 Participant'}
+                          {p.isHost ? `👑 ${t('pro.live.host', 'Hôte')}` : p.isSpeaker ? `🎙️ ${t('pro.live.speaker', 'Intervenant')}` : `👀 ${t('pro.live.participant', 'Participant')}`}
                         </p>
                       </div>
                     </div>
@@ -458,7 +462,7 @@ export default function LiveRoom() {
                         {!p.isSpeaker && (
                           <button
                             onClick={() => handlePromoteToSpeaker(p.id, p.name)}
-                            title="Inviter sur scène"
+                            title={t('pro.live.inviteToStage', 'Inviter sur scène')}
                             className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition-colors"
                           >
                             <UserPlus size={13} />
@@ -466,7 +470,7 @@ export default function LiveRoom() {
                         )}
                         <button
                           onClick={() => handleKickParticipant(p.id, p.name)}
-                          title="Expulser du live"
+                          title={t('pro.live.kickFromLive', 'Expulser du live')}
                           className="p-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/40 transition-colors"
                         >
                           <UserX size={13} />
@@ -495,8 +499,12 @@ export default function LiveRoom() {
       {showRatingModal && (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-800 text-white rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-center">Avez-vous apprécié cet événement ?</h3>
-            <p className="text-xs text-zinc-400 text-center">Donnez votre avis pour aider les organisateurs</p>
+            <h3 className="text-lg font-bold text-center">
+              {t('pro.live.rateTitle', 'Avez-vous apprécié cet événement ?')}
+            </h3>
+            <p className="text-xs text-zinc-400 text-center">
+              {t('pro.live.rateSubtitle', 'Donnez votre avis pour aider les organisateurs')}
+            </p>
 
             {/* Étoiles 1-5 */}
             <div className="flex items-center justify-center gap-2 py-2">
@@ -515,7 +523,7 @@ export default function LiveRoom() {
             <textarea
               value={feedback}
               onChange={e => setFeedback(e.target.value)}
-              placeholder="Laissez un commentaire sur cet événement..."
+              placeholder={t('pro.live.commentPlaceholder', 'Laissez un commentaire sur cet événement...')}
               rows={3}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-blue-500"
             />
@@ -529,13 +537,13 @@ export default function LiveRoom() {
                 className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
               >
                 <Award size={14} />
-                Voir mon certificat
+                {t('pro.live.viewCertificate', 'Voir mon certificat')}
               </button>
               <button
                 onClick={() => navigate('/pro/events')}
                 className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold text-xs transition-colors"
               >
-                Terminer
+                {t('common.finish', 'Terminer')}
               </button>
             </div>
           </div>
@@ -551,32 +559,42 @@ export default function LiveRoom() {
             </div>
 
             <div>
-              <h3 className="text-xl font-extrabold text-amber-400">CERTIFICAT DE PARTICIPATION</h3>
-              <p className="text-xs text-zinc-400 mt-1">Délivré par EXILE Platform</p>
+              <h3 className="text-xl font-extrabold text-amber-400">
+                {t('pro.live.certTitle', 'CERTIFICAT DE PARTICIPATION')}
+              </h3>
+              <p className="text-xs text-zinc-400 mt-1">
+                {t('pro.live.certDeliveredBy', 'Délivré par EXILE Platform')}
+              </p>
             </div>
 
             <div className="p-4 rounded-2xl bg-black/40 border border-amber-500/30 text-left space-y-2">
-              <p className="text-xs text-zinc-300">Ce certificat atteste que <strong className="text-white font-bold">Dr. Marc Antoine</strong> a participé avec succès à l'événement en direct :</p>
+              <p className="text-xs text-zinc-300">
+                {t('pro.live.certAttests', 'Ce certificat atteste que')}{' '}
+                <strong className="text-white font-bold">Dr. Marc Antoine</strong>{' '}
+                {t('pro.live.certParticipated', "a participé avec succès à l'événement en direct :")}
+              </p>
               <p className="text-sm font-bold text-amber-300">"{roomName}"</p>
-              <p className="text-[10px] text-zinc-400">Date: {new Date().toLocaleDateString('fr-FR')} · Durée: 45 min</p>
+              <p className="text-[10px] text-zinc-400">
+                {t('common.date', 'Date')}: {new Date().toLocaleDateString(i18n.language || 'fr-FR')} · {t('pro.live.duration', 'Durée')}: 45 min
+              </p>
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  showToast("📜 Certificat téléchargé avec succès !")
+                  showToast(t('pro.live.certDownloaded', '📜 Certificat téléchargé avec succès !'))
                   setTimeout(() => navigate('/pro/events'), 1500)
                 }}
                 className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2"
               >
                 <Download size={15} />
-                Télécharger (PDF/PNG)
+                {t('pro.live.downloadCert', 'Télécharger (PDF/PNG)')}
               </button>
               <button
                 onClick={() => navigate('/pro/events')}
                 className="px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition-colors"
               >
-                Fermer
+                {t('common.close', 'Fermer')}
               </button>
             </div>
           </div>

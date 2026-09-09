@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Users, Play, Heart, Bell, Search, ArrowLeft,
   Share2, Bookmark, Trash2, X
@@ -115,6 +116,7 @@ const demoFeedVideos: any[] = [
 ]
 
 export const Subscriptions = (): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   const navigate = useNavigate()
@@ -321,14 +323,14 @@ export const Subscriptions = (): JSX.Element => {
               <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-3">
                 <Users className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-base">Se désabonner ?</h3>
+              <h3 className="font-bold text-base">{t('pro.subscribers.unsubscribeModalTitle', 'Se désabonner ?')}</h3>
               <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Vous ne recevrez plus les publications de ce professionnel.
+                {t('pro.subscribers.unsubscribeModalDesc', 'Vous ne recevrez plus les publications de ce professionnel.')}
               </p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setUnsubscribeConfirm(null)} className={`flex-1 py-2.5 rounded-xl text-xs font-semibold ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'}`}>Annuler</button>
-              <button onClick={() => unsubscribe(unsubscribeConfirm)} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold">Confirmer</button>
+              <button onClick={() => setUnsubscribeConfirm(null)} className={`flex-1 py-2.5 rounded-xl text-xs font-semibold ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'}`}>{t('common.cancel', 'Annuler')}</button>
+              <button onClick={() => unsubscribe(unsubscribeConfirm)} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold">{t('common.confirm', 'Confirmer')}</button>
             </div>
           </div>
         </div>
@@ -347,7 +349,7 @@ export const Subscriptions = (): JSX.Element => {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF6B00] to-orange-400 flex items-center justify-center text-white shadow-sm">
               <Heart size={18} className="fill-white" />
             </div>
-            <h1 className="font-bold text-base">Abonnements</h1>
+            <h1 className="font-bold text-base">{t('pro.profile.subscriptions', 'Abonnements')}</h1>
           </div>
         </div>
 
@@ -358,7 +360,7 @@ export const Subscriptions = (): JSX.Element => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher une vidéo ou un créateur..."
+            placeholder={t('pro.subscribers.searchPlaceholder', 'Rechercher une vidéo ou un créateur...')}
             className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
           />
           {searchQuery && (
@@ -371,25 +373,25 @@ export const Subscriptions = (): JSX.Element => {
         {/* Tabs */}
         <div className="flex gap-1.5 pt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {[
-            { id: 'feed', label: 'Fil des Vidéos', icon: Play, count: displayedVideos.length },
-            { id: 'following', label: 'Mes Chaînes', icon: Users, count: filteredSubscriptions.length },
-            { id: 'favorites', label: 'Favoris', icon: Bookmark, count: sortedFavorites.length }
-          ].map((t) => {
-            const Icon = t.icon
-            const active = activeTab === t.id
+            { id: 'feed', label: t('pro.subscribers.feedTab', 'Fil des Vidéos'), icon: Play, count: displayedVideos.length },
+            { id: 'following', label: t('pro.subscribers.channelsTab', 'Mes Chaînes'), icon: Users, count: filteredSubscriptions.length },
+            { id: 'favorites', label: t('pro.subscribers.favoritesTab', 'Favoris'), icon: Bookmark, count: sortedFavorites.length }
+          ].map((tTab) => {
+            const Icon = tTab.icon
+            const active = activeTab === tTab.id
             return (
               <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id as any)}
+                key={tTab.id}
+                onClick={() => setActiveTab(tTab.id as any)}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                   active ? 'bg-[#FF6B00] text-white shadow-md' : isDark ? 'bg-zinc-800/40 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100/70 hover:bg-slate-200 text-slate-700'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
-                <span>{t.label}</span>
-                {t.count > 0 && (
+                <span>{tTab.label}</span>
+                {tTab.count > 0 && (
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${active ? 'bg-white/25 text-white' : isDark ? 'bg-zinc-700 text-zinc-300' : 'bg-slate-200 text-slate-700'}`}>
-                    {t.count}
+                    {tTab.count}
                   </span>
                 )}
               </button>
@@ -413,7 +415,7 @@ export const Subscriptions = (): JSX.Element => {
                     : isDark ? 'bg-zinc-900 border border-zinc-800 text-zinc-300' : 'bg-white border border-slate-200 text-slate-700'
                 }`}
               >
-                Tous
+                {t('common.all', 'Tous')}
               </button>
               {subscriptions.map(sub => (
                 <button
@@ -453,13 +455,13 @@ export const Subscriptions = (): JSX.Element => {
                         <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 leading-snug">{video.title}</h3>
                         <p className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{video.author?.name}</p>
                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/40">
-                          <span className="text-[10px] text-zinc-500">{video.viewsCount} vues • {video.createdAt}</span>
+                          <span className="text-[10px] text-zinc-500">{video.viewsCount} {t('pro.video.views', 'vues')} • {video.createdAt}</span>
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleToggleFavorite(video); }}
                               className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-[#FF6B00]"
-                              title="Enregistrer"
+                              title={t('common.save', 'Enregistrer')}
                             >
                               <Bookmark size={13} className={favorites.some(f => String(f.videoId || (f as any).id) === String(video.id)) ? 'fill-[#FF6B00] text-[#FF6B00]' : ''} />
                             </button>
@@ -467,7 +469,7 @@ export const Subscriptions = (): JSX.Element => {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleShare(video); }}
                               className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white"
-                              title="Partager"
+                              title={t('common.share', 'Partager')}
                             >
                               <Share2 size={13} />
                             </button>
@@ -487,7 +489,7 @@ export const Subscriptions = (): JSX.Element => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredSubscriptions.length === 0 ? (
               <div className="col-span-full py-16 text-center text-zinc-500 text-xs">
-                Aucune chaîne trouvée
+                {t('pro.subscribers.noChannels', 'Aucune chaîne trouvée')}
               </div>
             ) : (
               filteredSubscriptions.map(sub => (
@@ -510,7 +512,7 @@ export const Subscriptions = (): JSX.Element => {
                       type="button"
                       onClick={() => toggleNotifications(sub.id)}
                       className={`p-2 rounded-xl transition-colors ${sub.notificationsEnabled ? 'bg-[#FF6B00]/15 text-[#FF6B00]' : isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-500'}`}
-                      title="Notifications"
+                      title={t('pro.subscribers.notifications', 'Notifications')}
                     >
                       <Bell size={15} />
                     </button>
@@ -519,7 +521,7 @@ export const Subscriptions = (): JSX.Element => {
                       onClick={() => setUnsubscribeConfirm(sub.id)}
                       className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-800/80 hover:bg-red-500/20 text-zinc-300 hover:text-red-400 transition-colors"
                     >
-                      Abonné
+                      {t('pro.subscribers.subscribed', 'Abonné')}
                     </button>
                   </div>
                 </div>
@@ -534,8 +536,8 @@ export const Subscriptions = (): JSX.Element => {
             {sortedFavorites.length === 0 ? (
               <div className="py-20 text-center space-y-2">
                 <Bookmark className="w-12 h-12 text-zinc-600 mx-auto stroke-1" />
-                <p className="text-sm font-semibold text-zinc-400">Aucune vidéo dans vos favoris</p>
-                <p className="text-xs text-zinc-500">Ajoutez des vidéos aux favoris depuis l'accueil ou le lecteur vidéo.</p>
+                <p className="text-sm font-semibold text-zinc-400">{t('pro.subscribers.noFavorites', 'Aucune vidéo dans vos favoris')}</p>
+                <p className="text-xs text-zinc-500">{t('pro.subscribers.noFavoritesDesc', "Ajoutez des vidéos aux favoris depuis l'accueil ou le lecteur vidéo.")}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -553,12 +555,12 @@ export const Subscriptions = (): JSX.Element => {
                       <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 leading-snug">{fav.title}</h3>
                       <p className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{fav.professionalName}</p>
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/40">
-                        <span className="text-[10px] text-zinc-500">Enregistré</span>
+                        <span className="text-[10px] text-zinc-500">{t('common.saved', 'Enregistré')}</span>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleToggleFavorite(fav); }}
                           className="p-1.5 rounded-lg text-[#FF6B00] hover:bg-zinc-800"
-                          title="Retirer des favoris"
+                          title={t('pro.subscribers.removeFromFavorites', 'Retirer des favoris')}
                         >
                           <Bookmark size={14} className="fill-[#FF6B00]" />
                         </button>

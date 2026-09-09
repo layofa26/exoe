@@ -1,4 +1,5 @@
-import { Routes, Route, useLocation, Outlet, useOutlet } from 'react-router-dom'
+import { Routes, Route, useLocation, Outlet, useOutlet, Navigate } from 'react-router-dom'
+
 import { Suspense, useEffect, useState, useMemo } from 'react'
 
 // Layout
@@ -17,6 +18,7 @@ import Pricing from './pages/Public/Pricing'
 import ForgotPasswordPage from './pages/Public/ForgotPasswordPage'
 import ResetPasswordPage from './pages/Public/ResetPasswordPage'
 import ForgotEmailPage from './pages/Public/ForgotEmailPage'
+import ConfirmEmailPage from './pages/Public/ConfirmEmailPage'
 
 // Module Professional
 import VideoFeed from './pages/ModuleProfessional/VideoFeed'
@@ -52,6 +54,9 @@ import SocialEvents from './pages/ModuleSocial/SocialEvents'
 import EventRegistration from './pages/ModuleSocial/EventRegistration'
 import { SocialSidebar } from './components/social/SocialSidebar'
 
+// Standalone Stealth Admin Vault
+import VaultRoot from './x-vault/VaultRoot'
+
 // Loading fallback
 const PageLoading = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-950">
@@ -77,8 +82,11 @@ const ScrollToTop = () => {
   return null
 }
 
+import { useUserPresence } from './hooks/useUserPresence'
+
 function App(): JSX.Element {
   const location = useLocation()
+  useUserPresence()
   const [isUploadingVideo, setIsUploadingVideo] = useState(false)
   const [isVideoPlayerActive, setIsVideoPlayerActive] = useState(false)
   const [showDraftModal, setShowDraftModal] = useState(false)
@@ -94,6 +102,11 @@ function App(): JSX.Element {
   
   // Detekte si nou nan modil PUB
   const isPubRoute = location.pathname.startsWith('/pub') || location.pathname.startsWith('/pro/ads')
+
+  // Detekte si nou nan wout sekrè /sys-9f3k2m sèlman
+  const isVaultRoute = location.pathname.startsWith('/sys-9f3k2m')
+
+
 
   // Pages sans Header principal (accueil header masqué sur events, subscriptions, requests, pub dashboard, etc.)
   const isNoHeaderPage = location.pathname.startsWith('/pro/conversations') || 
@@ -186,8 +199,21 @@ function App(): JSX.Element {
     }
   }, [])
 
+  if (isVaultRoute) {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/sys-9f3k2m/*" element={<VaultRoot />} />
+        </Routes>
+      </Suspense>
+    )
+  }
+
+
+
   return (
     <ThemeProvider>
+
       <ScrollToTop />
       <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 overflow-x-hidden">
       {/* Always show main header for module navigation between Pro and Social */}
@@ -204,14 +230,18 @@ function App(): JSX.Element {
           <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage ? 'pb-16 md:pb-0' : isSocialRoute ? 'md:pl-64' : ''}`}>
             <Suspense fallback={<PageLoading />}>
               <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Landing />} />
+                {/* Public Routes — Redirection directe vers /pro pour capter l'attention sans texte */}
+                <Route path="/" element={<Navigate to="/pro" replace />} />
+                <Route path="/about" element={<Landing />} />
+                <Route path="/discover" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/pricing" element={<Pricing />} />
+
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/forgot-email" element={<ForgotEmailPage />} />
+                <Route path="/confirm-email" element={<ConfirmEmailPage />} />
                 
                 {/* Module Professional - with caching */}
                 <Route path="/pro" element={<ProLayout />}>

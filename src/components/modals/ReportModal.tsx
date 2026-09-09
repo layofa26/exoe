@@ -68,9 +68,22 @@ export const ReportModal = ({
     
     setIsSubmitting(true)
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
+    try {
+      const { API_BASE_URL } = await import('../../config/api');
+      await fetch(`${API_BASE_URL}/content/reports/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_type: context === 'conversation' ? 'comment' : 'user',
+          target_id: contextId || targetUser.id,
+          reason: description,
+          category: selectedReason
+        })
+      });
+    } catch (err) {
+      console.error('Erreur envoi signalement:', err);
+    }
+
     onReport(targetUser.id, selectedReason, description)
     setIsSubmitted(true)
     setIsSubmitting(false)

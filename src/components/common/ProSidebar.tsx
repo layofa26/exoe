@@ -12,6 +12,7 @@ import {
   X,
   Megaphone
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { getCurrentUserId } from '../../services/apiClient'
@@ -20,6 +21,7 @@ import { UploadVideo } from '../video/UploadVideo'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 export const ProSidebar = (): JSX.Element | null => {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const { resolvedTheme } = useTheme()
@@ -87,7 +89,7 @@ export const ProSidebar = (): JSX.Element | null => {
             <div className="flex flex-col items-center gap-2 pb-2">
               <div className="w-10 h-1 rounded-full bg-zinc-700/60" />
               <div className="w-full flex items-center justify-between">
-                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Créer & Publier</p>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{t('pro.sidebar.createTitle', 'Créer & Publier')}</p>
                 <button onClick={() => setShowMobileActionMenu(false)} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400">
                   <X className="w-4 h-4" />
                 </button>
@@ -108,8 +110,8 @@ export const ProSidebar = (): JSX.Element | null => {
                 <VideoIcon className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold">Publier une Vidéo</p>
-                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Tutoriel, expertise, étude de cas</p>
+                <p className="text-sm font-bold">{t('pro.sidebar.publishVideo', 'Publier une Vidéo')}</p>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.sidebar.publishVideoDesc', 'Tutoriel, expertise, étude de cas')}</p>
               </div>
             </button>
 
@@ -127,8 +129,8 @@ export const ProSidebar = (): JSX.Element | null => {
                 <CalendarPlus className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold">Créer un Événement</p>
-                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Webinaire, atelier, conférence</p>
+                <p className="text-sm font-bold">{t('pro.sidebar.createEvent', 'Créer un Événement')}</p>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.sidebar.createEventDesc', 'Webinaire, atelier, conférence')}</p>
               </div>
             </button>
 
@@ -147,10 +149,10 @@ export const ProSidebar = (): JSX.Element | null => {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-bold">Lancer un Live</p>
-                  <span className="px-1.5 py-0.2 bg-red-600 text-white text-[9px] font-bold rounded uppercase">Direct</span>
+                  <p className="text-sm font-bold">{t('pro.sidebar.startLive', 'Lancer un Live')}</p>
+                  <span className="px-1.5 py-0.2 bg-red-600 text-white text-[9px] font-bold rounded uppercase">{t('pro.sidebar.liveBadge', 'Direct')}</span>
                 </div>
-                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Masterclass en direct & chat interactif</p>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.sidebar.startLiveDesc', 'Masterclass en direct & chat interactif')}</p>
               </div>
             </button>
 
@@ -168,8 +170,8 @@ export const ProSidebar = (): JSX.Element | null => {
                 <Megaphone className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold">Campagne Publicitaire (PUB)</p>
-                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Promouvoir vos produits & services</p>
+                <p className="text-sm font-bold">{t('pro.sidebar.pubCampaign', 'Campagne Publicitaire (PUB)')}</p>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.sidebar.pubCampaignDesc', 'Promouvoir vos produits & services')}</p>
               </div>
             </button>
           </div>
@@ -189,7 +191,7 @@ export const ProSidebar = (): JSX.Element | null => {
             }`}
           >
             <Home className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5">Accueil</span>
+            <span className="text-[10px] mt-0.5">{t('pro.sidebar.home', 'Accueil')}</span>
           </button>
 
           {/* 2. Demandes */}
@@ -209,7 +211,7 @@ export const ProSidebar = (): JSX.Element | null => {
                 </span>
               )}
             </div>
-            <span className="text-[10px] mt-0.5">Demandes</span>
+            <span className="text-[10px] mt-0.5">{t('pro.sidebar.requests', 'Demandes')}</span>
           </button>
 
           {/* 3. CENTER + BUTTON (PUBLIER - Exact EXILE Orange #FF6B00) */}
@@ -223,7 +225,7 @@ export const ProSidebar = (): JSX.Element | null => {
                 setShowMobileActionMenu(!showMobileActionMenu)
               }}
               className="w-12 h-12 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white flex items-center justify-center shadow-lg shadow-[#FF6B00]/40 active:scale-95 transition-transform"
-              title="Publier"
+              title={t('pro.sidebar.publish', 'Publier')}
             >
               <Plus className="w-6 h-6 stroke-[2.5]" />
             </button>
@@ -239,7 +241,7 @@ export const ProSidebar = (): JSX.Element | null => {
             }`}
           >
             <Calendar className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5">Événements</span>
+            <span className="text-[10px] mt-0.5">{t('pro.sidebar.events', 'Événements')}</span>
           </button>
 
           {/* 5. Abonnement */}
@@ -252,7 +254,7 @@ export const ProSidebar = (): JSX.Element | null => {
             }`}
           >
             <Heart className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5">Abonnement</span>
+            <span className="text-[10px] mt-0.5">{t('pro.sidebar.subscriptions', 'Abonnement')}</span>
           </button>
         </nav>
       </div>
@@ -261,10 +263,10 @@ export const ProSidebar = (): JSX.Element | null => {
       <div className={`hidden md:flex fixed bottom-0 left-0 right-0 ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} border-t z-[10000] shadow-lg`}>
         <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-center gap-3">
           {[
-            { to: '/pro', label: 'Accueil', icon: Home },
-            { to: '/pro/requests', label: 'Demandes', icon: Inbox, badge: newRequestsCount },
-            { to: '/pro/events', label: 'Événements', icon: Calendar },
-            { to: '/pro/subscriptions', label: 'Abonnement', icon: Heart }
+            { to: '/pro', label: t('pro.sidebar.home', 'Accueil'), icon: Home },
+            { to: '/pro/requests', label: t('pro.sidebar.requests', 'Demandes'), icon: Inbox, badge: newRequestsCount },
+            { to: '/pro/events', label: t('pro.sidebar.events', 'Événements'), icon: Calendar },
+            { to: '/pro/subscriptions', label: t('pro.sidebar.subscriptions', 'Abonnement'), icon: Heart }
           ].map((item) => {
             const isItemActive = location.pathname === item.to || (item.to === '/pro' && location.pathname === '/pro')
             return (

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cacheService } from '../../services/cacheService';
 import { 
-  ChevronRight, Shield, Lock, Eye, Users, Globe, Building2, UserX,
+  ChevronLeft, Shield, Lock, Eye, Users, Globe, Building2, UserX,
   Mail, Smartphone, Briefcase, MapPin, Clock, Play, TrendingUp, Calendar
 } from 'lucide-react';
 
@@ -52,6 +53,7 @@ const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
 }
 
 const PrivacySettings = () => {
+  const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -96,7 +98,7 @@ const PrivacySettings = () => {
 
       const token = localStorage.getItem('accessToken')
       if (!token) {
-        setMessage({ type: 'error', text: 'Token non trouvé' });
+        setMessage({ type: 'error', text: t('common.tokenNotFound', 'Token non trouvé') });
         return
       }
 
@@ -110,13 +112,13 @@ const PrivacySettings = () => {
       })
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Paramètres de confidentialité mis à jour' });
+        setMessage({ type: 'success', text: t('settings.privacyUpdated', 'Paramètres de confidentialité mis à jour') });
       } else {
         throw new Error('Erreur lors de la mise à jour')
       }
     } catch (error) {
       console.error('Error saving privacy settings:', error);
-      setMessage({ type: 'error', text: 'Erreur lors de la sauvegarde' });
+      setMessage({ type: 'error', text: t('settings.saveError', 'Erreur lors de la sauvegarde') });
     } finally {
       setSaving(false);
     }
@@ -126,7 +128,7 @@ const PrivacySettings = () => {
     label, 
     value, 
     onChange, 
-    icon: Icon,
+    icon: Icon, 
     options 
   }: { 
     label: string; 
@@ -139,11 +141,11 @@ const PrivacySettings = () => {
     
     const getOptionLabel = (level: PrivacyLevel) => {
       switch (level) {
-        case 'PUBLIC': return 'Public';
-        case 'SUBSCRIBERS': return 'Abonnés';
-        case 'CONTACTS': return 'Contacts';
-        case 'INSTITUTIONS': return 'Institutions';
-        case 'PRIVATE': return 'Privé';
+        case 'PUBLIC': return t('settings.public', 'Public');
+        case 'SUBSCRIBERS': return t('settings.subscribers', 'Abonnés');
+        case 'CONTACTS': return t('settings.contacts', 'Contacts');
+        case 'INSTITUTIONS': return t('settings.institutions', 'Institutions');
+        case 'PRIVATE': return t('settings.private', 'Privé');
         default: return level;
       }
     };
@@ -214,12 +216,12 @@ const PrivacySettings = () => {
             onClick={() => navigate(-1)}
             className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
           >
-            <ChevronRight className={`w-6 h-6 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
+            <ChevronLeft className={`w-6 h-6 rtl-flip ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
           </button>
           <div className="flex items-center gap-2">
             <Shield className={`w-6 h-6 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
             <h1 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Confidentialité du profil
+              {t('settings.profilePrivacy', 'Confidentialité du profil')}
             </h1>
           </div>
         </div>
@@ -233,10 +235,10 @@ const PrivacySettings = () => {
             <Eye className={`w-5 h-5 mt-0.5 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
             <div>
               <p className={`font-medium ${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-800'} mb-1`}>
-                Contrôlez votre visibilité
+                {t('settings.controlVisibility', 'Contrôlez votre visibilité')}
               </p>
               <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-blue-200/70' : 'text-blue-700/70'}`}>
-                Choisissez qui peut voir chaque élément de votre profil. Les administrateurs conservent un accès total.
+                {t('settings.controlVisibilityDesc', 'Choisissez qui peut voir chaque élément de votre profil. Les administrateurs conservent un accès total.')}
               </p>
             </div>
           </div>
@@ -245,11 +247,11 @@ const PrivacySettings = () => {
         {/* Profile Information */}
         <div className="mb-6">
           <h2 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Informations de profil
+            {t('settings.profileInfo', 'Informations de profil')}
           </h2>
           
           <PrivacyOption
-            label="Photo de profil"
+            label={t('settings.avatarPhoto', 'Photo de profil')}
             value={settings.avatarVisibility}
             onChange={(v) => setSettings({ ...settings, avatarVisibility: v })}
             icon={Eye}
@@ -257,7 +259,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Nom complet"
+            label={t('settings.fullName', 'Nom complet')}
             value={settings.fullNameVisibility}
             onChange={(v) => setSettings({ ...settings, fullNameVisibility: v })}
             icon={UserX}
@@ -265,7 +267,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Biographie"
+            label={t('settings.bio', 'Biographie')}
             value={settings.bioVisibility}
             onChange={(v) => setSettings({ ...settings, bioVisibility: v })}
             icon={Lock}
@@ -273,7 +275,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Métier"
+            label={t('settings.profession', 'Métier')}
             value={settings.professionVisibility}
             onChange={(v) => setSettings({ ...settings, professionVisibility: v })}
             icon={Briefcase}
@@ -281,7 +283,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Spécialité"
+            label={t('settings.specialty', 'Spécialité')}
             value={settings.specialtyVisibility}
             onChange={(v) => setSettings({ ...settings, specialtyVisibility: v })}
             icon={Shield}
@@ -289,7 +291,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Ville"
+            label={t('settings.city', 'Ville')}
             value={settings.cityVisibility}
             onChange={(v) => setSettings({ ...settings, cityVisibility: v })}
             icon={MapPin}
@@ -297,7 +299,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Pays"
+            label={t('settings.country', 'Pays')}
             value={settings.countryVisibility}
             onChange={(v) => setSettings({ ...settings, countryVisibility: v })}
             icon={Globe}
@@ -308,11 +310,11 @@ const PrivacySettings = () => {
         {/* Contact Information */}
         <div className="mb-6">
           <h2 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Informations de contact
+            {t('settings.contactInfo', 'Informations de contact')}
           </h2>
           
           <PrivacyOption
-            label="Email"
+            label={t('settings.email', 'Email')}
             value={settings.emailVisibility}
             onChange={(v) => setSettings({ ...settings, emailVisibility: v })}
             icon={Mail}
@@ -320,7 +322,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Téléphone"
+            label={t('settings.phone', 'Téléphone')}
             value={settings.phoneVisibility}
             onChange={(v) => setSettings({ ...settings, phoneVisibility: v })}
             icon={Smartphone}
@@ -328,7 +330,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Sites web"
+            label={t('settings.websites', 'Sites web')}
             value={settings.websitesVisibility}
             onChange={(v) => setSettings({ ...settings, websitesVisibility: v })}
             icon={Globe}
@@ -339,11 +341,11 @@ const PrivacySettings = () => {
         {/* Professional Information */}
         <div className="mb-6">
           <h2 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Informations professionnelles
+            {t('settings.proInfo', 'Informations professionnelles')}
           </h2>
           
           <PrivacyOption
-            label="Compétences"
+            label={t('settings.skills', 'Compétences')}
             value={settings.skillsVisibility}
             onChange={(v) => setSettings({ ...settings, skillsVisibility: v })}
             icon={Shield}
@@ -351,7 +353,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Certifications"
+            label={t('settings.certifications', 'Certifications')}
             value={settings.certificationsVisibility}
             onChange={(v) => setSettings({ ...settings, certificationsVisibility: v })}
             icon={Shield}
@@ -359,7 +361,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Langues"
+            label={t('settings.languages', 'Langues')}
             value={settings.languagesVisibility}
             onChange={(v) => setSettings({ ...settings, languagesVisibility: v })}
             icon={Globe}
@@ -367,7 +369,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Disponibilité"
+            label={t('settings.availability', 'Disponibilité')}
             value={settings.availabilityVisibility}
             onChange={(v) => setSettings({ ...settings, availabilityVisibility: v })}
             icon={Clock}
@@ -378,11 +380,11 @@ const PrivacySettings = () => {
         {/* Content */}
         <div className="mb-6">
           <h2 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Contenu
+            {t('settings.content', 'Contenu')}
           </h2>
           
           <PrivacyOption
-            label="Vidéos"
+            label={t('settings.videos', 'Vidéos')}
             value={settings.videosVisibility}
             onChange={(v) => setSettings({ ...settings, videosVisibility: v })}
             icon={Play}
@@ -390,7 +392,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Événements"
+            label={t('settings.events', 'Événements')}
             value={settings.eventsVisibility}
             onChange={(v) => setSettings({ ...settings, eventsVisibility: v })}
             icon={Calendar}
@@ -398,7 +400,7 @@ const PrivacySettings = () => {
           />
           
           <PrivacyOption
-            label="Activité récente"
+            label={t('settings.recentActivity', 'Activité récente')}
             value={settings.activityVisibility}
             onChange={(v) => setSettings({ ...settings, activityVisibility: v })}
             icon={TrendingUp}
@@ -426,7 +428,7 @@ const PrivacySettings = () => {
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
           >
-            {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            {saving ? t('common.saving', 'Enregistrement...') : t('common.saveChanges', 'Enregistrer les modifications')}
           </button>
         </div>
       </div>

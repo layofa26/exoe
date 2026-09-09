@@ -61,21 +61,16 @@ interface JWTPayload {
   exp: number
 }
 
+import { resolveMediaUrl } from '../utils/mediaUtils'
+
 function resolveAvatarUrl(photo: string | null | undefined): string | undefined {
   if (!photo || typeof photo !== 'string') return undefined
   const clean = photo.trim()
   if (!clean || clean === 'null' || clean === 'undefined') return undefined
-  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('blob:')) {
-    return clean
-  }
-  if (clean.startsWith('/media/') || clean.startsWith('media/')) {
-    const cleanMedia = clean.startsWith('/') ? clean : `/${clean}`
-    const serverHost = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com' : 'http://localhost:8000')
-    return `${serverHost.replace('/api/v1', '').replace('/api', '')}${cleanMedia}`
-  }
-  // Ne pas construire d'URL /public/ sur des buckets privés sans URL signée
-  return undefined
+  const resolved = resolveMediaUrl(clean)
+  return resolved || undefined
 }
+
 
 export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
   const navigate = useNavigate()
@@ -159,79 +154,93 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     setLoading(false)
   }, [])
 
+  const completeLoginSession = (access: string, refresh: string, usernameFallback: string): LoginResult => {
+    localStorage.setItem('accessToken', access)
+    localStorage.setItem('refreshToken', refresh)
+    
+    try {
+      const decoded = jwtDecode<any>(access)
+      const userId = decoded.user_id || decoded.id || decoded.sub || 0
+      const userData: User = {
+        id: userId,
+        email: decoded.email || '',
+        username: decoded.username || usernameFallback,
+        fullName: decoded.full_name || '',
+        avatarUrl: undefined,
+        roles: [],
+        type: (decoded.type || 'PROFESSIONAL').toLowerCase() as 'professional' | 'institution',
+        legacyPro: false,
+        institutionPlan: undefined
+      }
+      setUser(userData)
+      setIsAuthenticated(true)
+
+      clearOldData()
+      fetchProfileAvatar(access, userId)
+
+      const userProfileData = {
+        id: userData.id,
+        name: userData.fullName || '',
+        username: userData.username,
+        email: userData.email,
+        profession: '',
+        speciality: '',
+        photo: null
+      }
+      localStorage.setItem('exile_user_profile', JSON.stringify(userProfileData))
+      navigate('/pro')
+      return { success: true }
+    } catch (error) {
+      console.error('Erreur lors du décodage du token:', error)
+      const userData: User = {
+        id: '0',
+        email: '',
+        username: usernameFallback,
+        fullName: '',
+        avatarUrl: undefined,
+        roles: [],
+        type: 'professional',
+        legacyPro: false,
+        institutionPlan: undefined
+      }
+      setUser(userData)
+      setIsAuthenticated(true)
+      clearOldData()
+      navigate('/pro')
+      return { success: true }
+    }
+  }
+
   const login = async (username: string, password: string): Promise<LoginResult> => {
     const result = await authApi.login(username, password)
     
-    if (result.success && result.data) {
-      // Store tokens
-      localStorage.setItem('accessToken', result.data.access)
-      localStorage.setItem('refreshToken', result.data.refresh)
-      
-      // Decode token to get user info
-      try {
-        const decoded = jwtDecode<any>(result.data.access)
-        const userId = decoded.user_id || decoded.id || decoded.sub || 0
-        const userData: User = {
-          id: userId,
-          email: decoded.email || '',
-          username: decoded.username || username,
-          fullName: decoded.full_name || '',
-          avatarUrl: undefined,
-          roles: [],
-          type: (decoded.type || 'PROFESSIONAL').toLowerCase() as 'professional' | 'institution',
-          legacyPro: false,
-          institutionPlan: undefined
-        }
-        setUser(userData)
-        setIsAuthenticated(true)
-
-        // Clear old data on successful login (BEFORE storing new profile)
-        clearOldData()
-        fetchProfileAvatar(result.data.access, userId)
-
-        // Store user profile in localStorage
-        const userProfileData = {
-          id: userData.id,
-          name: userData.fullName || '',
-          username: userData.username,
-          email: userData.email,
-          profession: '',
-          speciality: '',
-          photo: null
-        }
-        localStorage.setItem('exile_user_profile', JSON.stringify(userProfileData))
-        console.log('User profile stored in localStorage:', userProfileData)
-        
-        // Redirect to home page after login
-        navigate('/pro')
-        
-        return { success: true }
-      } catch (error) {
-        console.error('Erreur lors du décodage du token:', error)
-        // Even if token decoding fails, still consider login successful
-        const userData: User = {
-          id: '0',
-          email: '',
-          username: username,
-          fullName: '',
-          avatarUrl: undefined,
-          roles: [],
-          type: 'professional',
-          legacyPro: false,
-          institutionPlan: undefined
-        }
-        setUser(userData)
-        setIsAuthenticated(true)
-        clearOldData()
-        
-        // Redirect to home page after login
-        navigate('/pro')
-        
-        return { success: true }
+    if ((result as any).requires2FA) {
+      return {
+        success: false,
+        requires2FA: true,
+        sessionTemp: (result as any).sessionTemp,
+        twoFactorMethod: (result as any).twoFactorMethod,
+        emailMasked: (result as any).emailMasked
       }
+    }
+
+    if (result.success && result.data) {
+      return completeLoginSession(result.data.access, result.data.refresh, username)
     }
     
     return { success: false, error: result.error }
+  }
+
+  const verify2FA = async (sessionTemp: string, code: string): Promise<LoginResult> => {
+    const result = await authApi.verify2FALogin(sessionTemp, code)
+    if (result.success && result.data) {
+      return completeLoginSession(result.data.access, result.data.refresh, 'utilisateur')
+    }
+    return { success: false, error: result.error || 'Code invalide.' }
+  }
+
+  const resend2FAOtp = async (sessionTemp: string): Promise<{ success: boolean; error?: string; message?: string }> => {
+    return authApi.resend2FAOtp(sessionTemp)
   }
 
   const registerPro = async (userData: ProRegistrationData): Promise<RegisterResult> => {
@@ -360,6 +369,9 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
 
   const logout = (): void => {
     try {
+      // Invalider le token JWT côté serveur via la Blacklist
+      authApi.logout().catch(e => console.warn('Server logout notice:', e))
+
       // Clear all authentication tokens from localStorage
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
@@ -431,6 +443,8 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     isAuthenticated,
     loading,
     login,
+    verify2FA,
+    resend2FAOtp,
     registerPro,
     registerInstitution,
     logout,

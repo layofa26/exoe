@@ -8,6 +8,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../services/apiClient'
 import { useQuery } from '../../hooks/useQuery'
 
@@ -30,6 +31,7 @@ interface BlockedUser {
 }
 
 export const BlockedUsers = (): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [toast, setToast] = useState('')
@@ -95,16 +97,16 @@ export const BlockedUsers = (): JSX.Element => {
       })
 
       if (response.ok) {
-        setToast('Utilisateur débloqué avec succès')
+        setToast(t('pro.modals.unblockSuccess', 'Utilisateur débloqué avec succès'))
         setTimeout(() => setToast(''), 3000)
         // Reload the blocked users list
         loadBlockedUsers()
       } else {
-        throw new Error('Erreur lors du déblocage')
+        throw new Error(t('common.errorOccurred', 'Erreur lors du déblocage'))
       }
     } catch (err) {
       console.error('Error unblocking user:', err)
-      setToast('Erreur lors du déblocage')
+      setToast(t('common.errorOccurred', 'Erreur lors du déblocage'))
       setTimeout(() => setToast(''), 3000)
     }
   }
@@ -132,8 +134,8 @@ export const BlockedUsers = (): JSX.Element => {
               <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h1 className={`text-base sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Utilisateurs Bloqués</h1>
-              <p className={`text-[10px] sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Gérez vos utilisateurs bloqués</p>
+              <h1 className={`text-base sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{t('pro.modals.blockedUsers', 'Utilisateurs Bloqués')}</h1>
+              <p className={`text-[10px] sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.modals.manageBlockedUsers', 'Gérez vos utilisateurs bloqués')}</p>
             </div>
           </div>
         </div>
@@ -152,7 +154,7 @@ export const BlockedUsers = (): JSX.Element => {
         ) : blockedUsers.length === 0 ? (
           <div className="text-center py-8 sm:py-12">
             <UserX className={`w-10 h-10 sm:w-12 sm:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'} mx-auto mb-3 sm:mb-4`} />
-            <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Aucun utilisateur bloqué</p>
+            <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.modals.noBlockedUsers', 'Aucun utilisateur bloqué')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -185,7 +187,7 @@ export const BlockedUsers = (): JSX.Element => {
                   
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
-                      Bloqué le {new Date(blockedUser.createdAt).toLocaleDateString('fr-FR')}
+                      {t('pro.modals.blockedOn', 'Bloqué le')} {new Date(blockedUser.createdAt).toLocaleDateString(i18n.language || 'fr-FR')}
                     </span>
                   </div>
 
@@ -193,7 +195,7 @@ export const BlockedUsers = (): JSX.Element => {
                     onClick={() => handleUnblock(blockedUser.blockedId)}
                     className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-emerald-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-emerald-700 transition-colors mt-1 sm:mt-2"
                   >
-                    Débloquer
+                    {t('pro.modals.unblock', 'Débloquer')}
                   </button>
                 </div>
               </div>

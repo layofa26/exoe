@@ -24,6 +24,7 @@ import { videoApi } from '../../services/videoApi'
 import { cacheService } from '../../services/cacheService'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { VideoEditor } from './VideoEditor'
 
 interface VideoFilters {
@@ -58,6 +59,7 @@ const CATEGORIES = [
 ]
 
 export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSuccess }: UploadVideoProps): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { showSuccess, showError } = useNotifications()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
@@ -376,16 +378,16 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
               </div>
               <div>
                 <h2 className={`text-base sm:text-lg font-bold ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
-                  Publier une Vidéo d'Expertise
+                  {t('pro.upload.title', "Publier une Vidéo d'Expertise")}
                 </h2>
                 <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                  {currentStep === 'select' && 'Étape 1 sur 4 : Sélection'}
-                  {currentStep === 'details' && 'Étape 2 sur 4 : Informations'}
-                  {currentStep === 'options' && 'Étape 3 sur 4 : Options'}
-                  {currentStep === 'review' && 'Étape 4 sur 4 : Vérification & Publication'}
-                  {(currentStep === 'uploading' || currentStep === 'processing') && 'Traitement en cours...'}
-                  {currentStep === 'success' && 'Vidéo publiée avec succès !'}
-                  {currentStep === 'error' && 'Échec de publication'}
+                  {currentStep === 'select' && t('pro.upload.step1', 'Étape 1 sur 4 : Sélection')}
+                  {currentStep === 'details' && t('pro.upload.step2', 'Étape 2 sur 4 : Informations')}
+                  {currentStep === 'options' && t('pro.upload.step3', 'Étape 3 sur 4 : Options')}
+                  {currentStep === 'review' && t('pro.upload.step4', 'Étape 4 sur 4 : Vérification & Publication')}
+                  {(currentStep === 'uploading' || currentStep === 'processing') && t('pro.upload.processing', 'Traitement en cours...')}
+                  {currentStep === 'success' && t('pro.upload.successMsg', 'Vidéo publiée avec succès !')}
+                  {currentStep === 'error' && t('pro.upload.uploadFailed', 'Échec de publication')}
                 </p>
               </div>
             </div>
@@ -441,19 +443,19 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     <Upload className="w-8 h-8" />
                   </div>
                   <h3 className="text-base font-bold mb-1">
-                    Sélectionnez une vidéo depuis votre appareil
+                    {t('pro.upload.selectVideo', 'Sélectionnez une vidéo depuis votre appareil')}
                   </h3>
                   <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'} mb-4 max-w-sm mx-auto`}>
-                    Partagez votre expertise, tutoriel, étude de cas ou masterclass
+                    {t('pro.upload.selectVideoDesc', 'Partagez votre expertise, tutoriel, étude de cas ou masterclass')}
                   </p>
                   <button
                     type="button"
                     className="px-5 py-2.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
                   >
-                    Choisir un fichier
+                    {t('pro.upload.chooseFile', 'Choisir un fichier')}
                   </button>
                   <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-slate-400'} mt-4`}>
-                    Formats acceptés : MP4, MOV, AVI, WebM (Max 2 Go)
+                    {t('pro.upload.acceptedFormats', 'Formats acceptés : MP4, MOV, AVI, WebM (Max 2 Go)')}
                   </p>
                 </div>
               </div>
@@ -473,7 +475,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
 
                 <div>
                   <label className={`block text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'} mb-1.5`}>
-                    Titre de la vidéo *
+                    {t('pro.upload.videoTitle', 'Titre de la vidéo')} *
                   </label>
                   <input
                     type="text"
@@ -490,7 +492,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className={`text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                      Description & Hashtags
+                      {t('pro.upload.description', 'Description & Hashtags')}
                     </label>
                     <span className={`text-[11px] font-semibold ${hasTooManyHashtags ? 'text-red-500 font-bold' : isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                       {hashtags.length}/3 hashtags
@@ -509,14 +511,14 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                   />
                   {hasTooManyHashtags && (
                     <p className="text-[10px] text-red-500 font-semibold mt-1">
-                      ⚠️ 3 hashtags maximum autorisés pour garantir la lisibilité du feed.
+                      ⚠️ {t('pro.upload.tooManyHashtags', '3 hashtags maximum autorisés pour garantir la lisibilité du feed.')}
                     </p>
                   )}
                 </div>
 
                 <div>
                   <label className={`block text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'} mb-1.5`}>
-                    Catégorie d'expertise
+                    {t('pro.upload.category', "Catégorie d'expertise")}
                   </label>
                   <select
                     value={category}
@@ -533,7 +535,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
 
                 <div>
                   <label className={`block text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'} mb-1.5`}>
-                    Tags / Mots-clés (séparés par des virgules)
+                    {t('pro.upload.tagsLabel', 'Tags / Mots-clés (séparés par des virgules)')}
                   </label>
                   <div className="relative">
                     <Tag className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`} />
@@ -551,7 +553,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
 
                 <div>
                   <label className={`block text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'} mb-1.5`}>
-                    Miniature de la vidéo
+                    {t('pro.upload.thumbnail', 'Miniature de la vidéo')}
                   </label>
                   <input
                     type="file"
@@ -577,14 +579,14 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                         isDark ? 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-zinc-200' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                       }`}
                     >
-                      Changer l'image
+                      {t('pro.upload.changeImage', "Changer l'image")}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label className={`block text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'} mb-1.5`}>
-                    Visibilité
+                    {t('pro.upload.visibility', 'Visibilité')}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -598,8 +600,8 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     >
                       <Globe className="w-4 h-4" />
                       <div>
-                        <p className="text-xs font-bold">Public</p>
-                        <p className="text-[10px] opacity-70">Visible par toute la communauté</p>
+                        <p className="text-xs font-bold">{t('pro.upload.public', 'Public')}</p>
+                        <p className="text-[10px] opacity-70">{t('pro.upload.publicDesc', 'Visible par toute la communauté')}</p>
                       </div>
                     </button>
 
@@ -614,8 +616,8 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     >
                       <Lock className="w-4 h-4" />
                       <div>
-                        <p className="text-xs font-bold">Privé</p>
-                        <p className="text-[10px] opacity-70">Visible uniquement par vous</p>
+                        <p className="text-xs font-bold">{t('pro.upload.private', 'Privé')}</p>
+                        <p className="text-[10px] opacity-70">{t('pro.upload.privateDesc', 'Visible uniquement par vous')}</p>
                       </div>
                     </button>
                   </div>
@@ -628,13 +630,13 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[#FF6B00] flex items-center gap-2">
                     <MessageSquare className="w-4 h-4" />
-                    Interactions & Commentaires
+                    {t('pro.upload.interactionsTitle', 'Interactions & Commentaires')}
                   </h3>
 
                   <label className="flex items-center justify-between cursor-pointer pt-1">
                     <div>
-                      <p className="text-xs font-bold">Autoriser les commentaires</p>
-                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Les membres peuvent débattre et poser des questions</p>
+                      <p className="text-xs font-bold">{t('pro.upload.allowComments', 'Autoriser les commentaires')}</p>
+                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.upload.allowCommentsDesc', 'Les membres peuvent débattre et poser des questions')}</p>
                     </div>
                     <input
                       type="checkbox"
@@ -647,8 +649,8 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                   {allowComments && (
                     <label className="flex items-center justify-between cursor-pointer pt-2 border-t border-zinc-800/60">
                       <div>
-                        <p className="text-xs font-bold">Autoriser les commentaires anonymes</p>
-                        <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Permettre les retours sans afficher l'identité</p>
+                        <p className="text-xs font-bold">{t('pro.upload.allowAnonymous', 'Autoriser les commentaires anonymes')}</p>
+                        <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.upload.allowAnonymousDesc', "Permettre les retours sans afficher l'identité")}</p>
                       </div>
                       <input
                         type="checkbox"
@@ -663,13 +665,13 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[#FF6B00] flex items-center gap-2">
                     <Share2 className="w-4 h-4" />
-                    Partage & Diffusion
+                    {t('pro.upload.sharingTitle', 'Partage & Diffusion')}
                   </h3>
 
                   <label className="flex items-center justify-between cursor-pointer">
                     <div>
-                      <p className="text-xs font-bold">Autoriser le partage de la vidéo</p>
-                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Permettre aux utilisateurs de relayer le lien de votre vidéo</p>
+                      <p className="text-xs font-bold">{t('pro.upload.allowSharing', 'Autoriser le partage de la vidéo')}</p>
+                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.upload.allowSharingDesc', 'Permettre aux utilisateurs de relayer le lien de votre vidéo')}</p>
                     </div>
                     <input
                       type="checkbox"
@@ -683,13 +685,13 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[#FF6B00] flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    Planification de la publication
+                    {t('pro.upload.schedulingTitle', 'Planification de la publication')}
                   </h3>
 
                   <label className="flex items-center justify-between cursor-pointer">
                     <div>
-                      <p className="text-xs font-bold">Programmer la publication</p>
-                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Définir une date et heure de sortie automatique</p>
+                      <p className="text-xs font-bold">{t('pro.upload.schedulePost', 'Programmer la publication')}</p>
+                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.upload.schedulePostDesc', 'Définir une date et heure de sortie automatique')}</p>
                     </div>
                     <input
                       type="checkbox"
@@ -719,7 +721,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
               <div className="space-y-4">
                 <div className={`rounded-3xl border overflow-hidden p-4 space-y-3 ${isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[#FF6B00]">
-                    Récapitulatif avant publication
+                    {t('pro.upload.reviewTitle', 'Récapitulatif avant publication')}
                   </h3>
 
                   <div className="flex gap-3">
@@ -733,7 +735,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                       <h4 className="font-bold text-xs sm:text-sm line-clamp-2">{title}</h4>
                       <p className={`text-[11px] font-semibold text-[#FF6B00]`}>{category}</p>
                       <p className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        {visibility === 'public' ? '🌍 Public' : '🔒 Privé'} • {allowComments ? 'Commentaires activés' : 'Commentaires désactivés'}
+                        {visibility === 'public' ? `🌍 ${t('pro.upload.public', 'Public')}` : `🔒 ${t('pro.upload.private', 'Privé')}`} • {allowComments ? t('pro.upload.commentsOn', 'Commentaires activés') : t('pro.upload.commentsOff', 'Commentaires désactivés')}
                       </p>
                     </div>
                   </div>
@@ -746,7 +748,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 </div>
 
                 <div className={`p-4 rounded-2xl border text-center ${isDark ? 'bg-zinc-900/40 border-zinc-800 text-zinc-400' : 'bg-slate-100 border-slate-200 text-slate-600'} text-xs`}>
-                  En cliquant sur <strong>Publier</strong>, votre vidéo sera téléversée, encodée et intégrée dans le fil d'actualité professionnel.
+                  {t('pro.upload.disclaimer', "En cliquant sur Publier, votre vidéo sera téléversée, encodée et intégrée dans le fil d'actualité professionnel.")}
                 </div>
               </div>
             )}
@@ -762,10 +764,10 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
 
                 <div>
                   <h3 className="text-base font-bold mb-1">
-                    {currentStep === 'uploading' ? 'Téléversement en cours...' : 'Vidéo en cours de traitement...'}
+                    {currentStep === 'uploading' ? t('pro.upload.uploadingInProgress', 'Téléversement en cours...') : t('pro.upload.videoProcessing', 'Vidéo en cours de traitement...')}
                   </h3>
                   <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                    {currentStep === 'uploading' ? `${uploadProgress}% transféré` : 'Optimisation du format et encodage haute définition'}
+                    {currentStep === 'uploading' ? `${uploadProgress}% ${t('pro.upload.transferred', 'transféré')}` : t('pro.upload.optimizingHd', 'Optimisation du format et encodage haute définition')}
                   </p>
                 </div>
 
@@ -777,7 +779,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 </div>
 
                 <p className={`text-[11px] ${isDark ? 'text-zinc-500' : 'text-slate-400'} pt-2`}>
-                  État : Brouillon → Téléversement → <strong>{currentStep === 'processing' ? 'Traitement' : 'Upload'}</strong> → Publiée
+                  {t('pro.upload.statusPipeline', 'État : Brouillon → Téléversement → Traitement → Publiée')}
                 </p>
               </div>
             )}
@@ -787,9 +789,9 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
-                <h3 className="text-lg font-bold">Votre vidéo d'expertise est en ligne !</h3>
+                <h3 className="text-lg font-bold">{t('pro.upload.videoLiveSuccess', "Votre vidéo d'expertise est en ligne !")}</h3>
                 <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'} max-w-sm mx-auto`}>
-                  Elle est désormais visible sur votre profil et dans le fil d'actualité professionnel.
+                  {t('pro.upload.visibleOnProfile', "Elle est désormais visible sur votre profil et dans le fil d'actualité professionnel.")}
                 </p>
 
                 <div className="pt-4 flex justify-center gap-3">
@@ -797,7 +799,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     onClick={onClose}
                     className="px-6 py-2.5 bg-[#FF6B00] text-white rounded-xl text-xs font-bold shadow-md hover:bg-[#e05e00]"
                   >
-                    Voir mon fil
+                    {t('pro.upload.viewFeed', 'Voir mon fil')}
                   </button>
                 </div>
               </div>
@@ -808,9 +810,9 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto">
                   <AlertCircle className="w-8 h-8" />
                 </div>
-                <h3 className="text-lg font-bold">Échec du téléversement</h3>
+                <h3 className="text-lg font-bold">{t('pro.upload.uploadFailed', 'Échec du téléversement')}</h3>
                 <p className={`text-xs text-red-400 max-w-sm mx-auto`}>
-                  {error || 'Une interruption réseau est survenue. Veuillez réessayer.'}
+                  {error || t('pro.upload.networkInterruption', 'Une interruption réseau est survenue. Veuillez réessayer.')}
                 </p>
 
                 <div className="pt-4 flex justify-center gap-3">
@@ -819,13 +821,13 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     className="px-6 py-2.5 bg-[#FF6B00] text-white rounded-xl text-xs font-bold shadow-md hover:bg-[#e05e00] flex items-center gap-2"
                   >
                     <RefreshCw className="w-4 h-4" />
-                    <span>Réessayer</span>
+                    <span>{t('common.retry', 'Réessayer')}</span>
                   </button>
                   <button
                     onClick={handleReset}
                     className="px-4 py-2.5 bg-zinc-800 text-zinc-300 rounded-xl text-xs font-semibold hover:bg-zinc-700"
                   >
-                    Recommencer
+                    {t('common.reset', 'Recommencer')}
                   </button>
                 </div>
               </div>
@@ -842,7 +844,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                   isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                 }`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
 
               <div className="flex items-center gap-2">
@@ -853,7 +855,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     onClick={() => setCurrentStep('options')}
                     className="px-5 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    <span>Suivant : Options</span>
+                    <span>{t('pro.upload.nextOptions', 'Suivant : Options')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 )}
@@ -864,7 +866,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     onClick={() => setCurrentStep('review')}
                     className="px-5 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
                   >
-                    <span>Suivant : Résumé</span>
+                    <span>{t('pro.upload.nextReview', 'Suivant : Résumé')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 )}
@@ -876,7 +878,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     className="px-6 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-2"
                   >
                     <Sparkles className="w-4 h-4" />
-                    <span>Publier la vidéo</span>
+                    <span>{t('pro.upload.publishBtn', 'Publier la vidéo')}</span>
                   </button>
                 )}
               </div>

@@ -1,3 +1,5 @@
+import i18n from '../i18n'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 export interface AppNotification {
@@ -86,22 +88,24 @@ export function formatRelativeTime(dateStr: string): string {
 
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+  const currentLang = i18n.language || 'fr-FR'
 
   if (diffInSeconds < 45) {
-    return "À l'instant"
+    return i18n.t('notifications.time.justNow', "À l'instant")
   }
   if (diffInSeconds < 3600) {
     const mins = Math.max(1, Math.floor(diffInSeconds / 60))
-    return `Il y a ${mins} min`
+    return i18n.t('notifications.time.minutesAgo', "Il y a {{count}} min", { count: mins })
   }
   if (diffInSeconds < 86400) {
     const hours = Math.floor(diffInSeconds / 3600)
-    return `Il y a ${hours} h`
+    return i18n.t('notifications.time.hoursAgo', "Il y a {{count}} h", { count: hours })
   }
   if (diffInSeconds < 172800) {
-    return `Hier à ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    const timeStr = date.toLocaleTimeString(currentLang, { hour: '2-digit', minute: '2-digit' })
+    return i18n.t('notifications.time.yesterday', "Hier à {{time}}", { time: timeStr })
   }
-  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ` à ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  return date.toLocaleDateString(currentLang, { day: 'numeric', month: 'short' }) + ' ' + (currentLang.startsWith('ar') ? 'في' : currentLang.startsWith('en') ? 'at' : 'à') + ' ' + date.toLocaleTimeString(currentLang, { hour: '2-digit', minute: '2-digit' })
 }
 
 /**

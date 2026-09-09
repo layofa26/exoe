@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { Video } from '../../types/video'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { resolveMediaUrl, cleanUsername } from '../../services/videoApi'
 import { useVideoInteractions } from '../../hooks/useVideoInteractions'
@@ -97,6 +98,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({
   anchorRef, onClose, isDark,
   isSaved, copied, isPending, onSave, onShare, onOpenReport
 }) => {
+  const { t } = useTranslation()
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -155,7 +157,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({
         }`}
       >
         <Bookmark size={14} className={isSaved ? 'fill-[#FF6B00] text-[#FF6B00]' : ''} />
-        <span>{isSaved ? 'Retirer des favoris' : 'Enregistrer'}</span>
+        <span>{isSaved ? t('pro.subscribers.removeFromFavorites', 'Retirer des favoris') : t('common.save', 'Enregistrer')}</span>
       </button>
 
       {/* Partager */}
@@ -170,7 +172,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({
         }`}
       >
         {copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
-        <span>{copied ? 'Lien copié !' : 'Partager la vidéo'}</span>
+        <span>{copied ? t('common.copied', 'Lien copié !') : t('pro.feed.shareVideo', 'Partager la vidéo')}</span>
       </button>
 
       {/* Signaler */}
@@ -183,7 +185,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({
         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-left transition-colors text-red-400 hover:bg-red-500/10 cursor-pointer"
       >
         <Flag size={14} />
-        <span>Signaler</span>
+        <span>{t('pro.feed.report', 'Signaler')}</span>
       </button>
     </div>,
     document.body
@@ -201,16 +203,16 @@ interface ReportModalProps {
   onSubmit: (reason: string) => void
 }
 
-const REPORT_REASONS: string[] = [
-  'Contenu inapproprié ou offensant',
-  'Spam ou publicité trompeuse',
-  'Atteinte aux droits d\'auteur',
-  'Fausses informations',
-  'Harcèlement ou propos haineux',
-  'Autre motif'
-]
-
 const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, videoTitle, isDark, onSubmit }) => {
+  const { t } = useTranslation()
+  const REPORT_REASONS = [
+    t('pro.requests.reasonInappropriate', 'Contenu inapproprié ou offensant'),
+    t('pro.feed.reasonSpam', 'Spam ou publicité trompeuse'),
+    t('pro.feed.reasonCopyright', "Atteinte aux droits d'auteur"),
+    t('pro.requests.reasonFake', 'Fausses informations'),
+    t('pro.requests.reasonHarassment', 'Harcèlement ou propos haineux'),
+    t('pro.requests.reasonOther', 'Autre motif')
+  ]
   const [selectedReason, setSelectedReason] = useState<string>(REPORT_REASONS[0])
 
   if (!isOpen) return null
@@ -229,7 +231,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, videoTitle, 
         <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60">
           <div className="flex items-center gap-2">
             <ShieldAlert size={18} className="text-red-500" />
-            <h3 className="font-bold text-sm">Signaler cette vidéo</h3>
+            <h3 className="font-bold text-sm">{t('pro.feed.reportVideo', 'Signaler cette vidéo')}</h3>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400">
             <X size={16} />
@@ -237,7 +239,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, videoTitle, 
         </div>
 
         <p className="text-xs text-zinc-400 my-3 line-clamp-1">
-          Vidéo : <span className="font-semibold text-zinc-200">{videoTitle}</span>
+          {t('pro.feed.videoLabel', 'Vidéo :')} <span className="font-semibold text-zinc-200">{videoTitle}</span>
         </p>
 
         <div className="space-y-1.5 my-3">
@@ -270,14 +272,14 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, videoTitle, 
             onClick={onClose}
             className="flex-1 py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
           >
-            Annuler
+            {t('common.cancel', 'Annuler')}
           </button>
           <button
             type="button"
             onClick={() => onSubmit(selectedReason)}
             className="flex-1 py-2 rounded-xl text-xs font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white transition-colors shadow-lg shadow-[#FF6B00]/20"
           >
-            Envoyer
+            {t('common.send', 'Envoyer')}
           </button>
         </div>
       </div>
@@ -292,6 +294,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, videoTitle, 
 export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
   video, onClick, onContact, onProfileClick
 }): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const { showSuccess } = useNotifications()
   const isDark = resolvedTheme === 'dark'
@@ -416,7 +419,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
     }
   }
 
-  // IntersectionObserver pour pause fluide lorsqu'on quitte l'écran (Autoplay désactivé pour économie critique de bande passante)
+  // IntersectionObserver pour autoplay selon les paramètres choisis par l'utilisateur
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -426,19 +429,27 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         const v = videoRef.current
         if (!v) return
 
-        // Ne JAMAIS lancer de lecture automatique au défilement
-        if (entry.intersectionRatio < 0.25) {
+        let previewEnabled = false
+        try {
+          previewEnabled = localStorage.getItem('exile_video_preview_enabled') === 'true'
+        } catch {}
+
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6 && previewEnabled && videoUrl) {
+          v.muted = true
+          setIsMuted(true)
+          v.play().catch(() => {})
+        } else if (entry.intersectionRatio < 0.25) {
           if (!v.paused) {
             playbackPositionStore.set(video.id, v.currentTime)
             v.pause()
           }
         }
       })
-    }, { threshold: [0, 0.25, 0.5, 0.75, 1.0] })
+    }, { threshold: [0, 0.25, 0.6, 0.75, 1.0] })
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [video.id])
+  }, [video.id, videoUrl])
 
   // Clic sur la zone vidéo -> Navigation vers VideoPlayerPage ou lecture locale sur interaction explicite
   const handleVideoClick = useCallback((e: React.MouseEvent) => {
@@ -655,7 +666,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
           {isMuted ? (
             <>
               <VolumeX size={13} className="text-[#FF6B00]" />
-              <span className="text-[10px] font-bold">Activer le son</span>
+              <span className="text-[10px] font-bold">{t('pro.feed.enableSound', 'Activer le son')}</span>
             </>
           ) : (
             <Volume2 size={13} className="text-emerald-400" />
@@ -726,7 +737,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
 
           {/* Ligne 3 : Vues • Temps */}
           <div className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-500">
-            <span>{fmtViews(viewsCount)} vues</span>
+            <span>{fmtViews(viewsCount)} {t('pro.video.views', 'vues')}</span>
             <span>•</span>
             <span>Il y a {formatAgo(video.createdAt || video.postedAt)}</span>
           </div>
@@ -740,16 +751,16 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
             onClick={(e) => {
               e.stopPropagation()
               if (isOwnVideo) {
-                showSuccess('C\'est votre propre publication')
+                showSuccess(t('pro.feed.ownVideoNotice', "C'est votre propre publication"))
               } else if (onContact) {
                 onContact(video)
               }
             }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FF6B00]/12 hover:bg-[#FF6B00]/20 border border-[#FF6B00]/25 text-[#FF6B00] text-[11px] font-bold transition-all active:scale-95 cursor-pointer"
-            title={isOwnVideo ? 'Votre publication' : 'Contacter ce créateur'}
+            title={isOwnVideo ? t('pro.feed.ownVideoNotice', 'Votre publication') : t('pro.feed.contactCreator', 'Contacter ce créateur')}
           >
             <MessageSquare size={11} />
-            <span>Contacter</span>
+            <span>{t('pro.feed.contact', 'Contacter')}</span>
           </button>
 
           {/* Menu ⋮ */}
@@ -766,7 +777,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
                   ? isDark ? 'bg-zinc-800 text-white' : 'bg-slate-200 text-black'
                   : isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'hover:bg-slate-100 text-slate-600'
               }`}
-              title="Options"
+              title={t('common.options', 'Options')}
             >
               <MoreVertical size={16} />
             </button>

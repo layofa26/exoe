@@ -1,9 +1,7 @@
 import { LoginResponseSchema, RegisterResponseSchema, ApiErrorSchema } from '../schemas/authSchemas'
+import { API_BASE_URL as CONFIG_API_BASE_URL } from '../config/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
-const FINAL_API_BASE_URL = API_BASE_URL.includes('onrender.com') && !API_BASE_URL.includes('/api/v1') 
-  ? API_BASE_URL.replace('/api', '/api/v1') 
-  : API_BASE_URL
+const FINAL_API_BASE_URL = CONFIG_API_BASE_URL.replace(/\/+$/, '')
 const API_TIMEOUT = 45000 // 45 seconds timeout (handles Render cold start seamlessly)
 
 // Helper functions for cookie management (for reading httpOnly cookies set by backend)
@@ -123,8 +121,19 @@ export const authApi = {
         return { success: false, error: errorMsg }
       }
 
-      const data: LoginResponse = await response.json()
-      const validatedData = LoginResponseSchema.parse(data)
+      const rawData: any = await response.json()
+
+      if (rawData.requires_2fa) {
+        return {
+          success: true,
+          requires2FA: true,
+          sessionTemp: rawData.session_temp,
+          twoFactorMethod: rawData.two_factor_method || 'totp',
+          emailMasked: rawData.email_masked
+        }
+      }
+
+      const validatedData = LoginResponseSchema.parse(rawData)
 
       setCookie('access_token', validatedData.access, 1)
       setCookie('refresh_token', validatedData.refresh, 7)
@@ -276,5 +285,189 @@ export const authApi = {
         error: 'Erreur de connexion au serveur'
       }
     }
+  },
+
+  async verify2FALogin(sessionTemp: string, code: string): Promise<{ success: boolean; error?: string; data?: LoginResponse }> {
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/2fa/verify-login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_temp: sessionTemp, code }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Code de vérification invalide ou expiré.' }
+      }
+
+      const validatedData = LoginResponseSchema.parse(data)
+      setCookie('access_token', validatedData.access, 1)
+      setCookie('refresh_token', validatedData.refresh, 7)
+      localStorage.setItem('accessToken', validatedData.access)
+
+      return { success: true, data: validatedData }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur.' }
+    }
+  },
+
+  async resend2FAOtp(sessionTemp: string): Promise<{ success: boolean; error?: string; message?: string }> {
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/2fa/resend-otp/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_temp: sessionTemp }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || "Erreur lors de l'envoi du code." }
+      }
+      return { success: true, message: data.message }
+    } catch (err) {
+      return { success: false, error: 'Erreur réseau.' }
+    }
+  },
+
+  async setup2FA(method: 'totp' | 'email'): Promise<{ success: boolean; error?: string; data?: any }> {
+    const token = localStorage.getItem('accessToken')
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/2fa/setup/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ method })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Erreur lors de la configuration de la 2FA.' }
+      }
+      return { success: true, data }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur.' }
+    }
+  },
+
+  async confirm2FASetup(code: string): Promise<{ success: boolean; error?: string; message?: string }> {
+    const token = localStorage.getItem('accessToken')
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/2fa/confirm-setup/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Code invalide ou expiré.' }
+      }
+      return { success: true, message: data.message }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur.' }
+    }
+  },
+
+  async disable2FA(params: { password?: string; code?: string }): Promise<{ success: boolean; error?: string; message?: string }> {
+    const token = localStorage.getItem('accessToken')
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/2fa/disable/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(params)
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Impossible de désactiver la 2FA.' }
+      }
+      return { success: true, message: data.message }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur.' }
+    }
+  },
+
+  async getSessions(): Promise<{ success: boolean; error?: string; sessions?: any[] }> {
+    const token = localStorage.getItem('accessToken')
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/sessions/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Impossible de charger les sessions.' }
+      }
+      return { success: true, sessions: data.sessions || [] }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur.' }
+    }
+  },
+
+  async revokeSession(sessionId: number): Promise<{ success: boolean; error?: string; message?: string }> {
+    const token = localStorage.getItem('accessToken')
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/sessions/revoke/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ session_id: sessionId })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || "Impossible de déconnecter l'appareil." }
+      }
+      return { success: true, message: data.message }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur.' }
+    }
+  },
+
+  async logout(): Promise<{ success: boolean; error?: string }> {
+    const token = localStorage.getItem('accessToken')
+    const refreshToken = localStorage.getItem('refreshToken')
+    try {
+      if (token && refreshToken) {
+        await fetch(`${FINAL_API_BASE_URL}/users/logout/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ refresh_token: refreshToken })
+        })
+      }
+      return { success: true }
+    } catch (err) {
+      return { success: true }
+    }
+  },
+
+  async confirmChangeEmail(verificationToken: string): Promise<{ success: boolean; error?: string; message?: string; email?: string }> {
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/change-email/confirm/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ token: verificationToken })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return { success: false, error: data.error || "Lien de confirmation invalide ou expiré." }
+      }
+      return { success: true, message: data.message, email: data.email }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur.' }
+    }
   }
 }
+
+

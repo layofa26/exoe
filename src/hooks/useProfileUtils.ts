@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { resolveMediaUrl } from '../utils/mediaUtils';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
 
@@ -107,14 +109,9 @@ export const mapBackendProfile = (data: any): UserProfile => {
     if (!urlOrFilename || typeof urlOrFilename !== 'string') return undefined
     const clean = urlOrFilename.trim()
     if (!clean || clean === 'null' || clean === 'undefined') return undefined
-    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('blob:')) {
-      return clean
-    }
-    if (clean.startsWith('/media/') || clean.startsWith('media/')) {
-      return `http://localhost:8000${clean.startsWith('/') ? clean : `/${clean}`}`
-    }
-    return `${SUPABASE_URL}/${clean.replace(/^\/+/, '')}`
+    return resolveMediaUrl(clean) || undefined
   }
+
 
   let photoUrl = getPublicImageUrl(data.photo_url || data.photo || data.avatar)
   let bannerUrl = getPublicImageUrl(data.banner_url || data.banner || data.cover)

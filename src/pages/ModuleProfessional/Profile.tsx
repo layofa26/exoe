@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   MapPin, Globe, Calendar,
   Briefcase, Plus, Edit2, Lock, X,
@@ -128,6 +129,7 @@ interface RecentActivity {
 }
 
 const Profile = () => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -138,19 +140,19 @@ const Profile = () => {
     const now = new Date()
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
     
-    if (seconds < 60) return 'À l\'instant'
+    if (seconds < 60) return t('pro.feed.justNow', 'À l\'instant')
     const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `Il y a ${minutes} min`
+    if (minutes < 60) return `${t('pro.feed.ago', 'Il y a')} ${minutes} min`
     const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `Il y a ${hours} h`
+    if (hours < 24) return `${t('pro.feed.ago', 'Il y a')} ${hours} h`
     const days = Math.floor(hours / 24)
-    if (days < 7) return `Il y a ${days} j`
+    if (days < 7) return `${t('pro.feed.ago', 'Il y a')} ${days} ${t('pro.profile.days', 'j')}`
     const weeks = Math.floor(days / 7)
-    if (weeks < 4) return `Il y a ${weeks} sem`
+    if (weeks < 4) return `${t('pro.feed.ago', 'Il y a')} ${weeks} sem`
     const months = Math.floor(days / 30)
-    if (months < 12) return `Il y a ${months} mois`
+    if (months < 12) return `${t('pro.feed.ago', 'Il y a')} ${months} m`
     const years = Math.floor(days / 365)
-    return `Il y a ${years} ans`
+    return `${t('pro.feed.ago', 'Il y a')} ${years} a`
   }
   
   // Initialisation instantanée depuis le cache mémoire / localStorage (0ms latence)
@@ -795,27 +797,27 @@ const Profile = () => {
 
   // Statistiques globales - utiliser les vraies données du backend
   const stats = statistics ? [
-    { label: 'Événements', value: statistics.events?.total?.toString() || '-', icon: Calendar, color: 'blue' },
-    { label: 'Abonnés', value: statistics.subscriptions?.followers?.toString() || '-', icon: Users, color: 'purple' },
-    { label: 'Vidéos', value: statistics.videos?.total?.toString() || '-', icon: Video, color: 'red' },
-    { label: 'Vues', value: statistics.videos?.totalViews?.toString() || '-', icon: TrendingUp, color: 'orange' },
-    { label: 'Likes', value: statistics.videos?.totalLikes?.toString() || '-', icon: Heart, color: 'pink' },
-    { label: 'Commentaires', value: statistics.videos?.totalComments?.toString() || '-', icon: MessageSquare, color: 'green' }
+    { label: t('pro.events.title', 'Événements'), value: statistics.events?.total?.toString() || '-', icon: Calendar, color: 'blue' },
+    { label: t('pro.profile.subscribers', 'Abonnés'), value: statistics.subscriptions?.followers?.toString() || '-', icon: Users, color: 'purple' },
+    { label: t('pro.profile.videos', 'Vidéos'), value: statistics.videos?.total?.toString() || '-', icon: Video, color: 'red' },
+    { label: t('pro.feed.views', 'Vues'), value: statistics.videos?.totalViews?.toString() || '-', icon: TrendingUp, color: 'orange' },
+    { label: t('pro.feed.likes', 'Likes'), value: statistics.videos?.totalLikes?.toString() || '-', icon: Heart, color: 'pink' },
+    { label: t('pro.feed.comments', 'Commentaires'), value: statistics.videos?.totalComments?.toString() || '-', icon: MessageSquare, color: 'green' }
   ] : [
-    { label: 'Événements', value: '-', icon: Calendar, color: 'blue' },
-    { label: 'Abonnés', value: '-', icon: Users, color: 'purple' },
-    { label: 'Vidéos', value: '-', icon: Video, color: 'red' },
-    { label: 'Vues', value: '-', icon: TrendingUp, color: 'orange' },
-    { label: 'Likes', value: '-', icon: Heart, color: 'pink' },
-    { label: 'Commentaires', value: '-', icon: MessageSquare, color: 'green' }
+    { label: t('pro.events.title', 'Événements'), value: '-', icon: Calendar, color: 'blue' },
+    { label: t('pro.profile.subscribers', 'Abonnés'), value: '-', icon: Users, color: 'purple' },
+    { label: t('pro.profile.videos', 'Vidéos'), value: '-', icon: Video, color: 'red' },
+    { label: t('pro.feed.views', 'Vues'), value: '-', icon: TrendingUp, color: 'orange' },
+    { label: t('pro.feed.likes', 'Likes'), value: '-', icon: Heart, color: 'pink' },
+    { label: t('pro.feed.comments', 'Commentaires'), value: '-', icon: MessageSquare, color: 'green' }
   ]
 
   // Accès rapide
   const quickAccess = [
-    { label: 'Mes événements', path: '/pro/events', icon: Calendar },
-    { label: 'Mes demandes', path: '/pro/requests', icon: MessageSquare },
-    { label: 'Mes abonnés', path: '/pro/subscribers', icon: Users },
-    { label: 'Mes vidéos', path: '/pro/my-videos', icon: Video }
+    { label: t('pro.events.myEvents', 'Mes événements'), path: '/pro/events', icon: Calendar },
+    { label: t('pro.requests.hubTitle', 'Mes demandes'), path: '/pro/requests', icon: MessageSquare },
+    { label: t('pro.subscribers.title', 'Mes abonnés'), path: '/pro/subscribers', icon: Users },
+    { label: t('pro.myVideos.allVideos', 'Mes vidéos'), path: '/pro/my-videos', icon: Video }
   ]
 
   // Fonction de navigation avec stockage de la page d'origine
@@ -845,12 +847,12 @@ const Profile = () => {
                 <ArrowLeft className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
               </button>
               <div className="flex-1">
-                <h1 className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Mon Profil</h1>
+                <h1 className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{t('pro.header.myProfile', 'Mon Profil')}</h1>
               </div>
               <button
                 onClick={() => handleNavigate('/pro/settings')}
                 className={`p-2 rounded-lg ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
-                title="Paramètres"
+                title={t('pro.header.settings', 'Paramètres')}
               >
                 {/* Icône à 3 barres sur mobile et engrenage sur desktop */}
                 <Menu className={`w-5 h-5 block sm:hidden ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`} />
@@ -896,7 +898,7 @@ const Profile = () => {
               onClick={() => window.location.reload()}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
             >
-              Réessayer
+              {t('common.retry', 'Réessayer')}
             </button>
           </div>
         )}
@@ -933,8 +935,8 @@ const Profile = () => {
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center">
                             <Camera className="w-6 h-6 text-white/80 mb-1" />
-                            <span className="text-white text-xs sm:text-sm font-semibold">Ajouter une bannière</span>
-                            <span className="text-white/60 text-[10px] mt-0.5">Recommandé : 2560x1440px</span>
+                            <span className="text-white text-xs sm:text-sm font-semibold">{t('pro.profile.addBanner', 'Ajouter une bannière')}</span>
+                            <span className="text-white/60 text-[10px] mt-0.5">{t('pro.profile.recommendedBanner', 'Recommandé : 2560x1440px')}</span>
                           </div>
                         )}
                       </div>
@@ -943,7 +945,7 @@ const Profile = () => {
                   <button
                     onClick={() => bannerInputRef.current?.click()}
                     className="absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full shadow-lg transition-all backdrop-blur-sm opacity-90 group-hover:opacity-100"
-                    title="Modifier la bannière"
+                    title={t('pro.profile.changeBanner', 'Modifier la bannière')}
                   >
                     <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
@@ -991,14 +993,14 @@ const Profile = () => {
                   <button
                     onClick={triggerFileInput}
                     className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-transform active:scale-90"
-                    title="Changer la photo"
+                    title={t('pro.profile.changePhoto', 'Changer la photo')}
                   >
                     <Camera className="w-3.5 h-3.5" />
                   </button>
                 ) : (
                   <div className="absolute bottom-0 right-0 flex items-center gap-1 px-2 py-1 bg-gray-500/80 text-white rounded-full shadow-lg">
                     <Lock className="w-2 h-2" />
-                    <span className="text-[8px]">{getDaysUntilPhotoModification(profile?.photoLastModified)}j</span>
+                    <span className="text-[8px]">{getDaysUntilPhotoModification(profile?.photoLastModified)}{t('pro.profile.days', 'j')}</span>
                   </div>
                 )}
                 <input
@@ -1011,7 +1013,7 @@ const Profile = () => {
                 />
                 <div className={`mt-1.5 flex items-center justify-center gap-1.5 ${profile?.status === 'online' ? 'text-emerald-500' : 'text-gray-500'}`}>
                   <div className={`w-2 h-2 rounded-full ${profile?.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`} />
-                  <span className="text-xs font-semibold">{profile?.status === 'online' ? 'En ligne' : 'Hors ligne'}</span>
+                  <span className="text-xs font-semibold">{profile?.status === 'online' ? t('pro.conversations.online', 'En ligne') : t('pro.conversations.offline', 'Hors ligne')}</span>
                 </div>
               </div>
 
@@ -1028,7 +1030,7 @@ const Profile = () => {
                 <div className="flex items-center justify-center gap-1.5">
                   <Briefcase className={`w-4 h-4 md:w-5 md:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                   <span className={`text-sm md:text-base font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile?.profession || 'Non renseigné'}
+                    {profile?.profession || t('pro.profile.notSpecified', 'Non renseigné')}
                   </span>
                   {canModifyProfession(profile?.lastProfessionUpdate) ? (
                     <button
@@ -1040,7 +1042,7 @@ const Profile = () => {
                   ) : (
                     <div className={`flex items-center gap-1 px-2 py-0.5 bg-gray-500/80 text-white rounded-full shadow-lg`}>
                       <Lock className={`w-2 h-2`} />
-                      <span className={`text-[10px]`}>Modifiable dans {getDaysUntilModification()}j</span>
+                      <span className={`text-[10px]`}>{t('pro.profile.modifiableIn', 'Modifiable dans')} {getDaysUntilModification()}{t('pro.profile.days', 'j')}</span>
                     </div>
                   )}
                 </div>
@@ -1049,7 +1051,7 @@ const Profile = () => {
                 <div className="flex items-center justify-center gap-1.5">
                   <Award className={`w-4 h-4 md:w-5 md:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                   <span className={`text-sm md:text-base font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profile?.speciality || 'Non renseigné'}
+                    {profile?.speciality || t('pro.profile.notSpecified', 'Non renseigné')}
                   </span>
                   <button
                     onClick={() => {
@@ -1069,7 +1071,7 @@ const Profile = () => {
                     className={`flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-700 hover:bg-zinc-600' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}
                   >
                     <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                      Informations personnelles
+                      {t('pro.profile.personalInfo', 'Informations personnelles')}
                     </span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${showMobileInfoDropdown ? 'rotate-180' : ''}`} />
                   </button>
@@ -1078,11 +1080,11 @@ const Profile = () => {
                       {/* Bio */}
                       <div>
                         <label className={`text-xs font-medium mb-1 block ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                          Bio
+                          {t('pro.profile.bio', 'Bio')}
                         </label>
                         <div className="flex items-center justify-between gap-2">
                           <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                            {profile?.bio || 'Aucune bio'}
+                            {profile?.bio || t('pro.profile.noBio', 'Aucune biographie rédigée.')}
                           </p>
                           <button
                             onClick={() => {
@@ -1100,7 +1102,7 @@ const Profile = () => {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                            Localisation
+                            {t('pro.profile.location', 'Localisation')}
                           </label>
                           <button
                             onClick={() => {
@@ -1117,7 +1119,7 @@ const Profile = () => {
                           <span className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                             {profile?.city && profile?.country 
                               ? `${profile.city}, ${profile.country}`
-                              : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
+                              : profile?.city || profile?.country || profile?.location || t('pro.profile.notSpecified', 'Non renseigné')}
                           </span>
                         </div>
                       </div>
@@ -1126,7 +1128,7 @@ const Profile = () => {
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                            Sites web
+                            {t('pro.profile.websites', 'Sites web')}
                           </label>
                           <button
                             onClick={() => setShowWebsitesModal(true)}
@@ -1182,7 +1184,7 @@ const Profile = () => {
                   <div>
                     <div className="flex items-center justify-center gap-1">
                       <p className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                        {profile?.bio || 'Aucune bio'}
+                        {profile?.bio || t('pro.profile.noBio', 'Aucune biographie rédigée.')}
                       </p>
                       <button
                         onClick={() => {
@@ -1202,7 +1204,7 @@ const Profile = () => {
                     <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                       {profile?.city && profile?.country 
                         ? `${profile.city}, ${profile.country}`
-                        : profile?.city || profile?.country || profile?.location || 'Non renseigné'}
+                        : profile?.city || profile?.country || profile?.location || t('pro.profile.notSpecified', 'Non renseigné')}
                     </span>
                     <button
                       onClick={() => {
@@ -1220,7 +1222,7 @@ const Profile = () => {
                     <div className="flex items-center gap-1.5">
                       <Globe className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                       <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                        Sites web
+                        {t('pro.profile.websites', 'Sites web')}
                       </span>
                       <button
                         onClick={() => setShowWebsitesModal(true)}
@@ -1259,7 +1261,7 @@ const Profile = () => {
                                 : 'bg-gray-100 border-gray-200 text-blue-600'
                             }`}
                           >
-                            <span>+{(profile?.websites || []).length - 2} autres</span>
+                            <span>+{(profile?.websites || []).length - 2}</span>
                             <ChevronDown className="w-3 h-3" />
                           </button>
                           {showWebsitesDropdown && (
@@ -1297,7 +1299,7 @@ const Profile = () => {
                   <div className="flex items-center justify-center gap-1.5">
                     <Calendar className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                     <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                      Membre depuis {new Date(profile.date_joined).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                      {t('pro.profile.memberSince', 'Membre depuis')} {new Date(profile.date_joined).toLocaleDateString(i18n.language || 'fr-FR', { month: 'long', year: 'numeric' })}
                     </span>
                   </div>
                 )}
@@ -1317,7 +1319,7 @@ const Profile = () => {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <h3 className={`text-sm sm:text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                      Compétences
+                      {t('pro.profile.skills', 'Compétences')}
                     </h3>
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
                       {(profile?.skills || []).length}
@@ -1331,7 +1333,7 @@ const Profile = () => {
                     className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all active:scale-95"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Ajouter
+                    {t('common.add', 'Ajouter')}
                   </button>
                 )}
               </div>
@@ -1459,14 +1461,14 @@ const Profile = () => {
                   ) : (
                     <div className={`p-3.5 rounded-xl border border-dashed text-center ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800/50' : 'border-gray-200 bg-gray-50'}`}>
                       <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1.5`}>
-                        Aucune compétence renseignée
+                        {t('pro.profile.noSkills', 'Aucune compétence renseignée')}
                       </p>
                       <button
                         onClick={() => setShowSkillModal(true)}
                         className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                       >
                         <Plus className="w-3 h-3" />
-                        Ajouter une première compétence
+                        {t('pro.profile.addFirstSkill', 'Ajouter une première compétence')}
                       </button>
                     </div>
                   )}
@@ -1480,7 +1482,7 @@ const Profile = () => {
             {/* Statistics */}
             <div>
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                Statistiques Globales
+                {t('pro.stats.title', 'Statistiques Globales')}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                 {stats.map((stat, index) => (
@@ -1512,7 +1514,7 @@ const Profile = () => {
             {/* Quick Access */}
             <div>
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                Accès Rapide
+                {t('pro.profile.quickAccess', 'Accès Rapide')}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                 {quickAccess.map((item, index) => (
@@ -1533,7 +1535,7 @@ const Profile = () => {
             {/* Recent Activity */}
             <div>
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                Activité Récente
+                {t('pro.profile.recentActivity', 'Activité Récente')}
               </h3>
               <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg p-3 sm:p-3 space-y-2 sm:space-y-2`}>
                 {recentActivities.length > 0 ? (
@@ -1562,7 +1564,7 @@ const Profile = () => {
                   ))
                 ) : (
                   <p className={`text-xs sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'} text-center py-2`}>
-                    Aucune activité récente
+                    {t('pro.profile.noRecentActivity', 'Aucune activité récente')}
                   </p>
                 )}
               </div>
@@ -1571,7 +1573,7 @@ const Profile = () => {
             {/* Badges */}
             <div>
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                Badges et Récompenses
+                {t('pro.profile.badges', 'Badges et Récompenses')}
               </h3>
               <div className="flex flex-wrap gap-2 sm:gap-2">
                 {badges.length > 0 ? (
@@ -1591,7 +1593,7 @@ const Profile = () => {
                   ))
                 ) : (
                   <p className={`text-xs sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                    Aucun badge obtenu
+                    {t('pro.profile.noBadges', 'Aucun badge obtenu')}
                   </p>
                 )}
               </div>
@@ -1607,13 +1609,13 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Modifier la profession
+              {t('pro.profile.editProfession', 'Modifier la profession')}
             </h3>
             <input
               type="text"
               value={newProfession}
               onChange={(e) => setNewProfession(e.target.value)}
-              placeholder="Entrez votre nouvelle profession"
+              placeholder={t('pro.profile.enterNewProfession', 'Entrez votre nouvelle profession')}
               className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border ${
                 resolvedTheme === 'dark'
                   ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500'
@@ -1630,14 +1632,14 @@ const Profile = () => {
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
                 }`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={handleProfessionUpdate}
                 className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base"
                 disabled={!newProfession.trim() || newProfession.length < 3 || newProfession.length > 50}
               >
-                Confirmer
+                {t('common.confirm', 'Confirmer')}
               </button>
             </div>
           </div>
@@ -1649,13 +1651,13 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Modifier la spécialité
+              {t('pro.profile.editSpeciality', 'Modifier la spécialité')}
             </h3>
             <input
               type="text"
               value={newSpeciality}
               onChange={(e) => setNewSpeciality(e.target.value)}
-              placeholder="Entrez votre nouvelle spécialité"
+              placeholder={t('pro.profile.enterNewSpeciality', 'Entrez votre nouvelle spécialité')}
               className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border ${
                 resolvedTheme === 'dark'
                   ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500'
@@ -1672,14 +1674,14 @@ const Profile = () => {
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
                 }`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={handleSpecialityUpdate}
                 className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base"
                 disabled={!newSpeciality.trim()}
               >
-                Confirmer
+                {t('common.confirm', 'Confirmer')}
               </button>
             </div>
           </div>
@@ -1691,14 +1693,14 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Ajouter une compétence
+              {t('pro.profile.addSkill', 'Ajouter une compétence')}
             </h3>
             <div className="space-y-3 sm:space-y-4">
               <input
                 type="text"
                 value={newSkill.name}
                 onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })}
-                placeholder="Nom de la compétence"
+                placeholder={t('pro.profile.skillName', 'Nom de la compétence')}
                 className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border ${
                   resolvedTheme === 'dark'
                     ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500'
@@ -1707,7 +1709,7 @@ const Profile = () => {
               />
               <div>
                 <label className={`block text-xs sm:text-sm mb-1.5 sm:mb-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                  Catégorie
+                  {t('pro.profile.skillCategory', 'Catégorie')}
                 </label>
                 <select
                   value={newSkill.category}
@@ -1727,7 +1729,7 @@ const Profile = () => {
               </div>
               <div>
                 <label className={`block text-xs sm:text-sm mb-1.5 sm:mb-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                  Niveau
+                  {t('pro.profile.skillLevel', 'Niveau')}
                 </label>
                 <select
                   value={newSkill.level}
@@ -1756,14 +1758,14 @@ const Profile = () => {
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
                 }`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={handleAddSkill}
                 className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base"
                 disabled={!newSkill.name.trim() || newSkill.name.length < 2 || newSkill.name.length > 30 || (profile?.skills || []).length >= 10}
               >
-                Ajouter
+                {t('common.add', 'Ajouter')}
               </button>
             </div>
           </div>
@@ -1775,10 +1777,10 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Confirmer la suppression
+              {t('pro.profile.deleteConfirmTitle', 'Confirmer la suppression')}
             </h3>
             <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-              Êtes-vous sûr de vouloir supprimer ce {showDeleteConfirm.type === 'website' ? 'site web' : 'compétence'}?
+              {t('pro.profile.deleteConfirmMsg', 'Êtes-vous sûr de vouloir supprimer cet élément ?')}
             </p>
             <div className="flex gap-2 sm:gap-3">
               <button
@@ -1787,13 +1789,13 @@ const Profile = () => {
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
                 }`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={handleDeleteConfirm}
                 className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm sm:text-base"
               >
-                Supprimer
+                {t('common.delete', 'Supprimer')}
               </button>
             </div>
           </div>
@@ -1805,13 +1807,13 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Modifier la localisation
+              {t('pro.profile.editLocation', 'Modifier la localisation')}
             </h3>
             <input
               type="text"
               value={newLocation}
               onChange={(e) => setNewLocation(e.target.value)}
-              placeholder="Ex: Port-au-Prince, Haïti ou Paris, France"
+              placeholder={t('pro.profile.locationPlaceholder', 'Ex: Port-au-Prince, Haïti ou Paris, France')}
               className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border ${
                 resolvedTheme === 'dark'
                   ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500'
@@ -1828,14 +1830,14 @@ const Profile = () => {
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
                 }`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={handleLocationUpdate}
                 className="flex-1 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base"
                 disabled={!newLocation.trim()}
               >
-                Confirmer
+                {t('common.confirm', 'Confirmer')}
               </button>
             </div>
           </div>
@@ -1847,16 +1849,16 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl border ${resolvedTheme === 'dark' ? 'border-zinc-700' : 'border-gray-100'}`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-1 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Modifier votre bio
+              {t('pro.profile.editBio', 'Modifier votre bio')}
             </h3>
             <p className={`text-xs mb-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-              Présentez-vous brièvement (30 caractères max).
+              {t('pro.profile.bioHint', 'Présentez-vous brièvement (30 caractères max).')}
             </p>
             <input
               type="text"
               value={newBio}
               onChange={(e) => setNewBio(e.target.value.slice(0, 30))}
-              placeholder="Ex: Passionné d'art & tech"
+              placeholder={t('pro.profile.bioPlaceholder', "Ex: Passionné d'art & tech")}
               maxLength={30}
               className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border ${
                 resolvedTheme === 'dark'
@@ -1889,14 +1891,14 @@ const Profile = () => {
                   resolvedTheme === 'dark' ? 'bg-zinc-700 hover:bg-zinc-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
                 } transition-colors`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={handleBioUpdate}
                 className="flex-1 px-3 sm:px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-md active:scale-98"
                 disabled={newBio.length > 30}
               >
-                Enregistrer
+                {t('common.save', 'Enregistrer')}
               </button>
             </div>
           </div>
@@ -1908,7 +1910,7 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-md`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Gérer les sites web
+              {t('pro.profile.manageWebsites', 'Gérer les sites web')}
             </h3>
             <div className="space-y-2 sm:space-y-3 mb-3 sm:mb-4">
               {(profile?.websites || []).map((website, index) => (
@@ -1937,7 +1939,7 @@ const Profile = () => {
                 type="text"
                 value={newWebsite}
                 onChange={(e) => setNewWebsite(e.target.value)}
-                placeholder="Ajouter un site web"
+                placeholder={t('pro.profile.addWebsite', 'Ajouter un site web')}
                 className={`flex-1 px-2 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm ${
                   resolvedTheme === 'dark'
                     ? 'bg-zinc-700 border-zinc-600 text-white placeholder-zinc-500'
@@ -1949,7 +1951,7 @@ const Profile = () => {
                 className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm"
                 disabled={!newWebsite.trim()}
               >
-                Ajouter
+                {t('common.add', 'Ajouter')}
               </button>
             </div>
             <button
@@ -1961,7 +1963,7 @@ const Profile = () => {
                 resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
               }`}
             >
-              Fermer
+              {t('common.close', 'Fermer')}
             </button>
           </div>
         </div>
@@ -1972,7 +1974,7 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-2xl`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Aperçu de la bannière
+              {t('pro.profile.bannerPreview', 'Aperçu de la bannière')}
             </h3>
             <div className="w-full h-32 sm:h-40 md:h-48 mb-3 sm:mb-4 rounded-lg overflow-hidden">
               <img
@@ -1990,10 +1992,10 @@ const Profile = () => {
                 {isUploadingBanner ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Enregistrement...</span>
+                    <span>{t('pro.upload.saving', 'Enregistrement...')}</span>
                   </>
                 ) : (
-                  <span>Confirmer</span>
+                  <span>{t('common.confirm', 'Confirmer')}</span>
                 )}
               </button>
               <button
@@ -2001,7 +2003,7 @@ const Profile = () => {
                 disabled={isUploadingBanner}
                 className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-gray-900 dark:text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
             </div>
           </div>
@@ -2013,7 +2015,7 @@ const Profile = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-2xl p-4 sm:p-6 w-full max-w-lg`}>
             <h3 className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Recadrer la photo
+              {t('pro.profile.cropPhoto', 'Recadrer la photo')}
             </h3>
             <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 mx-auto mb-3 sm:mb-4 overflow-hidden rounded-full border-4 border-blue-500">
               <img
@@ -2075,7 +2077,7 @@ const Profile = () => {
                   resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
                 }`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={handleCropConfirm}
@@ -2085,10 +2087,10 @@ const Profile = () => {
                 {isUploadingPhoto ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Enregistrement...</span>
+                    <span>{t('pro.upload.saving', 'Enregistrement...')}</span>
                   </>
                 ) : (
-                  <span>Confirmer</span>
+                  <span>{t('common.confirm', 'Confirmer')}</span>
                 )}
               </button>
             </div>

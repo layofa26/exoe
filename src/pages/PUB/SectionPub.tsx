@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTranslation } from 'react-i18next'
 
 import { getStoredAds, fetchRemoteAds, trackAdClick, type Ad } from './AdBanner'
 import { API_BASE_URL } from '../../config/api'
@@ -64,6 +65,7 @@ interface SectionPubProps {
 }
 
 export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
@@ -287,13 +289,13 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
           <div className="w-9 h-9 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto text-sm font-bold">
             🏢
           </div>
-          <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Espace Entreprise(PUB)</p>
-          <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>Promouvez votre marque auprès des professionnels EXILE.</p>
+          <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('pub.enterpriseSpace', 'Espace Entreprise (PUB)')}</p>
+          <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pub.promoteBrand', 'Promouvez votre marque auprès des professionnels EXILE.')}</p>
           <button
             onClick={() => setIsInquiryModalOpen(true)}
             className="inline-block px-3.5 py-1.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs transition-colors shadow-sm active:scale-95"
           >
-            📩 Faire une demande publicitaire
+            📩 {t('pub.makeInquiry', 'Faire une demande publicitaire')}
           </button>
         </div>
       ) : (
@@ -301,7 +303,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
           <div className="flex items-center justify-between px-2 sm:px-1 mb-2">
             <h3 className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'} flex items-center gap-1.5`}>
               <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                Espace Entreprise(PUB)
+                {t('pub.enterpriseSpace', 'Espace Entreprise (PUB)')}
               </span>
             </h3>
             {/* Indicateur d'animation synchronisé avec Desktop */}
@@ -432,7 +434,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                       }}
                       className="w-full py-0.5 px-1 rounded-md text-[9px] sm:text-[10px] font-extrabold truncate text-center shadow-sm active:scale-95 transition-all flex items-center justify-center"
                     >
-                      <span className="truncate">{company.ctaLabel || 'Visiter'}</span>
+                      <span className="truncate">{company.ctaLabel || t('pub.visit', 'Visiter')}</span>
                     </button>
                   </div>
                 </div>
@@ -471,13 +473,13 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto">
               <Building2 className="w-5 h-5" />
             </div>
-            <h4 className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Espace Entreprises (PUB)</h4>
-            <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>Promouvez votre marque auprès des professionnels EXILE.</p>
+            <h4 className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('pub.enterpriseSpace', 'Espace Entreprises (PUB)')}</h4>
+            <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pub.promoteBrand', 'Promouvez votre marque auprès des professionnels EXILE.')}</p>
             <button
               onClick={() => setIsInquiryModalOpen(true)}
               className="inline-block w-full py-2 px-3 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold text-center transition-colors shadow-sm active:scale-95"
             >
-              📩 Faire une demande publicitaire
+              📩 {t('pub.makeInquiry', 'Faire une demande publicitaire')}
             </button>
           </div>
         ) : (
@@ -491,7 +493,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             <div className="p-3 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                  Espace Entreprise(PUB)
+                  {t('pub.enterpriseSpace', 'Espace Entreprise (PUB)')}
                 </span>
               </div>
               <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -541,7 +543,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                           aria-label="Regarder la vidéo publicitaire"
                         >
                           <Play size={13} className="fill-white" />
-                          <span>Regarder la vidéo</span>
+                          <span>{t('pub.watchVideo', 'Regarder la vidéo')}</span>
                         </button>
                       </div>
                     )
@@ -597,7 +599,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                 }}
                 className="w-full py-1.5 px-3 rounded-xl text-xs font-bold text-center transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95 group-hover:shadow-md"
               >
-                <span className="truncate">{activeAd.ctaLabel || 'Visiter'}</span>
+                <span className="truncate">{activeAd.ctaLabel || t('pub.visit', 'Visiter')}</span>
                 <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
               </button>
             </div>
@@ -612,14 +614,14 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
               <Sparkles className="w-4 h-4" />
             </div>
             <h3 className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Experts Recommandés
+              {t('pub.recommendedExperts', 'Experts Recommandés')}
             </h3>
           </div>
           <Link
             to="/pro/subscriptions"
             className="text-[11px] font-semibold text-orange-500 hover:text-orange-600 transition-colors flex items-center gap-0.5"
           >
-            Voir tout
+            {t('common.viewAll', 'Voir tout')}
             <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
@@ -649,7 +651,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                     <ShieldCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
                   </div>
                   <p className={`text-[10px] truncate ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    {pro.profession}
+                    {pro.profession || t('common.professional', 'Expert')}
                   </p>
                 </div>
               </div>
@@ -665,12 +667,12 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                 {pro.isFollowing ? (
                   <>
                     <Check className="w-3 h-3 stroke-[2.5]" />
-                    Suivi
+                    {t('common.following', 'Suivi')}
                   </>
                 ) : (
                   <>
                     <Plus className="w-3 h-3 stroke-[2.5]" />
-                    Suivre
+                    {t('common.follow', 'Suivre')}
                   </>
                 )}
               </button>
@@ -687,14 +689,14 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
               <Calendar className="w-4 h-4" />
             </div>
             <h3 className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Événements & Live
+              {t('pub.eventsAndLive', 'Événements & Live')}
             </h3>
           </div>
           <Link
             to="/pro/events"
             className="text-[11px] font-semibold text-purple-500 hover:text-purple-600 transition-colors flex items-center gap-0.5"
           >
-            Tous
+            {t('common.all', 'Tous')}
             <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
@@ -714,7 +716,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                     ? 'bg-red-500/15 text-red-500 animate-pulse'
                     : 'bg-blue-500/10 text-blue-500'
                 }`}>
-                  {evt.isLive ? 'EN DIRECT' : evt.category}
+                  {evt.isLive ? t('common.live', 'EN DIRECT') : evt.category}
                 </span>
                 <span className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
                   {evt.date}
@@ -736,6 +738,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
 }
 
 function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose: () => void; isDark: boolean }) {
+  const { t, i18n } = useTranslation()
   const [form, setForm] = useState({
     companyName: '',
     contactName: '',
@@ -800,19 +803,20 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
     const existingNotifs = JSON.parse(localStorage.getItem('exile_notifications') || '[]')
     const customPlatformLogo = localStorage.getItem('exile_pub_platform_logo') || ''
 
-    const realDateStr = new Date().toLocaleDateString('fr-FR', {
+    const currentLang = i18n.language || 'fr-FR'
+    const realDateStr = new Date().toLocaleDateString(currentLang, {
       day: 'numeric',
       month: 'short',
       year: 'numeric'
-    }) + ' à ' + new Date().toLocaleTimeString('fr-FR', {
+    }) + ' ' + (currentLang.startsWith('ar') ? 'في' : currentLang.startsWith('en') ? 'at' : 'à') + ' ' + new Date().toLocaleTimeString(currentLang, {
       hour: '2-digit',
       minute: '2-digit'
     })
 
     const autoNotif = {
       id: `notif_pub_${Date.now()}`,
-      title: '📩 Demande publicitaire enregistrée !',
-      message: `Votre demande pour "${form.companyName}" a bien été transmise à notre équipe. Vous serez recontacté(e) par ${form.preferredContact} (${form.phoneWhatsApp || form.email}).`,
+      title: '📩 ' + t('pub.modal.successTitle', 'Demande publicitaire enregistrée !'),
+      message: `${form.companyName} : ` + t('pub.modal.successDesc', 'Une notification automatique de confirmation a été envoyée à votre compte. Notre équipe vous recontactera très rapidement.'),
       date: realDateStr,
       createdAt: new Date().toISOString(),
       read: false,
@@ -860,8 +864,8 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
               📩
             </div>
             <div>
-              <h3 className="font-bold text-base">Demande Publicitaire Entreprise</h3>
-              <p className="text-xs text-zinc-400">Contactez directement l'équipe EXILE</p>
+              <h3 className="font-bold text-base">{t('pub.modal.title', 'Demande Publicitaire Entreprise')}</h3>
+              <p className="text-xs text-zinc-400">{t('pub.modal.subtitle', "Contactez directement l'équipe EXILE")}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors">
@@ -874,15 +878,15 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-3xl font-bold border border-emerald-500/30">
               ✓
             </div>
-            <h4 className="text-lg font-bold text-emerald-400">Demande transmise avec succès !</h4>
+            <h4 className="text-lg font-bold text-emerald-400">{t('pub.modal.successTitle', 'Demande transmise avec succès !')}</h4>
             <p className="text-xs text-zinc-300 max-w-xs mx-auto leading-relaxed">
-              Une <strong>notification automatique de confirmation</strong> a été envoyée à votre compte. Notre équipe vous recontactera très rapidement par <strong>{form.preferredContact}</strong>.
+              {t('pub.modal.successDesc', "Une notification automatique de confirmation a été envoyée à votre compte. Notre équipe vous recontactera très rapidement.")}
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
-              <label className="text-xs font-semibold block mb-1">Nom de l'Entreprise / Marque *</label>
+              <label className="text-xs font-semibold block mb-1">{t('pub.modal.companyName', "Nom de l'Entreprise / Marque *")}</label>
               <input
                 required
                 type="text"
@@ -895,7 +899,7 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold block mb-1">Nom du Contact</label>
+                <label className="text-xs font-semibold block mb-1">{t('pub.modal.contactName', "Nom du Contact")}</label>
                 <input
                   type="text"
                   value={form.contactName}
@@ -905,7 +909,7 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold block mb-1">Email Professionnel *</label>
+                <label className="text-xs font-semibold block mb-1">{t('pub.modal.email', "Email Professionnel *")}</label>
                 <input
                   required
                   type="email"
@@ -921,7 +925,7 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold block mb-1 flex items-center gap-1">
-                  <span>Numéro Téléphone / WhatsApp *</span>
+                  <span>{t('pub.modal.phone', "Numéro Téléphone / WhatsApp *")}</span>
                 </label>
                 <input
                   required
@@ -934,22 +938,22 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
               </div>
 
               <div>
-                <label className="text-xs font-semibold block mb-1">Canal de contact préféré *</label>
+                <label className="text-xs font-semibold block mb-1">{t('pub.modal.preferredContact', "Canal de contact préféré *")}</label>
                 <select
                   value={form.preferredContact}
                   onChange={e => setForm({ ...form, preferredContact: e.target.value })}
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00]`}
                 >
-                  <option value="WhatsApp 💬">💬 WhatsApp (Message Direct)</option>
-                  <option value="Appel Téléphonique 📞">📞 Appel Téléphonique</option>
-                  <option value="Email 📧">📧 Email Professionnel</option>
+                  <option value="WhatsApp 💬">{t('pub.modal.whatsapp', '💬 WhatsApp (Message Direct)')}</option>
+                  <option value="Appel Téléphonique 📞">{t('pub.modal.phoneCall', '📞 Appel Téléphonique')}</option>
+                  <option value="Email 📧">{t('pub.modal.emailChannel', '📧 Email Professionnel')}</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold block mb-1">Devise & Budget Souhaité</label>
+                <label className="text-xs font-semibold block mb-1">{t('pub.modal.budget', "Devise & Budget Souhaité")}</label>
                 <div className="flex gap-1.5">
                   <select
                     value={form.currency}
@@ -972,31 +976,31 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
               </div>
 
               <div>
-                <label className="text-xs font-semibold block mb-1">Secteur d'activité</label>
+                <label className="text-xs font-semibold block mb-1">{t('pub.modal.sector', "Secteur d'activité")}</label>
                 <select
                   value={form.sector}
                   onChange={e => setForm({ ...form, sector: e.target.value })}
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00]`}
                 >
-                  <option value="Technologie">Technologie</option>
-                  <option value="Commerce">Commerce</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Santé">Santé</option>
-                  <option value="Éducation">Éducation</option>
-                  <option value="Services">Services</option>
-                  <option value="Autre">Autre</option>
+                  <option value="Technologie">{t('pub.sectors.tech', 'Technologie')}</option>
+                  <option value="Commerce">{t('pub.sectors.commerce', 'Commerce')}</option>
+                  <option value="Finance">{t('pub.sectors.finance', 'Finance')}</option>
+                  <option value="Santé">{t('pub.sectors.health', 'Santé')}</option>
+                  <option value="Éducation">{t('pub.sectors.education', 'Éducation')}</option>
+                  <option value="Services">{t('pub.sectors.services', 'Services')}</option>
+                  <option value="Autre">{t('pub.sectors.other', 'Autre')}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-semibold block mb-1">Message & Objectif de la campagne *</label>
+              <label className="text-xs font-semibold block mb-1">{t('pub.modal.message', "Message & Objectif de la campagne *")}</label>
               <textarea
                 required
                 rows={3}
                 value={form.message}
                 onChange={e => setForm({ ...form, message: e.target.value })}
-                placeholder="Décrivez votre produit, vos objectifs de visibilité..."
+                placeholder={t('pub.modal.messagePlaceholder', "Décrivez votre produit, vos objectifs de visibilité...")}
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00] resize-none`}
               />
             </div>
@@ -1007,13 +1011,13 @@ function AdInquiryModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
                 onClick={onClose}
                 className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
               >
-                Annuler
+                {t('common.cancel', "Annuler")}
               </button>
               <button
                 type="submit"
                 className="px-6 py-2.5 rounded-xl text-xs font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white transition-all shadow-md active:scale-95 flex items-center gap-1.5"
               >
-                <span>Envoyer ma demande</span>
+                <span>{t('pub.modal.submit', "Envoyer ma demande")}</span>
               </button>
             </div>
           </form>

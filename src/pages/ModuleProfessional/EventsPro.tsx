@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Calendar, Users, Plus, Search,
   Clock, MapPin, Video, BarChart3, Trash2, CheckCircle,
@@ -113,6 +114,7 @@ const DEMO_EVENTS: EventItem[] = [
 
 // ============ P AJ EVENMAN ============
 export default function EventsPro() {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { resolvedTheme } = useTheme()
@@ -219,14 +221,14 @@ export default function EventsPro() {
   const [toast, setToast] = useState<string | null>(null)
 
   const CATEGORIES = [
-    { id: 'all', label: 'Toutes' },
-    { id: 'TECHNOLOGY', label: '💻 Technologie' },
-    { id: 'BUSINESS', label: '📈 Business & Finance' },
-    { id: 'DESIGN', label: '🎨 Design & UI/UX' },
-    { id: 'HEALTH', label: '🏥 Santé & Bien-être' },
-    { id: 'LAW', label: '⚖️ Droit & Fiscalité' },
-    { id: 'MARKETING', label: '📣 Marketing' },
-    { id: 'EDUCATION', label: '🎓 Masterclass' }
+    { id: 'all', label: t('common.all', 'Toutes') },
+    { id: 'TECHNOLOGY', label: `💻 ${t('pro.events.catTech', 'Technologie')}` },
+    { id: 'BUSINESS', label: `📈 ${t('pro.events.catBusiness', 'Business & Finance')}` },
+    { id: 'DESIGN', label: `🎨 ${t('pro.events.catDesign', 'Design & UI/UX')}` },
+    { id: 'HEALTH', label: `🏥 ${t('pro.events.catHealth', 'Santé & Bien-être')}` },
+    { id: 'LAW', label: `⚖️ ${t('pro.events.catLaw', 'Droit & Fiscalité')}` },
+    { id: 'MARKETING', label: `📣 ${t('pro.events.catMarketing', 'Marketing')}` },
+    { id: 'EDUCATION', label: `🎓 ${t('pro.events.catEducation', 'Masterclass')}` }
   ]
 
   // Set active tab or open create from URL
@@ -395,7 +397,7 @@ export default function EventsPro() {
     return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   })
 
-  const formatDate = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  const formatDate = (s: string) => new Date(s).toLocaleDateString(i18n.language || 'fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
   // ============ RENDU ============
   return (
@@ -414,7 +416,7 @@ export default function EventsPro() {
             <button
               onClick={handleBack}
               className={`p-2 rounded-xl transition-colors ${resolvedTheme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
-              title="Retour"
+              title={t('common.back', 'Retour')}
             >
               <ArrowLeft size={18} />
             </button>
@@ -423,7 +425,7 @@ export default function EventsPro() {
             </div>
             <div>
               <h1 className="font-bold text-base leading-tight">
-                Événements & Live
+                {t('pro.events.title', 'Événements & Live')}
               </h1>
             </div>
           </div>
@@ -433,8 +435,8 @@ export default function EventsPro() {
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl shadow-md text-xs font-bold transition-all active:scale-95 flex-shrink-0"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span className="hidden sm:inline">Créer un événement</span>
-            <span className="sm:hidden">Créer</span>
+            <span className="hidden sm:inline">{t('pro.events.createEvent', 'Créer un événement')}</span>
+            <span className="sm:hidden">{t('common.create', 'Créer')}</span>
           </button>
         </div>
 
@@ -445,7 +447,7 @@ export default function EventsPro() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par titre, intervenant ou ville..."
+            placeholder={t('pro.events.searchPlaceholder', 'Rechercher par titre, intervenant ou ville...')}
             className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
           />
           {searchQuery && (
@@ -458,11 +460,11 @@ export default function EventsPro() {
         {/* 1. STATUS TABS FILTER (YouTube Style) */}
         <div className="flex gap-1.5 pt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {[
-            { id: 'all', label: 'Tous', count: events.length },
-            { id: 'upcoming', label: 'À venir', count: events.filter(e => isUpcoming(e.startDate) && !e.isLive).length },
-            { id: 'live', label: 'En direct', count: activeLiveEvents.length },
-            { id: 'past', label: 'Passés', count: events.filter(e => isPast(e.endDate || e.startDate) && !e.isLive).length },
-            { id: 'mine', label: 'Mes événements', count: events.filter(e => e.isRegistered || e.status === 'draft').length }
+            { id: 'all', label: t('common.all', 'Tous'), count: events.length },
+            { id: 'upcoming', label: t('pro.events.upcoming', 'À venir'), count: events.filter(e => isUpcoming(e.startDate) && !e.isLive).length },
+            { id: 'live', label: t('pro.events.live', 'En direct'), count: activeLiveEvents.length },
+            { id: 'past', label: t('pro.events.past', 'Passés'), count: events.filter(e => isPast(e.endDate || e.startDate) && !e.isLive).length },
+            { id: 'mine', label: t('pro.events.myEvents', 'Mes événements'), count: events.filter(e => e.isRegistered || e.status === 'draft').length }
           ].map(tab => {
             const active = activeTab === tab.id
             return (
@@ -521,7 +523,7 @@ export default function EventsPro() {
             <div className="flex items-center gap-2 px-1">
               <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
               <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-red-500 flex items-center gap-1.5">
-                <span>En Direct Maintenant</span>
+                <span>{t('pro.events.liveNow', 'En Direct Maintenant')}</span>
                 <span className="px-1.5 py-0.2 bg-red-600/15 text-red-500 text-[10px] rounded-md font-bold">
                   {activeLiveEvents.length} LIVE
                 </span>
@@ -542,11 +544,11 @@ export default function EventsPro() {
                     <div className="flex items-center gap-2">
                       <span className="px-2.5 py-1 rounded-full bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 animate-pulse shadow-md">
                         <Radio className="w-3 h-3" />
-                        EN DIRECT
+                        {t('pro.events.live', 'EN DIRECT')}
                       </span>
                       <span className="text-[11px] font-semibold text-red-400 flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" />
-                        {liveEvt.participantsCount || liveEvt.stats.attendees || 42} participants
+                        {liveEvt.participantsCount || liveEvt.stats.attendees || 42} {t('pro.events.participants', 'participants')}
                       </span>
                     </div>
                   </div>
@@ -578,7 +580,7 @@ export default function EventsPro() {
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/30 flex items-center gap-1.5 active:scale-95 transition-all flex-shrink-0"
                     >
                       <Video className="w-3.5 h-3.5" />
-                      <span>Rejoindre le Direct</span>
+                      <span>{t('pro.events.joinLive', 'Rejoindre le Direct')}</span>
                     </button>
                   </div>
                 </div>
@@ -591,7 +593,7 @@ export default function EventsPro() {
         {filtered.length === 0 ? (
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} rounded-2xl border p-4 sm:p-6 md:p-12 text-center`}>
             <Calendar className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'} mx-auto mb-2 sm:mb-3`} />
-            <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-xs sm:text-sm md:text-base`}>Aucun événement</p>
+            <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-xs sm:text-sm md:text-base`}>{t('pro.events.noEvents', 'Aucun événement')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -614,23 +616,23 @@ export default function EventsPro() {
                       {event.isLive && (
                         <span className="bg-red-600/90 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1">
                           <Radio className="w-2.5 h-2.5" />
-                          En Direct
+                          {t('pro.events.live', 'En Direct')}
                         </span>
                       )}
                       {!event.isLive && event.status === 'published' && isUpcoming(event.startDate) && (
                         <span className="bg-emerald-600/90 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          À venir
+                          {t('pro.events.upcoming', 'À venir')}
                         </span>
                       )}
                       {event.status === 'draft' && (
                         <span className="bg-zinc-700/90 backdrop-blur text-zinc-300 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          Brouillon
+                          {t('pro.events.draft', 'Brouillon')}
                         </span>
                       )}
                       {event.isRegistered && (
                         <span className="bg-[#FF6B00] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
-                          Inscrit
+                          {t('pro.events.registered', 'Inscrit')}
                         </span>
                       )}
                     </div>
@@ -642,7 +644,7 @@ export default function EventsPro() {
                         className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xl bg-red-600 hover:bg-red-700 text-white animate-pulse"
                       >
                         <Video className="w-3.5 h-3.5" />
-                        <span>Rejoindre</span>
+                        <span>{t('pro.events.join', 'Rejoindre')}</span>
                       </button>
                     )}
                   </div>
@@ -664,9 +666,9 @@ export default function EventsPro() {
                       </span>
                       <span className="flex items-center gap-1">
                         {event.format === 'virtual' ? (
-                          <><Video className="w-3 h-3 text-blue-400" /> En ligne</>
+                          <><Video className="w-3 h-3 text-blue-400" /> {t('pro.events.onlineEvent', 'En ligne')}</>
                         ) : (
-                          <><MapPin className="w-3 h-3 text-emerald-400" /> {event.location?.city || 'Sur place'}</>
+                          <><MapPin className="w-3 h-3 text-emerald-400" /> {event.location?.city || t('pro.events.onSite', 'Sur place')}</>
                         )}
                       </span>
                       <span className="flex items-center gap-1">
@@ -702,12 +704,12 @@ export default function EventsPro() {
                       {event.isRegistered ? (
                         <>
                           <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>Inscrit ✓</span>
+                          <span>{t('pro.events.registered', 'Inscrit')} ✓</span>
                         </>
                       ) : (
                         <>
                           <Ticket className="w-3.5 h-3.5" />
-                          <span>S'inscrire ({event.price === 0 ? 'Gratuit' : `${event.price}$`})</span>
+                          <span>{t('pro.events.register', "S'inscrire")} ({event.price === 0 ? t('pro.events.free', 'Gratuit') : `${event.price}$`})</span>
                         </>
                       )}
                     </button>
@@ -718,7 +720,7 @@ export default function EventsPro() {
                       className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
                         resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                       }`}
-                      title="Partager l'événement"
+                      title={t('common.share', "Partager l'événement")}
                     >
                       <Share2 className="w-3.5 h-3.5" />
                     </button>
@@ -729,7 +731,7 @@ export default function EventsPro() {
                       className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
                         resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                       }`}
-                      title="Ajouter au calendrier Google"
+                      title={t('pro.events.addToGoogleCalendar', 'Ajouter au calendrier Google')}
                     >
                       <CalendarPlus className="w-3.5 h-3.5" />
                     </button>
@@ -744,7 +746,7 @@ export default function EventsPro() {
                       }`}
                     >
                       <BarChart3 className="w-3 h-3" />
-                      <span>Statistiques</span>
+                      <span>{t('pro.events.stats', 'Statistiques')}</span>
                     </button>
 
                     <button
@@ -752,7 +754,7 @@ export default function EventsPro() {
                       className="text-red-400 hover:text-red-500 font-semibold transition-colors flex items-center gap-1"
                     >
                       <Trash2 className="w-3 h-3" />
-                      <span>Supprimer</span>
+                      <span>{t('common.delete', 'Supprimer')}</span>
                     </button>
                   </div>
                 </div>
@@ -774,20 +776,20 @@ export default function EventsPro() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} rounded-2xl p-4 sm:p-6 max-w-sm w-full border`}>
-            <h3 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>Supprimer ?</h3>
-            <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-4 sm:mb-6`}>Cette action est irréversible.</p>
+            <h3 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>{t('pro.events.deleteModalTitle', 'Supprimer ?')}</h3>
+            <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-4 sm:mb-6`}>{t('pro.events.deleteModalMsg', 'Cette action est irréversible.')}</p>
             <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
                 className={`flex-1 py-2 sm:py-2.5 text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-xl font-medium transition-colors`}
               >
-                Annuler
+                {t('common.cancel', 'Annuler')}
               </button>
               <button
                 onClick={() => deleteEvent(deleteConfirm)}
                 className="flex-1 py-2 sm:py-2.5 bg-red-600 text-white rounded-xl text-xs sm:text-sm font-medium hover:bg-red-700 transition-colors"
               >
-                Confirmer
+                {t('common.confirm', 'Confirmer')}
               </button>
             </div>
           </div>
@@ -818,6 +820,7 @@ export default function EventsPro() {
 
 // ============ CREATE EVENT MODAL ============
 function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate: (data: any) => void }) {
+  const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const [form, setForm] = useState({
     title: '',
@@ -851,43 +854,43 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
 
     // Titre: entre 5 et 100 caractères
     if (!form.title.trim()) {
-      newErrors.title = 'Le titre est obligatoire'
+      newErrors.title = t('pro.events.errTitleRequired', 'Le titre est obligatoire')
     } else if (form.title.length < 5) {
-      newErrors.title = 'Le titre doit contenir au moins 5 caractères'
+      newErrors.title = t('pro.events.errTitleMin', 'Le titre doit contenir au moins 5 caractères')
     } else if (form.title.length > 100) {
-      newErrors.title = 'Le titre ne doit pas dépasser 100 caractères'
+      newErrors.title = t('pro.events.errTitleMax', 'Le titre ne doit pas dépasser 100 caractères')
     }
 
     // Description: entre 20 et 500 caractères
     if (!form.description.trim()) {
-      newErrors.description = 'La description est obligatoire'
+      newErrors.description = t('pro.events.errDescRequired', 'La description est obligatoire')
     } else if (form.description.length < 20) {
-      newErrors.description = 'La description doit contenir au moins 20 caractères'
+      newErrors.description = t('pro.events.errDescMin', 'La description doit contenir au moins 20 caractères')
     } else if (form.description.length > 500) {
-      newErrors.description = 'La description ne doit pas dépasser 500 caractères'
+      newErrors.description = t('pro.events.errDescMax', 'La description ne doit pas dépasser 500 caractères')
     }
 
     // Dates: date de fin après date de début
     if (!form.startDate) {
-      newErrors.startDate = 'La date de début est obligatoire'
+      newErrors.startDate = t('pro.events.errStartDateRequired', 'La date de début est obligatoire')
     }
     if (!form.endDate) {
-      newErrors.endDate = 'La date de fin est obligatoire'
+      newErrors.endDate = t('pro.events.errEndDateRequired', 'La date de fin est obligatoire')
     }
     if (form.startDate && form.endDate && new Date(form.endDate) <= new Date(form.startDate)) {
-      newErrors.endDate = 'La date de fin doit être après la date de début'
+      newErrors.endDate = t('pro.events.errEndDateAfter', 'La date de fin doit être après la date de début')
     }
 
     // Capacité: entre 1 et 10000
     if (form.capacity < 1) {
-      newErrors.capacity = 'La capacité doit être au moins 1'
+      newErrors.capacity = t('pro.events.errCapacityMin', 'La capacité doit être au moins 1')
     } else if (form.capacity > 10000) {
-      newErrors.capacity = 'La capacité ne doit pas dépasser 10000'
+      newErrors.capacity = t('pro.events.errCapacityMax', 'La capacité ne doit pas dépasser 10000')
     }
 
     // Lieu: requis si format présentiel ou hybride
     if (form.format !== 'virtual' && !form.location.city.trim()) {
-      newErrors.city = 'La ville est obligatoire pour les événements présentiel/hybride'
+      newErrors.city = t('pro.events.errCityRequired', 'La ville est obligatoire pour les événements présentiel/hybride')
     }
 
     setErrors(newErrors)
@@ -971,10 +974,10 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
             </button>
             <div>
               <h2 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-slate-900'}`}>
-                Créer un Événement
+                {t('pro.events.createEvent', 'Créer un Événement')}
               </h2>
               <p className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Webinaire, masterclass ou atelier professionnel
+                {t('pro.events.createSubtitle', 'Webinaire, masterclass ou atelier professionnel')}
               </p>
             </div>
           </div>
@@ -986,7 +989,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
               resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            Aperçu
+            {t('pro.events.preview', 'Aperçu')}
           </button>
         </div>
 
@@ -995,7 +998,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
           {/* UPLOAD IMAGE */}
           <div>
             <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-              Image de couverture
+              {t('pro.events.coverImage', 'Image de couverture')}
             </label>
             <div
               className={`relative border-2 border-dashed rounded-2xl p-4 sm:p-6 text-center transition-all ${
@@ -1033,7 +1036,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
                       <Plus className="w-6 h-6" />
                     </div>
                     <p className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'}`}>
-                      Ajouter une affiche ou bannière
+                      {t('pro.events.addCover', 'Ajouter une affiche ou bannière')}
                     </p>
                     <p className={`text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
                       JPEG, PNG, WebP (max 5MB)
@@ -1046,7 +1049,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
 
           <div>
             <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-              Titre de l'événement *
+              {t('pro.events.titleLabel', "Titre de l'événement *")}
             </label>
             <input
               required
@@ -1060,7 +1063,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
 
           <div>
             <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-              Description *
+              {t('pro.events.descriptionLabel', 'Description *')}
             </label>
             <textarea
               value={form.description}
@@ -1075,7 +1078,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                Date & Heure de début *
+                {t('pro.events.startDateLabel', 'Date & Heure de début *')}
               </label>
               <input
                 type="datetime-local"
@@ -1088,7 +1091,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
             </div>
             <div>
               <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                Date & Heure de fin *
+                {t('pro.events.endDateLabel', 'Date & Heure de fin *')}
               </label>
               <input
                 type="datetime-local"
@@ -1104,35 +1107,35 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                Format
+                {t('pro.events.format', 'Format')}
               </label>
               <select
                 value={form.format}
                 onChange={e => setForm({ ...form, format: e.target.value as any })}
                 className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#FF6B00] focus:outline-none transition-colors`}
               >
-                <option value="virtual">En ligne (Live / Webinaire)</option>
-                <option value="in-person">Présentiel</option>
-                <option value="hybrid">Hybride</option>
+                <option value="virtual">{t('pro.events.formatVirtual', 'En ligne (Live / Webinaire)')}</option>
+                <option value="in-person">{t('pro.events.formatInPerson', 'Présentiel')}</option>
+                <option value="hybrid">{t('pro.events.formatHybrid', 'Hybride')}</option>
               </select>
             </div>
             <div>
               <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                Catégorie
+                {t('pro.events.category', 'Catégorie')}
               </label>
               <select
                 value={form.category}
                 onChange={e => setForm({ ...form, category: e.target.value })}
                 className={`w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/80 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#FF6B00] focus:outline-none transition-colors`}
               >
-                <option value="Tech">Technologie</option>
-                <option value="Business">Business & Finance</option>
-                <option value="Design">Design & UI/UX</option>
-                <option value="Marketing">Marketing & Vente</option>
-                <option value="Santé">Santé & Bien-être</option>
-                <option value="Droit">Droit & Fiscalité</option>
-                <option value="Education">Masterclass Pro</option>
-                <option value="Autre">Autre</option>
+                <option value="Tech">{t('pro.events.catTech', 'Technologie')}</option>
+                <option value="Business">{t('pro.events.catBusiness', 'Business & Finance')}</option>
+                <option value="Design">{t('pro.events.catDesign', 'Design & UI/UX')}</option>
+                <option value="Marketing">{t('pro.events.catMarketing', 'Marketing & Vente')}</option>
+                <option value="Santé">{t('pro.events.catHealth', 'Santé & Bien-être')}</option>
+                <option value="Droit">{t('pro.events.catLaw', 'Droit & Fiscalité')}</option>
+                <option value="Education">{t('pro.events.catEducation', 'Masterclass Pro')}</option>
+                <option value="Autre">{t('common.other', 'Autre')}</option>
               </select>
             </div>
           </div>
@@ -1140,7 +1143,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                Capacité max (places)
+                {t('pro.events.capacity', 'Capacité max (places)')}
               </label>
               <input
                 type="number"
@@ -1152,7 +1155,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
             </div>
             <div>
               <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                Tarif (0 = Gratuit)
+                {t('pro.events.price', 'Tarif (0 = Gratuit)')}
               </label>
               <input
                 type="number"
@@ -1168,7 +1171,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                  Ville *
+                  {t('pro.events.city', 'Ville *')}
                 </label>
                 <input
                   value={form.location.city}
@@ -1180,7 +1183,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
               </div>
               <div>
                 <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
-                  Nom du lieu
+                  {t('pro.events.venue', 'Nom du lieu')}
                 </label>
                 <input
                   value={form.location.venue}
@@ -1202,7 +1205,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
               resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
-            Annuler
+            {t('common.cancel', 'Annuler')}
           </button>
           <button
             type="submit"
@@ -1210,7 +1213,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
             className="px-6 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 flex items-center gap-2"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Créer l'Événement</span>
+            <span>{t('pro.events.createEvent', "Créer l'Événement")}</span>
           </button>
         </div>
       </div>
@@ -1220,7 +1223,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
         <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'} rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border shadow-2xl p-5 space-y-4`}>
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-              <h2 className="text-base font-bold">Aperçu de l'événement</h2>
+              <h2 className="text-base font-bold">{t('pro.events.previewTitle', "Aperçu de l'événement")}</h2>
               <button onClick={() => setShowPreview(false)} className="p-1.5 rounded-full hover:bg-zinc-800">
                 <X className="w-4 h-4" />
               </button>
@@ -1236,12 +1239,12 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
                 )}
               </div>
               <div className="p-4 space-y-2">
-                <h3 className="font-bold text-sm">{form.title || 'Titre de l\'événement'}</h3>
-                <p className="text-xs text-zinc-400 line-clamp-2">{form.description || 'Description de l\'événement...'}</p>
+                <h3 className="font-bold text-sm">{form.title || t('pro.events.defaultTitle', "Titre de l'événement")}</h3>
+                <p className="text-xs text-zinc-400 line-clamp-2">{form.description || t('pro.events.defaultDesc', "Description de l'événement...")}</p>
                 <div className="flex items-center gap-3 text-[11px] text-zinc-500 pt-2 border-t border-zinc-800">
-                  <span>{form.format === 'virtual' ? '🎥 En ligne' : '📍 ' + (form.location.city || 'Lieu')}</span>
-                  <span>👥 {form.capacity} places</span>
-                  <span>💰 {form.price === 0 ? 'Gratuit' : `${form.price}$`}</span>
+                  <span>{form.format === 'virtual' ? `🎥 ${t('pro.events.onlineEvent', 'En ligne')}` : '📍 ' + (form.location.city || t('pro.events.location', 'Lieu'))}</span>
+                  <span>👥 {form.capacity} {t('pro.events.capacityUnit', 'places')}</span>
+                  <span>💰 {form.price === 0 ? t('pro.events.free', 'Gratuit') : `${form.price}$`}</span>
                 </div>
               </div>
             </div>

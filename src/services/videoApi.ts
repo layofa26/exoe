@@ -1,8 +1,8 @@
 import type { Video as FeedVideo } from '../types/video'
+import { API_BASE_URL as CONFIG_API_BASE_URL } from '../config/api'
 
-const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 // S'assurer que l'URL de base est toujours propre et sans double /v1
-const API_BASE_URL = RAW_API_BASE.replace(/\/+$/, '')
+const API_BASE_URL = CONFIG_API_BASE_URL.replace(/\/+$/, '')
 
 const getEndpoint = (path: string): string => {
   const clean = path.replace(/^\/+/, '')
@@ -75,16 +75,9 @@ export const unwrapList = <T,>(data: any): T[] => {
 
 const AVATAR_COLORS = ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#0EA5E9']
 
-export const resolveMediaUrl = (url?: string | null): string => {
-  if (!url || typeof url !== 'string' || !url.trim()) return ''
-  const trimmed = url.trim()
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
-    return trimmed
-  }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
-  const origin = apiBase.replace(/\/api.*$/, '').replace(/\/$/, '')
-  return `${origin}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`
-}
+import { resolveMediaUrl } from '../utils/mediaUtils'
+export { resolveMediaUrl }
+
 
 export const cleanUsername = (str?: string | null): string => {
   if (!str) return 'utilisateur'

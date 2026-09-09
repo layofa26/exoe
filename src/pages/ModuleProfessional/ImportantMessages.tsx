@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   Star,
@@ -28,6 +29,7 @@ interface ImportantMessage {
 }
 
 export const ImportantMessages = (): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,7 +84,7 @@ export const ImportantMessages = (): JSX.Element => {
   }
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('fr-FR', { 
+    return new Date(dateString).toLocaleTimeString(i18n.language || 'fr-FR', { 
       hour: '2-digit', 
       minute: '2-digit' 
     })
@@ -95,11 +97,11 @@ export const ImportantMessages = (): JSX.Element => {
     yesterday.setDate(yesterday.getDate() - 1)
     
     if (date.toDateString() === today.toDateString()) {
-      return "Aujourd'hui"
+      return t('common.today', "Aujourd'hui")
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return "Hier"
+      return t('common.yesterday', "Hier")
     } else {
-      return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      return date.toLocaleDateString(i18n.language || 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     }
   }
 
@@ -127,8 +129,12 @@ export const ImportantMessages = (): JSX.Element => {
                   <Star className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div>
-                  <h1 className={`text-base sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Messages Importants</h1>
-                  <p className={`text-[10px] sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} hidden sm:block`}>Vos messages marqués comme importants</p>
+                  <h1 className={`text-base sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {t('pro.conversations.important', 'Messages Importants')}
+                  </h1>
+                  <p className={`text-[10px] sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} hidden sm:block`}>
+                    {t('pro.conversations.importantDesc', 'Vos messages marqués comme importants')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -141,7 +147,7 @@ export const ImportantMessages = (): JSX.Element => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Rechercher..."
+                  placeholder={t('common.search', 'Rechercher...')}
                   className={`w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm border ${resolvedTheme === 'dark' ? 'border-zinc-600 text-white bg-zinc-700' : 'border-gray-300 text-gray-900 bg-white'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                 />
               </div>
@@ -160,7 +166,9 @@ export const ImportantMessages = (): JSX.Element => {
               <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
                 <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
               </div>
-              <h1 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Messages Importants</h1>
+              <h1 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {t('pro.conversations.important', 'Messages Importants')}
+              </h1>
             </div>
 
             {/* Search */}
@@ -170,7 +178,7 @@ export const ImportantMessages = (): JSX.Element => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher..."
+                placeholder={t('common.search', 'Rechercher...')}
                 className={`w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1 sm:py-1.5 text-xs sm:text-sm border ${resolvedTheme === 'dark' ? 'border-zinc-600 text-white bg-zinc-700' : 'border-gray-300 text-gray-900 bg-white'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
               />
             </div>
@@ -194,7 +202,7 @@ export const ImportantMessages = (): JSX.Element => {
           <div className="text-center py-8 sm:py-12">
             <Star className={`w-10 h-10 sm:w-12 sm:h-12 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-gray-400'} mx-auto mb-3 sm:mb-4`} />
             <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-              {searchQuery ? 'Aucun message trouvé' : 'Aucun message important'}
+              {searchQuery ? t('common.noResults', 'Aucun message trouvé') : t('pro.conversations.noImportant', 'Aucun message important')}
             </p>
           </div>
         ) : (

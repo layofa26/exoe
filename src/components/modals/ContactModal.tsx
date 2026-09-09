@@ -8,6 +8,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 const API = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
@@ -35,6 +36,7 @@ export const ContactModal = ({
   receiver,
   sender
 }: ContactModalProps): JSX.Element | null => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -58,7 +60,7 @@ export const ContactModal = ({
 
     // Vérifier si l'utilisateur essaie de s'envoyer à lui-même
     if (sender.id === receiver.id) {
-      setResult({ success: false, message: 'Vous ne pouvez pas envoyer de demande à vous-même.' })
+      setResult({ success: false, message: t('pro.modals.cannotSendSelf', 'Vous ne pouvez pas envoyer de demande à vous-même.') })
       return
     }
 
@@ -67,7 +69,7 @@ export const ContactModal = ({
     try {
       const token = localStorage.getItem('accessToken')
       if (!token) {
-        setResult({ success: false, message: 'Vous devez être connecté pour envoyer une demande.' })
+        setResult({ success: false, message: t('pro.modals.mustBeLoggedIn', 'Vous devez être connecté pour envoyer une demande.') })
         setIsSubmitting(false)
         return
       }
@@ -84,14 +86,14 @@ export const ContactModal = ({
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        setResult({ success: true, message: 'Demande envoyée avec succès !' })
+        setResult({ success: true, message: t('pro.modals.requestSentSuccess', 'Demande envoyée avec succès !') })
         setTimeout(() => { onClose(); setResult(null); setMessage('') }, 2000)
       } else {
-        const errMsg = Array.isArray(data.receiver) ? data.receiver[0] : (data.detail || data.message || 'Erreur lors de l\'envoi')
+        const errMsg = Array.isArray(data.receiver) ? data.receiver[0] : (data.detail || data.message || t('common.errorOccurred', "Erreur lors de l'envoi"))
         setResult({ success: false, message: errMsg })
       }
     } catch {
-      setResult({ success: false, message: 'Erreur réseau. Vérifiez votre connexion.' })
+      setResult({ success: false, message: t('pro.modals.networkError', 'Erreur réseau. Vérifiez votre connexion.') })
     } finally {
       setIsSubmitting(false)
     }
@@ -117,7 +119,7 @@ export const ContactModal = ({
             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
               <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <h3 className={`font-semibold text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Contacter un professionnel</h3>
+            <h3 className={`font-semibold text-sm sm:text-base ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{t('pro.modals.contactPro', 'Contacter un professionnel')}</h3>
           </div>
           <button
             onClick={onClose}
@@ -163,20 +165,20 @@ export const ContactModal = ({
           {/* Options de type de demande */}
           <div className="space-y-1.5">
             <label className={`block text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-              Objet de votre demande
+              {t('pro.modals.requestSubject', 'Objet de votre demande')}
             </label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'collaboration', label: '🤝 Collaboration', hint: 'Projet commun, partenariat' },
-                { id: 'service', label: '💼 Prestation', hint: 'Mission, service pro' },
-                { id: 'contact', label: '💬 Prise de contact', hint: 'Échange, réseau pro' },
-                { id: 'quote', label: '🎯 Demande de devis', hint: 'Tarifs et faisabilité' },
+                { id: 'collaboration', label: `🤝 ${t('pro.modals.collaboration', 'Collaboration')}`, textKey: 'collaboration', hint: t('pro.modals.collaborationHint', 'Projet commun, partenariat') },
+                { id: 'service', label: `💼 ${t('pro.modals.service', 'Prestation')}`, textKey: 'service', hint: t('pro.modals.serviceHint', 'Mission, service pro') },
+                { id: 'contact', label: `💬 ${t('pro.modals.contact', 'Prise de contact')}`, textKey: 'contact', hint: t('pro.modals.contactHint', 'Échange, réseau pro') },
+                { id: 'quote', label: `🎯 ${t('pro.modals.quote', 'Demande de devis')}`, textKey: 'quote', hint: t('pro.modals.quoteHint', 'Tarifs et faisabilité') },
               ].map(opt => (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => {
-                    const prefix = `[${opt.label.split(' ')[1]}] `
+                    const prefix = `[${opt.label.split(' ')[1] || opt.label}] `
                     if (!message.startsWith('[')) {
                       setMessage(prefix + message)
                     } else {
@@ -184,7 +186,7 @@ export const ContactModal = ({
                     }
                   }}
                   className={`p-2 rounded-xl text-left border text-xs transition-all ${
-                    message.includes(opt.label.split(' ')[1])
+                    message.includes(opt.label.split(' ')[1] || opt.label)
                       ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold'
                       : resolvedTheme === 'dark'
                         ? 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-600 text-zinc-300'
@@ -203,12 +205,12 @@ export const ContactModal = ({
               {/* Message */}
               <div className="space-y-2 sm:space-y-3">
                 <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                  Votre message
+                  {t('pro.modals.yourMessage', 'Votre message')}
                 </label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Décrivez brièvement votre projet ou votre demande..."
+                  placeholder={t('pro.modals.describeRequest', 'Décrivez brièvement votre projet ou votre demande...')}
                   rows={4}
                   disabled={isSubmitting}
                   className={`w-full px-2.5 sm:px-3 py-2 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none text-xs sm:text-sm ${
@@ -234,7 +236,7 @@ export const ContactModal = ({
                 ) : (
                   <>
                     <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-                    Envoyer la demande
+                    {t('pro.modals.sendRequest', 'Envoyer la demande')}
                   </>
                 )}
               </button>
@@ -248,7 +250,7 @@ export const ContactModal = ({
             onClick={onClose}
             className={`px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg transition-colors ${resolvedTheme === 'dark' ? 'text-zinc-300 hover:bg-zinc-700' : 'text-gray-700 hover:bg-gray-100'}`}
           >
-            Annuler
+            {t('common.cancel', 'Annuler')}
           </button>
         </div>
       </div>
