@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Lock, CheckCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { API_BASE_URL } from '../../config/api';
 
 export default function ResetPasswordPage() {
   const { resolvedTheme } = useTheme();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
+  const uid = searchParams.get('uid');
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,16 +59,19 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/reset-password/`, {
+      const response = await fetch(`${API_BASE_URL}/users/reset-password/confirm/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, new_password })
+        body: JSON.stringify({ token, uid, new_password: password })
       });
 
-      if (response.ok) {
+      const data = await response.json();
+      if (response.ok && data.success) {
         setSuccess(true);
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
       } else {
-        const data = await response.json();
         setError(data.error || 'Une erreur est survenue');
       }
     } catch (err: any) {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { API_BASE_URL } from '../../config/api';
 
 export default function ForgotPasswordPage() {
   const { resolvedTheme } = useTheme();
@@ -16,20 +17,20 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/reset-password/`, {
+      const response = await fetch(`${API_BASE_URL}/users/forgot-password/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, new_password })
+        body: JSON.stringify({ email: email.trim() })
       });
 
-      if (response.ok) {
+      const data = await response.json();
+      if (response.ok && data.success) {
         setSuccess(true);
       } else {
-        const data = await response.json();
-        setError(data.error || 'Une erreur est survenue');
+        setError(data.error || 'Une erreur est survenue lors de l\'envoi.');
       }
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue');
+      setError(err.message || 'Impossible de contacter le serveur.');
     } finally {
       setLoading(false);
     }
