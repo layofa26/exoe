@@ -6,7 +6,7 @@ import {
   Eye, EyeOff, ChevronRight, Play,
   User, Camera, MapPin, Briefcase, Plus, X, Info,
   Check, MessageSquare, UserCheck, UserX, AlertCircle,
-  RefreshCw, Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key
+  RefreshCw, Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key, Crown
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -28,7 +28,8 @@ type SettingsCategory =
   | 'notifications' 
   | 'app' 
   | 'video' 
-  | 'support';
+  | 'support'
+  | 'premium';
 
 type WhoCanContactOption = 'everyone' | 'followers' | 'verified_pro' | 'nobody';
 type ProfileVisibilityOption = 'public' | 'members' | 'private';
@@ -1118,6 +1119,33 @@ const Settings = () => {
                 </div>
               </button>
 
+              {/* 8. Passer à Premium */}
+              <button
+                onClick={() => { setActiveCategory('premium'); setMobileShowContent(true); }}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
+                  activeCategory === 'premium'
+                    ? resolvedTheme === 'dark' ? 'bg-zinc-800 text-white font-semibold' : 'bg-gray-100 text-gray-900 font-semibold'
+                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/60 text-zinc-300' : 'hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                <div className={`p-2 rounded-lg flex-shrink-0 ${
+                  activeCategory === 'premium' 
+                    ? resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
+                    : 'bg-amber-500/10 text-amber-500'
+                }`}>
+                  <Crown className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium truncate">{t('settings.categories.premium', 'Passer à Premium')}</span>
+                    <ChevronRight className="w-4 h-4 opacity-50 rtl-flip" />
+                  </div>
+                  <p className={`text-[11px] truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
+                    {t('settings.categories.premiumDesc', 'Débloquez plus de fonctionnalités')}
+                  </p>
+                </div>
+              </button>
+
               {/* Bouton Déconnexion */}
               <div className="pt-2 mt-3 border-t border-zinc-700/40">
                 <button
@@ -1174,7 +1202,9 @@ const Settings = () => {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800/60">
                     <div className="flex items-center gap-4">
                       <div className="relative group">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-blue-600 flex items-center justify-center font-bold text-xl sm:text-2xl text-white shadow-md">
+                        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden flex items-center justify-center font-bold text-xl sm:text-2xl shadow-sm ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-200' : 'bg-gray-100 text-gray-700'
+                        }`}>
                           {photoPreview ? (
                             <img src={photoPreview} alt="Avatar" className="w-full h-full object-cover" />
                           ) : (
@@ -1183,7 +1213,9 @@ const Settings = () => {
                         </div>
                         <button
                           onClick={() => setShowPhotoUploadModal(true)}
-                          className="absolute -bottom-1 -right-1 p-1.5 rounded-lg bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-colors"
+                          className={`absolute -bottom-1 -right-1 p-1.5 rounded-full border shadow-sm transition-colors ${
+                            resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:text-white' : 'bg-white border-gray-200 text-gray-600 hover:text-black'
+                          }`}
                           title="Changer la photo"
                         >
                           <Camera className="w-3.5 h-3.5" />
@@ -1193,21 +1225,22 @@ const Settings = () => {
                         <h2 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                           {profileData.firstName} {profileData.lastName}
                         </h2>
-                        <p className="text-xs sm:text-sm text-blue-500 font-medium">
+                        <p className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                           {profileData.username ? (profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`) : '@utilisateur'}
                         </p>
-                        <p className={`text-xs mt-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                          {profileData.profession || 'Profession non définie'} • {profileData.city || 'Localisation non définie'}
+                        <p className={`text-xs mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                          {profileData.profession || 'Créateur de contenu'} • {profileData.city || 'Localisation non définie'}
                         </p>
                       </div>
                     </div>
 
                     <button
                       onClick={() => setShowProfileEditModal(true)}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm"
+                      className={`px-4 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-colors shadow-sm ${
+                        resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700' : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200'
+                      }`}
                     >
-                      <User className="w-4 h-4" />
-                      <span>{t('settings.account.editInfo', 'Modifier mes informations')}</span>
+                      {t('settings.account.editProfileBtn', 'Modifier le profil')}
                     </button>
                   </div>
 
@@ -1215,19 +1248,17 @@ const Settings = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                     
                     {/* Carte Mot de passe */}
-                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} flex flex-col justify-between`}>
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 flex-shrink-0">
-                          <Lock className="w-5 h-5" />
-                        </div>
-                        <div>
+                    <div className={`p-5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} flex flex-col justify-between space-y-4 shadow-sm`}>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2.5">
+                          <Lock className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`} />
                           <h3 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                            {t('settings.account.passwordCardTitle', 'Sécurité du Mot de passe')}
+                            {t('settings.account.securityTitle', 'Sécurité du compte')}
                           </h3>
-                          <p className={`text-xs mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                            {t('settings.account.passwordCardDesc', 'Mis à jour directement dans la base de données Django Auth')}
-                          </p>
                         </div>
+                        <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                          {t('settings.account.passwordDescClean', 'Mot de passe sécurisé et actif')}
+                        </p>
                       </div>
                       <button
                         onClick={() => {
@@ -1241,26 +1272,26 @@ const Settings = () => {
                           setShowConfirmPassword(false)
                           setShowPasswordModal(true)
                         }}
-                        className="w-full py-2.5 px-3 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 text-blue-500 font-semibold text-xs sm:text-sm transition-colors text-center"
+                        className={`w-full py-2.5 px-4 rounded-xl border text-xs sm:text-sm font-semibold transition-colors text-center ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700' : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200 shadow-sm'
+                        }`}
                       >
-                        {t('settings.account.changePassword', 'Changer le mot de passe')}
+                        {t('settings.account.changePasswordClean', 'Changer le mot de passe')}
                       </button>
                     </div>
 
                     {/* Carte Adresse Email */}
-                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} flex flex-col justify-between`}>
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 flex-shrink-0">
-                          <Mail className="w-5 h-5" />
-                        </div>
-                        <div>
+                    <div className={`p-5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} flex flex-col justify-between space-y-4 shadow-sm`}>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2.5">
+                          <Mail className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`} />
                           <h3 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                            {t('settings.account.emailCardTitle', 'Adresse Email Associée')}
+                            {t('settings.account.emailAssociated', 'Email associé')}
                           </h3>
-                          <p className={`text-xs mt-0.5 font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} truncate max-w-[220px]`}>
-                            {profileData.email && profileData.email.includes('@') && !profileData.email.startsWith('@') ? profileData.email : 'Non renseigné'}
-                          </p>
                         </div>
+                        <p className={`text-xs font-medium truncate ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
+                          {profileData.email && profileData.email.includes('@') && !profileData.email.startsWith('@') ? profileData.email : 'Non renseigné'}
+                        </p>
                       </div>
                       <button
                         onClick={() => {
@@ -1270,32 +1301,64 @@ const Settings = () => {
                           setEmailSuccess(null)
                           setShowEmailModal(true)
                         }}
-                        className="w-full py-2.5 px-3 rounded-xl bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-500 font-semibold text-xs sm:text-sm transition-colors text-center"
+                        className={`w-full py-2.5 px-4 rounded-xl border text-xs sm:text-sm font-semibold transition-colors text-center ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700' : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200 shadow-sm'
+                        }`}
                       >
-                        {t('settings.account.modifyEmail', "Modifier l'email")}
+                        {t('settings.account.changeEmailClean', "Changer l'email")}
                       </button>
                     </div>
 
                   </div>
                 </div>
 
+                {/* Sektion Passer à Premium (Clean & Minimaliste ekzateman jan nan imaj modèl la) */}
+                <div className={`p-5 sm:p-6 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-100' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      <Crown className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className={`text-sm sm:text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {t('settings.premium.title', 'Passer à Premium')}
+                      </h3>
+                      <p className={`text-xs sm:text-sm mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.premium.desc', 'Profitez de fonctionnalités exclusives et d\'une meilleure expérience.')}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setActiveCategory('premium'); setMobileShowContent(true); }}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-semibold text-xs sm:text-sm transition-all shadow-sm whitespace-nowrap active:scale-95"
+                  >
+                    {t('settings.premium.viewOffers', 'Voir les offres')}
+                  </button>
+                </div>
+
                 {/* Zone de Danger (Pleine Largeur) */}
-                <div className={`p-5 sm:p-6 rounded-2xl border border-red-500/20 ${resolvedTheme === 'dark' ? 'bg-red-950/10' : 'bg-red-50/50'}`}>
+                <div className={`p-5 sm:p-6 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} shadow-sm mt-6`}>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-xl bg-red-500/10 text-red-500 flex-shrink-0">
-                        <Trash2 className="w-5 h-5" />
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-gray-900 dark:text-white">
+                        <Trash2 className="w-4 h-4 text-gray-600 dark:text-zinc-400" />
+                        <h3 className="text-sm font-bold">{t('settings.account.dangerZoneClean', 'Zone dangereuse')}</h3>
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-red-500">{t('settings.account.dangerZone', 'Zone de danger : Suppression du compte')}</h3>
-                        <p className={`text-xs mt-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
-                          {t('settings.account.dangerZoneDesc', 'Supprime définitivement votre profil, vos vidéos, conversations et données stockées.')}
+                        <p className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-200' : 'text-gray-800'}`}>
+                          {t('settings.account.deleteAccountTitle', 'Supprimer le compte')}
+                        </p>
+                        <p className={`text-xs mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                          {t('settings.account.dangerZoneDescClean', 'Cette action supprime définitivement votre profil, vos vidéos, vos conversations et toutes vos données.')}
                         </p>
                       </div>
                     </div>
                     <button
                       onClick={() => setShowDeleteModal(true)}
-                      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs sm:text-sm transition-colors whitespace-nowrap shadow-sm"
+                      className={`px-4 py-2 rounded-xl border font-semibold text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                        resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-red-950/40 text-red-400 border-zinc-700 hover:border-red-500/50' : 'bg-white hover:bg-red-50 text-gray-800 hover:text-red-600 border-gray-200 shadow-sm'
+                      }`}
                     >
                       {t('settings.account.deleteAccount', 'Supprimer le compte')}
                     </button>
@@ -2047,6 +2110,86 @@ const Settings = () => {
                     </div>
                     <ChevronRight className="w-4 h-4 text-zinc-400 rtl-flip" />
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------ */}
+            {/* 8. SECTION : PASSER À PREMIUM (OFFRES & AVANTAGES)           */}
+            {/* ------------------------------------------------------------ */}
+            {activeCategory === 'premium' && (
+              <div className="space-y-6">
+                <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-6 sm:p-8 shadow-sm space-y-6`}>
+                  
+                  <div className="flex items-center gap-4 pb-6 border-b border-zinc-800/60">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                      resolvedTheme === 'dark' ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'
+                    }`}>
+                      <Crown className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h2 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {t('settings.premium.heroTitle', 'EXILE Pro Premium')}
+                      </h2>
+                      <p className={`text-xs sm:text-sm mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.premium.heroSubtitle', 'Accédez aux outils avancés pour booster votre notoriété et vos opportunités professionnelles.')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Cartes d'avantages Clean & Minimalistes */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} space-y-2`}>
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs">
+                        HD
+                      </div>
+                      <h4 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Vidéos Haute Définition</h4>
+                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        Téléversez des vidéos sans limite de compression et en qualité 4K/1080p maximale.
+                      </p>
+                    </div>
+
+                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} space-y-2`}>
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs">
+                        ✓
+                      </div>
+                      <h4 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Badge Vérifié</h4>
+                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        Obtenez le badge officiel distinctif prouvant votre expertise auprès des clients.
+                      </p>
+                    </div>
+
+                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} space-y-2`}>
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold text-xs">
+                        ★
+                      </div>
+                      <h4 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Visibilité Prioritaire</h4>
+                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        Votre profil et vos publications sont propulsés en tête des recherches et du fil d'actualité.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Offre tarifaire */}
+                  <div className={`p-6 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-gray-50 border-gray-200'} flex flex-col sm:flex-row items-center justify-between gap-4`}>
+                    <div>
+                      <span className="text-xs uppercase tracking-wider font-bold text-amber-500">Plan Pro Annuel</span>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$9.99</span>
+                        <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>/ mois (facturé annuellement)</span>
+                      </div>
+                      <p className={`text-xs mt-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        Annulable à tout moment. Garantie 14 jours satisfait ou remboursé.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => alert('Le module d\'abonnement sécurisé Stripe sera disponible très prochainement.')}
+                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-black hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-sm shadow-md transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      Souscrire à l'offre Pro
+                    </button>
+                  </div>
+
                 </div>
               </div>
             )}
