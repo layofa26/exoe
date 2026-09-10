@@ -6,7 +6,7 @@ import {
   Eye, EyeOff, ChevronRight, Play,
   User, Camera, MapPin, Briefcase, Plus, X, Info,
   Check, MessageSquare, UserCheck, UserX, AlertCircle,
-  RefreshCw, Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key, Crown
+  RefreshCw, Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key, Crown, Wifi, Sparkles
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -162,8 +162,6 @@ const Settings = () => {
     inApp: true,
     frequency: 'immediate'
   })
-  const [sendingTestNotif, setSendingTestNotif] = useState(false)
-  const [testNotifFeedback, setTestNotifFeedback] = useState<string | null>(null)
 
   // Signalement de Bug Technique (100% Réel)
   const [showBugModal, setShowBugModal] = useState(false)
@@ -185,6 +183,8 @@ const Settings = () => {
   const [videoPreviewEnabled, setVideoPreviewEnabled] = useState(false)
   const [previewVideos, setPreviewVideos] = useState<any[]>([])
   const [autoplayInterval, setAutoplayInterval] = useState(5)
+  const [videoDataSaver, setVideoDataSaver] = useState<boolean>(false)
+  const [videoNetworkMode, setVideoNetworkMode] = useState<'all' | 'wifi_only'>('all')
 
   // Charger les vidéos et paramètres locaux
   useEffect(() => {
@@ -195,6 +195,10 @@ const Settings = () => {
       const savedInterval = localStorage.getItem('exile_autoplay_interval')
       if (savedEnabled) setVideoPreviewEnabled(JSON.parse(savedEnabled))
       if (savedInterval) setAutoplayInterval(JSON.parse(savedInterval))
+      const savedDataSaver = localStorage.getItem('exile_video_data_saver')
+      if (savedDataSaver) setVideoDataSaver(JSON.parse(savedDataSaver))
+      const savedNetworkMode = localStorage.getItem('exile_video_network_mode')
+      if (savedNetworkMode) setVideoNetworkMode(JSON.parse(savedNetworkMode))
       const savedNotifs = localStorage.getItem('exile_notification_settings')
       if (savedNotifs) setNotificationSettings(JSON.parse(savedNotifs))
       const savedApp = localStorage.getItem('exile_app_settings')
@@ -208,6 +212,14 @@ const Settings = () => {
     localStorage.setItem('exile_video_preview_enabled', JSON.stringify(videoPreviewEnabled))
     localStorage.setItem('exile_autoplay_interval', JSON.stringify(autoplayInterval))
   }, [videoPreviewEnabled, autoplayInterval])
+
+  useEffect(() => {
+    localStorage.setItem('exile_video_data_saver', JSON.stringify(videoDataSaver))
+  }, [videoDataSaver])
+
+  useEffect(() => {
+    localStorage.setItem('exile_video_network_mode', JSON.stringify(videoNetworkMode))
+  }, [videoNetworkMode])
 
   useEffect(() => {
     localStorage.setItem('exile_notification_settings', JSON.stringify(notificationSettings))
@@ -454,31 +466,6 @@ const Settings = () => {
       }
     } catch (err) {
       console.error('Error saving notification preferences:', err)
-    }
-  }
-
-  const handleSendTestNotification = async () => {
-    setSendingTestNotif(true)
-    setTestNotifFeedback(null)
-    try {
-      const token = localStorage.getItem('accessToken')
-      const res = await fetch(`${API_BASE_URL}/users/notifications/test/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      if (res.ok) {
-        setTestNotifFeedback('Notifikasyon tès voye avèk siksè sou imèl ou !')
-      } else {
-        setTestNotifFeedback('Echèk pandan voye notifikasyon tès la.')
-      }
-    } catch {
-      setTestNotifFeedback('Erè rezo pandan voye notifikasyon.')
-    } finally {
-      setSendingTestNotif(false)
-      setTimeout(() => setTestNotifFeedback(null), 4000)
     }
   }
 
@@ -935,231 +922,295 @@ const Settings = () => {
           {/* COLONNE GAUCHE (SIDEBAR NAVIGATION) : 5 Cols Tablet, 3-4 Desktop */}
           {/* ============================================================ */}
           <aside className={`md:col-span-5 lg:col-span-4 xl:col-span-3 ${mobileShowContent ? 'hidden md:block' : 'block'}`}>
-            <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-3 sm:p-4 shadow-sm space-y-2 md:sticky md:top-20 lg:top-24`}>
+            <div className="space-y-4 md:sticky md:top-20 lg:top-24">
               
-              {/* Carte Profil Rapide dans la Sidebar */}
-              <div className={`p-3 rounded-xl mb-3 flex items-center gap-3 ${resolvedTheme === 'dark' ? 'bg-zinc-800/60' : 'bg-gray-50'}`}>
-                <div className="w-11 h-11 rounded-full overflow-hidden bg-blue-600 flex-shrink-0 flex items-center justify-center font-bold text-white shadow-sm">
-                  {photoPreview ? (
-                    <img src={photoPreview} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    profileData.firstName?.[0]?.toUpperCase() || 'U'
-                  )}
+              {/* Carte Profil Rapide (comme dans l'image de référence) */}
+              <div 
+                onClick={() => { setActiveCategory('account'); setMobileShowContent(true); }}
+                className={`p-3.5 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-all border ${
+                  resolvedTheme === 'dark' 
+                    ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 shadow-sm' 
+                    : 'bg-white border-gray-100 shadow-sm hover:shadow'
+                }`}
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-indigo-600 flex-shrink-0 flex items-center justify-center font-bold text-white shadow-sm ring-2 ring-blue-500/20">
+                    {photoPreview ? (
+                      <img src={photoPreview} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-base">{profileData.firstName?.[0]?.toUpperCase() || 'U'}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm sm:text-base font-bold truncate ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {profileData.firstName || profileData.lastName ? `${profileData.firstName} ${profileData.lastName}`.trim() : 'Utilisateur'}
+                    </p>
+                    <p className={`text-xs font-medium truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      {profileData.username ? (profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`) : '@utilisateur'}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-bold truncate ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {profileData.firstName} {profileData.lastName}
-                  </p>
-                  <p className="text-xs text-blue-500 font-medium truncate">
-                    {profileData.username ? (profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`) : '@utilisateur'}
-                  </p>
+                <ChevronRight className={`w-5 h-5 flex-shrink-0 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
+              </div>
+
+              {/* SECTION: COMPTE */}
+              <div>
+                <p className="text-[11px] font-bold tracking-wider text-gray-400 dark:text-zinc-500 uppercase px-3 mb-2">
+                  {t('settings.sections.account', 'Compte')}
+                </p>
+                <div className={`rounded-2xl border overflow-hidden transition-colors ${
+                  resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 divide-y divide-zinc-800/80' : 'bg-white border-gray-100 divide-y divide-gray-100 shadow-sm'
+                }`}>
+                  
+                  {/* 1. Informations personnelles */}
+                  <button
+                    onClick={() => { setActiveCategory('account'); setMobileShowContent(true); }}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      activeCategory === 'account'
+                        ? resolvedTheme === 'dark' ? 'bg-zinc-800/80' : 'bg-blue-50/70'
+                        : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/40' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-500/10 text-blue-500 dark:bg-blue-500/20 dark:text-blue-400">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${
+                        activeCategory === 'account' && resolvedTheme !== 'dark' ? 'text-blue-600' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {t('settings.categories.account', 'Informations personnelles')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.categories.accountDesc', 'Nom, bio, coordonnées')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                      activeCategory === 'account' && resolvedTheme !== 'dark' ? 'text-blue-600' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'
+                    }`} />
+                  </button>
+
+                  {/* 2. Confidentialité & contacts */}
+                  <button
+                    onClick={() => { setActiveCategory('privacy'); setMobileShowContent(true); }}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      activeCategory === 'privacy'
+                        ? resolvedTheme === 'dark' ? 'bg-zinc-800/80' : 'bg-purple-50/70'
+                        : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/40' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-400">
+                      <Shield className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${
+                        activeCategory === 'privacy' && resolvedTheme !== 'dark' ? 'text-purple-600' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {t('settings.categories.privacy', 'Confidentialité & contacts')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.categories.privacyDesc', 'Qui peut vous contacter, visibilité')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                      activeCategory === 'privacy' && resolvedTheme !== 'dark' ? 'text-purple-600' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'
+                    }`} />
+                  </button>
+
+                  {/* 3. Sécurité & sessions */}
+                  <button
+                    onClick={() => { setActiveCategory('security'); setMobileShowContent(true); }}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      activeCategory === 'security'
+                        ? resolvedTheme === 'dark' ? 'bg-zinc-800/80' : 'bg-emerald-50/70'
+                        : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/40' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/10 text-emerald-500 dark:bg-emerald-500/20 dark:text-emerald-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${
+                        activeCategory === 'security' && resolvedTheme !== 'dark' ? 'text-emerald-600' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {t('settings.categories.security', 'Sécurité & sessions')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.categories.securityDesc', 'Mot de passe, 2FA, appareils')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                      activeCategory === 'security' && resolvedTheme !== 'dark' ? 'text-emerald-600' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'
+                    }`} />
+                  </button>
+
+                  {/* 4. Notifications */}
+                  <button
+                    onClick={() => { setActiveCategory('notifications'); setMobileShowContent(true); }}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      activeCategory === 'notifications'
+                        ? resolvedTheme === 'dark' ? 'bg-zinc-800/80' : 'bg-amber-50/70'
+                        : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/40' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/10 text-amber-500 dark:bg-amber-500/20 dark:text-amber-400">
+                      <Bell className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${
+                        activeCategory === 'notifications' && resolvedTheme !== 'dark' ? 'text-amber-600' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {t('settings.categories.notifications', 'Notifications')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.categories.notificationsDesc', 'Email, push, alertes')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                      activeCategory === 'notifications' && resolvedTheme !== 'dark' ? 'text-amber-600' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'
+                    }`} />
+                  </button>
+
+                  {/* 5. Langue & fuseau horaire */}
+                  <button
+                    onClick={() => { setActiveCategory('app'); setMobileShowContent(true); }}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      activeCategory === 'app'
+                        ? resolvedTheme === 'dark' ? 'bg-zinc-800/80' : 'bg-blue-50/70'
+                        : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/40' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${
+                        activeCategory === 'app' && resolvedTheme !== 'dark' ? 'text-blue-600' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {t('settings.categories.app', 'Langue & fuseau horaire')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.categories.appDesc', 'Affichage, fuseau, région')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                      activeCategory === 'app' && resolvedTheme !== 'dark' ? 'text-blue-600' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'
+                    }`} />
+                  </button>
+
+                  {/* 6. Lecture vidéo */}
+                  <button
+                    onClick={() => { setActiveCategory('video'); setMobileShowContent(true); }}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      activeCategory === 'video'
+                        ? resolvedTheme === 'dark' ? 'bg-zinc-800/80' : 'bg-rose-50/70'
+                        : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/40' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-rose-500/10 text-rose-500 dark:bg-rose-500/20 dark:text-rose-400">
+                      <Play className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${
+                        activeCategory === 'video' && resolvedTheme !== 'dark' ? 'text-rose-600' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {t('settings.categories.video', 'Lecture vidéo')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.categories.videoDesc', 'Autoplay, qualité, données')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                      activeCategory === 'video' && resolvedTheme !== 'dark' ? 'text-rose-600' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'
+                    }`} />
+                  </button>
+
+                  {/* 7. Support & aide */}
+                  <button
+                    onClick={() => { setActiveCategory('support'); setMobileShowContent(true); }}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      activeCategory === 'support'
+                        ? resolvedTheme === 'dark' ? 'bg-zinc-800/80' : 'bg-teal-50/70'
+                        : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/40' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-500/10 text-teal-500 dark:bg-teal-500/20 dark:text-teal-400">
+                      <HelpCircle className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${
+                        activeCategory === 'support' && resolvedTheme !== 'dark' ? 'text-teal-600' : resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {t('settings.categories.support', 'Support & aide')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.categories.supportDesc', 'Assistance, bug, à propos')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                      activeCategory === 'support' && resolvedTheme !== 'dark' ? 'text-teal-600' : resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'
+                    }`} />
+                  </button>
+
                 </div>
               </div>
 
-
-
-              {/* 1. Compte & Profil */}
-              <button
-                onClick={() => { setActiveCategory('account'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'account'
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${activeCategory === 'account' ? 'bg-white/20 text-white' : 'bg-blue-500/10 text-blue-500'}`}>
-                  <User className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.account', 'Compte & Profil')}</span>
-                    <ChevronRight className={`w-4 h-4 opacity-50 rtl-flip ${activeCategory === 'account' ? 'text-white opacity-100' : ''}`} />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${activeCategory === 'account' ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
-                    {t('settings.categories.accountDesc', 'Infos, mot de passe, email')}
-                  </p>
-                </div>
-              </button>
-
-              {/* 2. Confidentialité & Qui peut me contacter ? */}
-              <button
-                onClick={() => { setActiveCategory('privacy'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'privacy'
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${activeCategory === 'privacy' ? 'bg-white/20 text-white' : 'bg-purple-500/10 text-purple-500'}`}>
-                  <MessageSquare className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.privacy', 'Confidentialité & Contacts')}</span>
-                    <ChevronRight className={`w-4 h-4 opacity-50 rtl-flip ${activeCategory === 'privacy' ? 'text-white opacity-100' : ''}`} />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${activeCategory === 'privacy' ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
-                    {t('settings.categories.privacyDesc', 'Qui peut me contacter, statut')}
-                  </p>
-                </div>
-              </button>
-
-              {/* 3. Sécurité & Sessions */}
-              <button
-                onClick={() => { setActiveCategory('security'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'security'
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${activeCategory === 'security' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                  <Shield className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.security', 'Sécurité & Sessions')}</span>
-                    <ChevronRight className={`w-4 h-4 opacity-50 rtl-flip ${activeCategory === 'security' ? 'text-white opacity-100' : ''}`} />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${activeCategory === 'security' ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
-                    {t('settings.categories.securityDesc', '2FA, appareils connectés')}
-                  </p>
-                </div>
-              </button>
-
-              {/* 4. Notifications */}
-              <button
-                onClick={() => { setActiveCategory('notifications'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'notifications'
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${activeCategory === 'notifications' ? 'bg-white/20 text-white' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                  <Bell className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.notifications', 'Notifications')}</span>
-                    <ChevronRight className={`w-4 h-4 opacity-50 rtl-flip ${activeCategory === 'notifications' ? 'text-white opacity-100' : ''}`} />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${activeCategory === 'notifications' ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
-                    {t('settings.categories.notificationsDesc', 'Email, push, in-app')}
-                  </p>
-                </div>
-              </button>
-
-              {/* 5. Préférences Application */}
-              <button
-                onClick={() => { setActiveCategory('app'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'app'
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${activeCategory === 'app' ? 'bg-white/20 text-white' : 'bg-pink-500/10 text-pink-500'}`}>
-                  <Globe className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.app', 'Préférences')}</span>
-                    <ChevronRight className={`w-4 h-4 opacity-50 rtl-flip ${activeCategory === 'app' ? 'text-white opacity-100' : ''}`} />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${activeCategory === 'app' ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
-                    {t('settings.categories.appDesc', 'Thème sombre/clair, langue')}
-                  </p>
-                </div>
-              </button>
-
-              {/* 6. Lecture Vidéo */}
-              <button
-                onClick={() => { setActiveCategory('video'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'video'
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${activeCategory === 'video' ? 'bg-white/20 text-white' : 'bg-indigo-500/10 text-indigo-500'}`}>
-                  <Play className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.video', 'Lecture Vidéo')}</span>
-                    <ChevronRight className={`w-4 h-4 opacity-50 rtl-flip ${activeCategory === 'video' ? 'text-white opacity-100' : ''}`} />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${activeCategory === 'video' ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
-                    {t('settings.categories.videoDesc', 'Autoplay, défilement')}
-                  </p>
-                </div>
-              </button>
-
-              {/* 7. Support & Aide */}
-              <button
-                onClick={() => { setActiveCategory('support'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'support'
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${activeCategory === 'support' ? 'bg-white/20 text-white' : 'bg-cyan-500/10 text-cyan-500'}`}>
-                  <HelpCircle className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.support', 'Support & Aide')}</span>
-                    <ChevronRight className={`w-4 h-4 opacity-50 rtl-flip ${activeCategory === 'support' ? 'text-white opacity-100' : ''}`} />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${activeCategory === 'support' ? 'text-blue-100' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
-                    {t('settings.categories.supportDesc', 'Assistance, bug, à propos')}
-                  </p>
-                </div>
-              </button>
-
-              {/* 8. Passer à Premium */}
-              <button
+              {/* SECTION: PASSER A PREMIUM (Bannière distincte dorée) */}
+              <div
                 onClick={() => { setActiveCategory('premium'); setMobileShowContent(true); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all group ${
-                  activeCategory === 'premium'
-                    ? resolvedTheme === 'dark' ? 'bg-zinc-800 text-white font-semibold' : 'bg-gray-100 text-gray-900 font-semibold'
-                    : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/60 text-zinc-300' : 'hover:bg-gray-50 text-gray-700'
+                className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center gap-3.5 ${
+                  resolvedTheme === 'dark'
+                    ? activeCategory === 'premium'
+                      ? 'bg-amber-950/40 border-amber-500/60 shadow-lg shadow-amber-900/20'
+                      : 'bg-amber-950/20 border-amber-800/40 hover:border-amber-700/60'
+                    : activeCategory === 'premium'
+                      ? 'bg-amber-50 border-amber-300 shadow-md ring-1 ring-amber-300'
+                      : 'bg-amber-50/60 border-amber-200/80 hover:bg-amber-50 hover:border-amber-300'
                 }`}
               >
-                <div className={`p-2 rounded-lg flex-shrink-0 ${
-                  activeCategory === 'premium' 
-                    ? resolvedTheme === 'dark' ? 'bg-zinc-700 text-white' : 'bg-gray-200 text-gray-900'
-                    : 'bg-amber-500/10 text-amber-500'
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+                  resolvedTheme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600'
                 }`}>
-                  <Crown className="w-4 h-4" />
+                  <Crown className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">{t('settings.categories.premium', 'Passer à Premium')}</span>
-                    <ChevronRight className="w-4 h-4 opacity-50 rtl-flip" />
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`}>
+                  <p className={`text-sm font-bold truncate ${resolvedTheme === 'dark' ? 'text-amber-200' : 'text-gray-900'}`}>
+                    {t('settings.categories.premium', 'Passer à Premium')}
+                  </p>
+                  <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-amber-300/70' : 'text-amber-800/80'}`}>
                     {t('settings.categories.premiumDesc', 'Débloquez plus de fonctionnalités')}
                   </p>
                 </div>
-              </button>
+                <ChevronRight className={`w-4 h-4 flex-shrink-0 ${resolvedTheme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+              </div>
 
-              {/* Bouton Déconnexion */}
-              <div className="pt-2 mt-3 border-t border-zinc-700/40">
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl text-left text-red-500 hover:bg-red-500/10 transition-colors"
-                >
-                  <div className="p-2 rounded-lg bg-red-500/10 text-red-500 flex-shrink-0">
-                    <LogOut className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-semibold block">{t('common.logout', 'Déconnexion')}</span>
-                    <p className="text-[11px] text-red-400/80">{t('settings.logoutDesc', 'Quitter votre session')}</p>
-                  </div>
-                </button>
+              {/* SECTION: COMPTE & SÉCURITÉ (Déconnexion) */}
+              <div>
+                <p className="text-[11px] font-bold tracking-wider text-gray-400 dark:text-zinc-500 uppercase px-3 mb-2">
+                  {t('settings.sections.security', 'Compte & sécurité')}
+                </p>
+                <div className={`rounded-2xl border overflow-hidden transition-colors ${
+                  resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-100 shadow-sm'
+                }`}>
+                  <button
+                    onClick={handleLogout}
+                    className={`w-full flex items-center gap-3.5 p-3.5 text-left transition-colors ${
+                      resolvedTheme === 'dark' ? 'hover:bg-red-500/10' : 'hover:bg-red-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400">
+                      <LogOut className="w-4 h-4 rtl-flip" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-red-600 dark:text-red-400 truncate">
+                        {t('common.logout', 'Déconnexion')}
+                      </p>
+                      <p className={`text-xs truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {t('settings.logoutDesc', 'Quitter votre session')}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -1867,29 +1918,6 @@ const Settings = () => {
                       <div className={`w-4 h-4 bg-white rounded-full transition-transform ${notificationSettings.inApp ? 'translate-x-6' : 'translate-x-0'}`} />
                     </button>
                   </div>
-
-                  {/* Bouton de test envoi email notification */}
-                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <span className={`text-sm font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                        Tester vos notifications
-                      </span>
-                      <p className={`text-xs mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                        Envoyer un email de test immédiat à votre adresse pour valider la réception
-                      </p>
-                      {testNotifFeedback && (
-                        <p className="text-xs mt-2 text-blue-400 font-medium">{testNotifFeedback}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={handleSendTestNotification}
-                      disabled={sendingTestNotif}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 cursor-pointer shadow-sm"
-                    >
-                      {sendingTestNotif ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                      <span>Envoyer un email test</span>
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -2049,6 +2077,90 @@ const Settings = () => {
                     </p>
                   </div>
                 )}
+
+                {/* Économiseur de données (Data Saver) */}
+                <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/40 border border-zinc-700/20">
+                  <div className="space-y-0.5">
+                    <span className={`text-sm font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {t('settings.video.dataSaver', 'Économiseur de données (Data Saver)')}
+                    </span>
+                    <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      {t('settings.video.dataSaverDesc', 'Ajuste automatiquement la qualité de la vidéo pour réduire la consommation de votre forfait internet')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const updated = !videoDataSaver
+                      setVideoDataSaver(updated)
+                      setPrivacyFeedback(updated ? 'Économiseur de données activé' : 'Économiseur de données désactivé')
+                      setTimeout(() => setPrivacyFeedback(null), 3000)
+                    }}
+                    className={`w-12 h-6 rounded-full p-1 transition-colors flex-shrink-0 ${videoDataSaver ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-zinc-700'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${videoDataSaver ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                {/* Wi-Fi / Données Mobiles */}
+                <div className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/40 border border-zinc-700/20 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Wifi className="w-4 h-4 text-blue-500" />
+                    <span className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {t('settings.video.networkMode', 'Lecture réseau : Wi-Fi / Données mobiles')}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                    {t('settings.video.networkModeDesc', 'Définissez sur quel type de connexion autoriser le streaming en direct et la haute définition.')}
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div
+                      onClick={() => {
+                        setVideoNetworkMode('all')
+                        setPrivacyFeedback('Lecture autorisée sur Wi-Fi et données mobiles')
+                        setTimeout(() => setPrivacyFeedback(null), 3000)
+                      }}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                        videoNetworkMode === 'all'
+                          ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500'
+                          : resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800/60' : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div>
+                        <span className={`text-xs font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          Wi-Fi + Données mobiles
+                        </span>
+                        <span className="text-[10px] text-zinc-400">Aucune restriction réseau</span>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${videoNetworkMode === 'all' ? 'border-blue-500 bg-blue-500' : 'border-gray-400'}`}>
+                        {videoNetworkMode === 'all' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      </div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setVideoNetworkMode('wifi_only')
+                        setPrivacyFeedback('Lecture haute qualité limitée au Wi-Fi uniquement')
+                        setTimeout(() => setPrivacyFeedback(null), 3000)
+                      }}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                        videoNetworkMode === 'wifi_only'
+                          ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500'
+                          : resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800/60' : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div>
+                        <span className={`text-xs font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          Wi-Fi uniquement
+                        </span>
+                        <span className="text-[10px] text-zinc-400">Économise vos mégabytes mobiles</span>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${videoNetworkMode === 'wifi_only' ? 'border-blue-500 bg-blue-500' : 'border-gray-400'}`}>
+                        {videoNetworkMode === 'wifi_only' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2115,82 +2227,288 @@ const Settings = () => {
             )}
 
             {/* ------------------------------------------------------------ */}
-            {/* 8. SECTION : PASSER À PREMIUM (OFFRES & AVANTAGES)           */}
+            {/* 8. SECTION : PASSER À PREMIUM (OFFRES, GESTION & PAIEMENTS)  */}
             {/* ------------------------------------------------------------ */}
             {activeCategory === 'premium' && (
               <div className="space-y-6">
-                <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-6 sm:p-8 shadow-sm space-y-6`}>
-                  
-                  <div className="flex items-center gap-4 pb-6 border-b border-zinc-800/60">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                      resolvedTheme === 'dark' ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'
-                    }`}>
-                      <Crown className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h2 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                        {t('settings.premium.heroTitle', 'EXILE Pro Premium')}
-                      </h2>
-                      <p className={`text-xs sm:text-sm mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                        {t('settings.premium.heroSubtitle', 'Accédez aux outils avancés pour booster votre notoriété et vos opportunités professionnelles.')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Cartes d'avantages Clean & Minimalistes */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} space-y-2`}>
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs">
-                        HD
+                
+                {/* 1. Carte Plan Actuel & Statut */}
+                <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-5 sm:p-6 shadow-sm space-y-4`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800/60">
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg ${
+                        resolvedTheme === 'dark' ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'
+                      }`}>
+                        <Crown className="w-6 h-6" />
                       </div>
-                      <h4 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Vidéos Haute Définition</h4>
-                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                        Téléversez des vidéos sans limite de compression et en qualité 4K/1080p maximale.
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className={`text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                            {t('settings.premium.currentPlanTitle', 'Plan actuel')}
+                          </h3>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border border-gray-200 dark:border-zinc-700">
+                            FREE — $0/mois
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                          Pou tout moun kòmanse sou EXILE. Accès aux fonctionnalités de base.
+                        </p>
+                      </div>
                     </div>
 
-                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} space-y-2`}>
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs">
-                        ✓
-                      </div>
-                      <h4 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Badge Vérifié</h4>
-                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                        Obtenez le badge officiel distinctif prouvant votre expertise auprès des clients.
-                      </p>
-                    </div>
-
-                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/40 border-zinc-800' : 'bg-gray-50 border-gray-200'} space-y-2`}>
-                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold text-xs">
-                        ★
-                      </div>
-                      <h4 className={`text-sm font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Visibilité Prioritaire</h4>
-                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                        Votre profil et vos publications sont propulsés en tête des recherches et du fil d'actualité.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Offre tarifaire */}
-                  <div className={`p-6 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-gray-50 border-gray-200'} flex flex-col sm:flex-row items-center justify-between gap-4`}>
-                    <div>
-                      <span className="text-xs uppercase tracking-wider font-bold text-amber-500">Plan Pro Annuel</span>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$9.99</span>
-                        <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>/ mois (facturé annuellement)</span>
-                      </div>
-                      <p className={`text-xs mt-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                        Annulable à tout moment. Garantie 14 jours satisfait ou remboursé.
-                      </p>
-                    </div>
                     <button
-                      onClick={() => alert('Le module d\'abonnement sécurisé Stripe sera disponible très prochainement.')}
-                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-black hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-sm shadow-md transition-all active:scale-95 whitespace-nowrap"
+                      onClick={() => {
+                        const elem = document.getElementById('pro-plan-card')
+                        elem?.scrollIntoView({ behavior: 'smooth' })
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 whitespace-nowrap self-start sm:self-center"
                     >
-                      Souscrire à l'offre Pro
+                      {t('settings.premium.upgradeBtn', 'Passer à PRO ($25/mois)')}
+                    </button>
+                  </div>
+
+                  {/* Renouvellement & Gestion */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/30 border-zinc-800' : 'bg-gray-50 border-gray-200'}`}>
+                      <span className="text-xs text-zinc-400 block font-medium">Renouvellement automatique</span>
+                      <span className={`text-sm font-bold mt-1 block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        Non applicable (Plan Gratuit)
+                      </span>
+                      <p className="text-[11px] text-zinc-500 mt-1">Aucune carte bancaire n'est débitée pour le plan Free.</p>
+                    </div>
+
+                    <div className={`p-4 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-zinc-800/30 border-zinc-800' : 'bg-gray-50 border-gray-200'} flex flex-col justify-between`}>
+                      <div>
+                        <span className="text-xs text-zinc-400 block font-medium">Gestion de l'abonnement</span>
+                        <span className={`text-sm font-bold mt-1 block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          Actif à vie
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          alert('Vous êtes actuellement sur le plan gratuit. Aucun abonnement payant n\'est en cours.')
+                        }}
+                        className="text-[11px] text-red-500 hover:text-red-400 font-semibold text-left mt-2"
+                      >
+                        {t('settings.premium.cancelSubscription', 'Cancel subscription (Résilier)')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Comparatif des 2 Offres : FREE vs PRO */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  
+                  {/* CARTE 1 : FREE — $0/mois */}
+                  <div className={`p-6 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} shadow-sm flex flex-col justify-between space-y-6`}>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Pour démarrer</span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                          Plan Actif
+                        </span>
+                      </div>
+
+                      <div>
+                        <h3 className={`text-2xl font-black ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          FREE
+                        </h3>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$0</span>
+                          <span className="text-xs text-zinc-400">/ mois</span>
+                        </div>
+                        <p className={`text-xs mt-2 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                          Pou tout moun kòmanse sou EXILE.
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-zinc-800/60 space-y-2.5">
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Profil professionnel</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Publier des vidéos</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Suivre des professionnels</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Likes, commentaires, partages</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Messagerie</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Accès aux cours et lives</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Piblisite EXILE</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Statistiques de base</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>Visibilité normale</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-500 opacity-60">
+                          <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                          <span className="line-through">Badge vérifié</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-500 opacity-60">
+                          <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                          <span className="line-through">Promotion payante incluse</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-xl border border-zinc-700/60 text-zinc-400 text-xs sm:text-sm font-semibold text-center cursor-default bg-zinc-800/20"
+                    >
+                      Plan Actuel
+                    </button>
+                  </div>
+
+                  {/* CARTE 2 : PRO — $25/mois */}
+                  <div
+                    id="pro-plan-card"
+                    className={`p-6 rounded-2xl border-2 border-[#FF6B00] relative ${resolvedTheme === 'dark' ? 'bg-zinc-900/90' : 'bg-white'} shadow-xl flex flex-col justify-between space-y-6`}
+                  >
+                    <div className="absolute -top-3 right-6 px-3 py-0.5 rounded-full bg-[#FF6B00] text-white font-bold text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1">
+                      <Crown className="w-3 h-3" />
+                      <span>Recommandé</span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#FF6B00]">Pleine puissance</span>
+                      </div>
+
+                      <div>
+                        <h3 className={`text-2xl font-black ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} flex items-center gap-2`}>
+                          <span>PRO</span>
+                          <span className="text-amber-400 text-xl">⭐</span>
+                        </h3>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$25</span>
+                          <span className="text-xs text-zinc-400">/ mois</span>
+                        </div>
+                        <p className={`text-xs mt-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
+                          Pou professionnels ki vle plis crédibilité ak visibilité.
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-zinc-800/60 space-y-2.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-[#FF6B00]">
+                          <Check className="w-4 h-4 text-[#FF6B00] flex-shrink-0" />
+                          <span>Tout sa ki nan Free</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-white">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span className="font-semibold">Badge Pro vérifié</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-white">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span className="font-semibold">Sans publicité</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-200">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>2 promotions / semaine</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-200">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>Statistiques avancées</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-200">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>Priorité dans les recherches</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-200">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>Mise en avant du contenu</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-200">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>Lien professionnel personnalisé</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-200">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>Support prioritaire</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-200">
+                          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>1 bonus de visibilité / mois</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Voulez-vous procéder à la souscription du plan EXILE PRO ($25/mois) ?')) {
+                          alert('La passerelle de paiement sécurisée Stripe / MonCash est en cours d\'initialisation pour votre compte.')
+                        }
+                      }}
+                      className="w-full py-3 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Passer à PRO ($25/mois)</span>
                     </button>
                   </div>
 
                 </div>
+
+                {/* 3. Historique Paiement (Clean Table) */}
+                <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-5 sm:p-6 shadow-sm space-y-4`}>
+                  <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60">
+                    <div>
+                      <h3 className={`text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        Historique paiement
+                      </h3>
+                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        Consultez et téléchargez vos factures et transactions passées.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800 text-zinc-400' : 'border-gray-200 text-gray-500'}`}>
+                          <th className="py-2.5 px-3 font-semibold">Date</th>
+                          <th className="py-2.5 px-3 font-semibold">Plan</th>
+                          <th className="py-2.5 px-3 font-semibold">Montant</th>
+                          <th className="py-2.5 px-3 font-semibold">Statut</th>
+                          <th className="py-2.5 px-3 font-semibold text-right">Facture</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800/40 text-zinc-300' : 'border-gray-100 text-gray-700'}`}>
+                          <td className="py-3 px-3">Inscription</td>
+                          <td className="py-3 px-3 font-medium">FREE Plan</td>
+                          <td className="py-3 px-3 font-bold">$0.00</td>
+                          <td className="py-3 px-3">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
+                              Gratuit
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right text-zinc-400">
+                            —
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
               </div>
             )}
 

@@ -430,11 +430,24 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         if (!v) return
 
         let previewEnabled = false
+        let dataSaver = false
+        let networkMode = 'all'
         try {
           previewEnabled = localStorage.getItem('exile_video_preview_enabled') === 'true'
+          dataSaver = localStorage.getItem('exile_video_data_saver') === 'true'
+          networkMode = JSON.parse(localStorage.getItem('exile_video_network_mode') || '"all"')
         } catch {}
 
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.6 && previewEnabled && videoUrl) {
+        // Détection de connexion cellulaire / économiseur de données natif
+        const nav = typeof navigator !== 'undefined' ? (navigator as any) : null
+        const connection = nav?.connection || nav?.mozConnection || nav?.webkitConnection
+        const isCellular = connection && (connection.type === 'cellular' || connection.effectiveType === '2g' || connection.effectiveType === '3g' || connection.saveData)
+        const isRestrictedByNetwork = networkMode === 'wifi_only' && isCellular
+
+        // Si l'économiseur de données ou la restriction Wi-Fi bloque l'autoplay
+        const shouldAutoplay = previewEnabled && !dataSaver && !isRestrictedByNetwork
+
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6 && shouldAutoplay && videoUrl) {
           v.muted = true
           setIsMuted(true)
           v.play().catch(() => {})
