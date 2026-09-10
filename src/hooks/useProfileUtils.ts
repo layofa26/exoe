@@ -103,7 +103,8 @@ export const getProfileWithFallback = async (token: string) => {
  * Mapping unique backend -> UI (évite que des champs restent aux anciennes valeurs)
  */
 export const mapBackendProfile = (data: any): UserProfile => {
-  const SUPABASE_URL = 'https://rmbvwaemgiijitumhnys.supabase.co/storage/v1/object/public/Exile_images'
+  const supabaseBase = import.meta.env.VITE_SUPABASE_URL || 'https://yovqbztvqotktkmkkqsq.supabase.co'
+  const SUPABASE_URL = `${supabaseBase}/storage/v1/object/public/Exile_images`
   
   const getPublicImageUrl = (urlOrFilename: string | null | undefined): string | undefined => {
     if (!urlOrFilename || typeof urlOrFilename !== 'string') return undefined
