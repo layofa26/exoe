@@ -50,7 +50,7 @@ export const resolveMediaUrl = (url?: string | null): string => {
 
   // Si c'est un nom de fichier brut destiné au bucket Supabase Exile_images
   if (!cleanPath.startsWith('/api') && !cleanPath.startsWith('/static')) {
-    const supabaseBase = import.meta.env.VITE_SUPABASE_URL || 'https://phjpbbcymhtppfkyoegk.supabase.co'
+    const supabaseBase = import.meta.env.VITE_SUPABASE_URL || 'https://yovqbztvqotktkmkkqsq.supabase.co'
     return `${supabaseBase.replace(/\/+$/, '')}/storage/v1/object/public/Exile_images/${trimmed.replace(/^\/+/, '')}`
   }
 
