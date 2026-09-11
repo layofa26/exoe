@@ -20,6 +20,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { SUPPORTED_LANGUAGES } from '../../i18n'
 import { API_BASE_URL } from '../../config/api'
+import PayerPremiumButton from '../../components/PayerPremiumButton'
 
 type SettingsCategory = 
   | 'account' 
@@ -2399,7 +2400,7 @@ const Settings = () => {
                           <span className="text-amber-400 text-xl">⭐</span>
                         </h3>
                         <div className="flex items-baseline gap-1 mt-1">
-                          <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$25</span>
+                          <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$20</span>
                           <span className="text-xs text-zinc-400">/ mois</span>
                         </div>
                         <p className={`text-xs mt-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
@@ -2451,17 +2452,7 @@ const Settings = () => {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        if (window.confirm('Voulez-vous procéder à la souscription du plan EXILE PRO ($25/mois) ?')) {
-                          alert('La passerelle de paiement sécurisée Stripe / MonCash est en cours d\'initialisation pour votre compte.')
-                        }
-                      }}
-                      className="w-full py-3 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Passer à PRO ($25/mois)</span>
-                    </button>
+                    <PayerPremiumButton montant={20.00} />
                   </div>
 
                 </div>
