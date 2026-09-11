@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Users, Inbox, Search, Clock, XCircle,
   ArrowLeft, Loader2, X, Shield, MessageSquare,
-  Send, Check, Ban, CheckCheck, MessageCircle
+  Send, Check, Ban, CheckCheck, MessageCircle, UserX
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { useQuery } from '../../hooks/useQuery'
 import { notificationService } from '../../services/notificationService'
 import { ConversationView } from './Conversation'
@@ -51,12 +52,12 @@ async function apiFetch(path: string, options?: RequestInit) {
 
 function getCurrentUserId(): string | null {
   try {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
-    if (!token) return null
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+    if (!token) return localStorage.getItem('user_id')
     const payload = JSON.parse(atob(token.split('.')[1]))
-    return String(payload.user_id || payload.id || '')
+    return String(payload.user_id || payload.id || payload.uuid || localStorage.getItem('user_id') || '')
   } catch {
-    return null
+    return localStorage.getItem('user_id')
   }
 }
 
@@ -130,6 +131,36 @@ function normalizeDemande(item: any): Demande {
     status: normalizeStatus(item.status),
     createdAt: item.created_at || new Date().toISOString(),
     lastMessage: item.last_message || null,
+  }
+}
+
+function normalizeConversationToDemande(c: any, currentUserId: string | null): Demande {
+  const parts: any[] = c.participants || []
+  const partner = parts.find((p: any) => String(p.id) !== String(currentUserId)) || parts[0] || {}
+  const lastMsg = c.last_message || (c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null)
+  const isLastSenderMe = String(lastMsg?.sender_id || lastMsg?.sender?.id) === String(currentUserId)
+
+  return {
+    id: `conv-${c.id}`,
+    conversationId: c.id,
+    senderId: isLastSenderMe ? String(currentUserId || '') : String(partner.id || ''),
+    senderName: isLastSenderMe ? 'Moi' : (partner.full_name || partner.username || 'Utilisateur'),
+    senderUsername: (partner.username || '').replace(/^@/, ''),
+    senderAvatar: partner.avatar_url || null,
+    receiverId: isLastSenderMe ? String(partner.id || '') : String(currentUserId || ''),
+    receiverName: partner.full_name || partner.username || 'Utilisateur',
+    receiverUsername: (partner.username || '').replace(/^@/, ''),
+    receiverAvatar: partner.avatar_url || null,
+    message: lastMsg?.content || '',
+    status: 'accepted' as DemandeStatus,
+    createdAt: c.updated_at || c.created_at || (lastMsg?.created_at) || new Date().toISOString(),
+    lastMessage: lastMsg ? {
+      id: lastMsg.id,
+      content: lastMsg.content,
+      created_at: lastMsg.created_at,
+      sender: lastMsg.sender || { id: lastMsg.sender_id, username: lastMsg.sender_username },
+      read: lastMsg.read,
+    } : null,
   }
 }
 
@@ -241,7 +272,11 @@ export const Requests = (): JSX.Element => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const currentUserId = useMemo(() => getCurrentUserId(), [])
+  const { user } = useAuth()
+  const currentUserId = useMemo(() => {
+    if (user?.id) return String(user.id)
+    return getCurrentUserId()
+  }, [user])
 
   type Tab = 'all' | 'accepted' | 'received' | 'sent'
   const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -286,67 +321,123 @@ export const Requests = (): JSX.Element => {
     setTimeout(() => setToast(null), 3500)
   }, [])
 
-  // ─── Load demandes & conversations ──────────────────────────────────────────
+  // ─── Fetch All Unified Demandes & Conversations ─────────────────────────────
+  const fetchAllUnifiedData = useCallback(async (): Promise<Demande[]> => {
+    try {
+      const [demandesRes, convsRes] = await Promise.all([
+        apiFetch('/demandes/').catch(() => null),
+        apiFetch('/conversations/').catch(() => null),
+      ])
+
+      let loadedDemandes: Demande[] = []
+      if (demandesRes && demandesRes.ok) {
+        const dData = await demandesRes.json()
+        const rawD = Array.isArray(dData) ? dData : (dData.results || [])
+        loadedDemandes = rawD.map(normalizeDemande)
+      }
+
+      let loadedConvs: any[] = []
+      if (convsRes && convsRes.ok) {
+        const cData = await convsRes.json()
+        loadedConvs = Array.isArray(cData) ? cData : (cData.results || [])
+      }
+
+      // Convert conversations into Demande items
+      const convDemandes: Demande[] = loadedConvs.map((c: any) =>
+        normalizeConversationToDemande(c, currentUserId)
+      )
+
+      // Merge: Map existing demandes by conversationId and by partnerId
+      const mapByConvId = new Map<string, Demande>()
+      const mapByPartner = new Map<string, Demande>()
+
+      for (const d of loadedDemandes) {
+        if (d.conversationId) {
+          mapByConvId.set(String(d.conversationId), d)
+        }
+        const partnerId = d.senderId === currentUserId ? d.receiverId : d.senderId
+        if (partnerId) {
+          mapByPartner.set(String(partnerId), d)
+        }
+      }
+
+      const mergedList: Demande[] = [...loadedDemandes]
+
+      for (const cd of convDemandes) {
+        const convIdStr = String(cd.conversationId)
+        const partnerIdStr = cd.senderId === currentUserId ? cd.receiverId : cd.senderId
+
+        const existingByConv = mapByConvId.get(convIdStr)
+        const existingByPartner = mapByPartner.get(partnerIdStr)
+
+        if (existingByConv) {
+          if (!existingByConv.lastMessage && cd.lastMessage) {
+            existingByConv.lastMessage = cd.lastMessage
+          }
+          if (cd.lastMessage?.content && !existingByConv.message) {
+            existingByConv.message = cd.lastMessage.content
+          }
+        } else if (existingByPartner) {
+          existingByPartner.conversationId = cd.conversationId
+          if (!existingByPartner.lastMessage && cd.lastMessage) {
+            existingByPartner.lastMessage = cd.lastMessage
+          }
+        } else {
+          mergedList.push(cd)
+        }
+      }
+
+      return mergedList
+    } catch (e) {
+      console.error('Error fetching unified demandes/conversations:', e)
+      return []
+    }
+  }, [currentUserId])
+
   const {
-    data: cachedDemandes,
+    data: allItems,
     isLoading,
-    setData: setDemandes,
+    setData: setAllItems,
   } = useQuery<Demande[]>(
-    async () => {
-      const res = await apiFetch('/demandes/')
-      if (!res.ok) throw new Error('Erreur chargement demandes')
-      const data = await res.json()
-      const raw = Array.isArray(data) ? data : (data.results || [])
-      return raw.map(normalizeDemande)
-    },
-    { cacheKey: `pro:demandes:user:${currentUserId || 'guest'}:v4`, cacheTime: 10_000, initialData: [] }
+    fetchAllUnifiedData,
+    { cacheKey: `pro:demandes_and_convs:user:${currentUserId || 'guest'}:v5`, cacheTime: 10_000, initialData: [] }
   )
 
-  const demandes = useMemo(() => {
-    if (!currentUserId) return []
-    return (cachedDemandes || []).filter(
-      d => String(d.senderId) === String(currentUserId) || String(d.receiverId) === String(currentUserId)
-    )
-  }, [cachedDemandes, currentUserId])
-
-  // ─── Real-time Auto-mount & 3s Polling for Demandes ────────────────────────
-  const refetchDemandes = useCallback(async () => {
+  // ─── Real-time Auto-mount & 3s Polling ──────────────────────────────────────
+  const refetchData = useCallback(async () => {
     try {
-      const res = await apiFetch('/demandes/')
-      if (res.ok) {
-        const data = await res.json()
-        const raw = Array.isArray(data) ? data : (data.results || [])
-        const normalized = raw.map(normalizeDemande)
-        setDemandes(normalized)
+      const data = await fetchAllUnifiedData()
+      if (data && data.length > 0) {
+        setAllItems(data)
       }
     } catch {}
-  }, [setDemandes])
+  }, [fetchAllUnifiedData, setAllItems])
 
   useEffect(() => {
-    const handleDemandeChange = () => {
-      refetchDemandes()
+    const handleDataChange = () => {
+      refetchData()
     }
 
-    window.addEventListener('exile_demande_created', handleDemandeChange)
-    window.addEventListener('exile_demande_updated', handleDemandeChange)
-    window.addEventListener('storage', handleDemandeChange)
+    window.addEventListener('exile_demande_created', handleDataChange)
+    window.addEventListener('exile_demande_updated', handleDataChange)
+    window.addEventListener('storage', handleDataChange)
 
     const interval = setInterval(() => {
-      refetchDemandes()
+      refetchData()
     }, 3000)
 
     return () => {
-      window.removeEventListener('exile_demande_created', handleDemandeChange)
-      window.removeEventListener('exile_demande_updated', handleDemandeChange)
-      window.removeEventListener('storage', handleDemandeChange)
+      window.removeEventListener('exile_demande_created', handleDataChange)
+      window.removeEventListener('exile_demande_updated', handleDataChange)
+      window.removeEventListener('storage', handleDataChange)
       clearInterval(interval)
     }
-  }, [refetchDemandes])
+  }, [refetchData])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
   const updateStatus = useCallback((id: string, status: DemandeStatus, conversationId?: string | number) => {
-    setDemandes((prev: Demande[]) => prev.map(d => d.id === id ? { ...d, status, conversationId: conversationId || d.conversationId } : d))
-  }, [setDemandes])
+    setAllItems((prev: Demande[]) => prev.map(d => d.id === id ? { ...d, status, conversationId: conversationId || d.conversationId } : d))
+  }, [setAllItems])
 
   // Open Conversation on the Right Pane instantly
   const handleOpenConversation = useCallback(async (d: Demande) => {
@@ -365,7 +456,7 @@ export const Requests = (): JSX.Element => {
         if (startRes.ok) {
           const startData = await startRes.json()
           if (startData.id) {
-            updateStatus(d.id, 'accepted', startData.id)
+            updateStatus(d.id, d.status, startData.id)
             setSelectedConversationId(startData.id)
             setSelectedDemande(prev => prev ? { ...prev, conversationId: startData.id } : null)
           }
@@ -395,9 +486,9 @@ export const Requests = (): JSX.Element => {
       window.dispatchEvent(new CustomEvent('exile_demande_updated', { detail: { id: d.id, status: 'accepted', convId } }))
       window.dispatchEvent(new Event('storage'))
 
-      showToast('🎉 Demande acceptée ! Ouverture de la discussion...')
+      showToast('🎉 Demande acceptée ! Discussion confirmée.')
 
-      const updatedD = { ...d, status: 'accepted' as DemandeStatus, conversationId: convId || d.conversationId }
+      const updatedD: Demande = { ...d, status: 'accepted' as DemandeStatus, conversationId: convId || d.conversationId }
       setSelectedDemande(updatedD)
       setSelectedConversationId(convId || `demande-${d.id}`)
 
@@ -418,6 +509,7 @@ export const Requests = (): JSX.Element => {
       const res = await apiFetch(`/demandes/${d.id}/reject/`, { method: 'POST' })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Erreur')
       updateStatus(d.id, 'rejected')
+      setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'rejected' } : prev)
       showToast('Demande refusée')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur', 'error')
@@ -433,6 +525,7 @@ export const Requests = (): JSX.Element => {
       const res = await apiFetch(`/demandes/${d.id}/cancel/`, { method: 'POST' })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Erreur')
       updateStatus(d.id, 'cancelled')
+      setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'cancelled' } : prev)
       showToast('Demande annulée')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur', 'error')
@@ -452,6 +545,7 @@ export const Requests = (): JSX.Element => {
       })
       if (!res.ok) throw new Error('Erreur lors du blocage')
       updateStatus(d.id, 'blocked')
+      setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'blocked' } : prev)
       showToast('🚫 Utilisateur bloqué')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur', 'error')
@@ -492,8 +586,8 @@ export const Requests = (): JSX.Element => {
   // ─── Filtered, Deduplicated & Sorted Demandes ──────────────────────────────
   const deduplicatedDemandes = useMemo(() => {
     const threadMap = new Map<string, Demande>()
-    for (const d of demandes) {
-      const isSender = d.senderId === currentUserId
+    for (const d of allItems || []) {
+      const isSender = String(d.senderId) === String(currentUserId)
       const partnerKey = isSender ? String(d.receiverId || d.receiverUsername) : String(d.senderId || d.senderUsername)
       const existing = threadMap.get(partnerKey)
 
@@ -517,23 +611,32 @@ export const Requests = (): JSX.Element => {
       }
     }
     return Array.from(threadMap.values())
-  }, [demandes, currentUserId])
+  }, [allItems, currentUserId])
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase()
-    const list = deduplicatedDemandes.filter(d => {
-      const isSender = d.senderId === currentUserId
+
+    let baseList: Demande[] = []
+    if (activeTab === 'received') {
+      // Tout reçues
+      baseList = (allItems || []).filter(d => !d.id.startsWith('conv-') && String(d.receiverId) === String(currentUserId))
+    } else if (activeTab === 'sent') {
+      // Tout envoyées
+      baseList = (allItems || []).filter(d => !d.id.startsWith('conv-') && String(d.senderId) === String(currentUserId))
+    } else if (activeTab === 'accepted') {
+      // Tout discussions
+      baseList = deduplicatedDemandes.filter(d => d.status === 'accepted' || (Boolean(d.conversationId) && d.status !== 'rejected' && d.status !== 'cancelled'))
+    } else {
+      // Tous
+      baseList = deduplicatedDemandes
+    }
+
+    const list = baseList.filter(d => {
+      const isSender = String(d.senderId) === String(currentUserId)
       const username = (isSender ? d.receiverUsername : d.senderUsername).toLowerCase()
       const name = (isSender ? d.receiverName : d.senderName).toLowerCase()
-      const msg = d.message.toLowerCase()
-      const matchesSearch = !q || username.includes(q) || name.includes(q) || msg.includes(q)
-
-      switch (activeTab) {
-        case 'accepted': return d.status === 'accepted' && matchesSearch
-        case 'received': return !isSender && d.status === 'pending' && matchesSearch
-        case 'sent': return isSender && d.status === 'pending' && matchesSearch
-        default: return matchesSearch
-      }
+      const msg = (d.message || d.lastMessage?.content || '').toLowerCase()
+      return !q || username.includes(q) || name.includes(q) || msg.includes(q)
     })
 
     return list.sort((a, b) => {
@@ -541,15 +644,18 @@ export const Requests = (): JSX.Element => {
       const timeB = new Date(b.lastMessage?.created_at || b.createdAt).getTime()
       return timeB - timeA
     })
-  }, [deduplicatedDemandes, activeTab, searchQuery, currentUserId])
+  }, [allItems, deduplicatedDemandes, activeTab, searchQuery, currentUserId])
 
   // Tab counts
-  const counts = useMemo(() => ({
-    all: deduplicatedDemandes.length,
-    accepted: deduplicatedDemandes.filter(d => d.status === 'accepted').length,
-    received: deduplicatedDemandes.filter(d => d.senderId !== currentUserId && d.status === 'pending').length,
-    sent: deduplicatedDemandes.filter(d => d.senderId === currentUserId && d.status === 'pending').length,
-  }), [deduplicatedDemandes, currentUserId])
+  const counts = useMemo(() => {
+    const rawList = allItems || []
+    return {
+      all: deduplicatedDemandes.length,
+      accepted: deduplicatedDemandes.filter(d => d.status === 'accepted' || (Boolean(d.conversationId) && d.status !== 'rejected' && d.status !== 'cancelled')).length,
+      received: rawList.filter(d => !d.id.startsWith('conv-') && String(d.receiverId) === String(currentUserId)).length,
+      sent: rawList.filter(d => !d.id.startsWith('conv-') && String(d.senderId) === String(currentUserId)).length,
+    }
+  }, [deduplicatedDemandes, allItems, currentUserId])
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: 'all', label: 'Tous', icon: Users },
@@ -670,15 +776,17 @@ export const Requests = (): JSX.Element => {
               </p>
             </div>
           ) : filtered.map(d => {
-            const isSender = d.senderId === currentUserId
+            const isSender = String(d.senderId) === String(currentUserId)
             const otherUsername = (isSender ? d.receiverUsername : d.senderUsername) || (isSender ? d.receiverName : d.senderName)
             const otherAvatar = isSender ? d.receiverAvatar : d.senderAvatar
             const isAccepted = d.status === 'accepted'
-            const isSelected = String(d.conversationId) === String(selectedConversationId)
+            const isSelected = selectedDemande?.id === d.id || (Boolean(d.conversationId) && String(d.conversationId) === String(selectedConversationId))
             const isLoadingAction = loadingAction?.startsWith(d.id + ':')
+            const isDiscussionTab = activeTab === 'accepted'
+            const showAsDiscussionCard = isAccepted && (isDiscussionTab || activeTab === 'all')
 
-            // ─── 1. WhatsApp Discussion Card (Accepted) ────────────────────────
-            if (isAccepted) {
+            // ─── 1. WhatsApp Discussion Card (Accepted in Discussions or All) ──
+            if (showAsDiscussionCard) {
               const previewMsg = d.lastMessage?.content || d.message || 'Discussion active'
               const msgTime = timeAgo(d.lastMessage?.created_at || d.createdAt)
 
@@ -722,12 +830,16 @@ export const Requests = (): JSX.Element => {
               )
             }
 
-            // ─── 2. Request Card (Pending / Rejected / Cancelled) ──────────────
+            // ─── 2. Request Card (Pending / Reçues / Envoyées) ───────────────
             return (
               <div
                 key={d.id}
-                className={`rounded-2xl border p-3.5 transition-all duration-150 ${card}
-                  ${isLoadingAction ? 'opacity-70 pointer-events-none' : 'hover:border-violet-500/30'}`}
+                onClick={() => handleOpenConversation(d)}
+                className={`rounded-2xl border p-3.5 cursor-pointer transition-all duration-150 ${card}
+                  ${isSelected
+                    ? 'border-violet-500 ring-2 ring-violet-500/30 bg-violet-500/10'
+                    : 'hover:border-violet-500/40 hover:shadow-md'}
+                  ${isLoadingAction ? 'opacity-70 pointer-events-none' : ''}`}
               >
                 <div className="flex items-start gap-3">
                   <Avatar src={otherAvatar} name={otherUsername} size={42} />
@@ -752,7 +864,7 @@ export const Requests = (): JSX.Element => {
                     <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
                       <StatusBadge status={d.status} />
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                         {!isSender && d.status === 'pending' && (
                           <>
                             <button
@@ -788,6 +900,15 @@ export const Requests = (): JSX.Element => {
                             Annuler
                           </button>
                         )}
+
+                        {d.status === 'accepted' && (
+                          <button
+                            onClick={() => handleOpenConversation(d)}
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+                          >
+                            <MessageSquare size={12} /> Ouvrir
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -802,11 +923,17 @@ export const Requests = (): JSX.Element => {
       <div className={`flex-1 flex flex-col h-full overflow-hidden ${selectedConversationId || selectedDemande ? 'flex' : 'hidden lg:flex'}`}>
         {selectedDemande ? (
           <ConversationView
+            key={`demande-${selectedDemande.id}-${selectedDemande.conversationId || 'none'}`}
             conversationId={selectedDemande.conversationId}
-            partnerId={selectedDemande.senderId === currentUserId ? selectedDemande.receiverId : selectedDemande.senderId}
-            partnerUsername={selectedDemande.senderId === currentUserId ? selectedDemande.receiverUsername : selectedDemande.senderUsername}
-            partnerAvatar={selectedDemande.senderId === currentUserId ? selectedDemande.receiverAvatar : selectedDemande.senderAvatar}
+            partnerId={String(selectedDemande.senderId) === String(currentUserId) ? selectedDemande.receiverId : selectedDemande.senderId}
+            partnerUsername={String(selectedDemande.senderId) === String(currentUserId) ? selectedDemande.receiverUsername : selectedDemande.senderUsername}
+            partnerAvatar={String(selectedDemande.senderId) === String(currentUserId) ? selectedDemande.receiverAvatar : selectedDemande.senderAvatar}
             initialMessage={selectedDemande.message}
+            demandeStatus={selectedDemande.status}
+            isDemandeSender={String(selectedDemande.senderId) === String(currentUserId)}
+            onAcceptDemande={() => handleAccept(selectedDemande)}
+            onRejectDemande={() => handleReject(selectedDemande)}
+            onBlockUser={() => handleBlock(selectedDemande)}
             onClose={() => {
               setSelectedConversationId(null)
               setSelectedDemande(null)
@@ -814,6 +941,7 @@ export const Requests = (): JSX.Element => {
           />
         ) : selectedConversationId ? (
           <ConversationView
+            key={`conv-${selectedConversationId}`}
             conversationId={selectedConversationId}
             onClose={() => {
               setSelectedConversationId(null)
@@ -827,7 +955,7 @@ export const Requests = (): JSX.Element => {
             </div>
             <h2 className={`text-lg font-bold mb-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>Messagerie Professionnelle Instantanée</h2>
             <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
-              Sélectionnez une discussion ou acceptez une demande à gauche pour ouvrir et commencer la conversation instantanément ici à droite.
+              Sélectionnez une discussion ou cliquez sur une demande à gauche pour ouvrir et commencer la conversation instantanément ici à droite.
             </p>
           </div>
         )}

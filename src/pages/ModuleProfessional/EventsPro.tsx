@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Calendar, Users, Plus, Search,
   Clock, MapPin, Video, BarChart3, Trash2, CheckCircle,
-  Radio, Ticket, X, ArrowLeft, Share2, CalendarPlus, Check, Sparkles
+  Radio, Ticket, X, ArrowLeft, Share2, CalendarPlus, Check, Sparkles,
+  Play, Download, Upload, RotateCcw, Laptop, Briefcase, Palette, HeartPulse,
+  Scale, Megaphone, GraduationCap, Layers, PlayCircle, User, AlertCircle, Eye, Shield
 } from 'lucide-react'
 import TicketModal from '../../components/modals/TicketModal'
 import EventStatsModal from '../../components/modals/EventStatsModal'
@@ -37,11 +39,14 @@ interface EventItem {
   // Live & Streaming fields
   liveStatus?: 'at_coming' | 'live' | 'ended'
   speaker?: { name: string; avatar?: string }
-  liveRoomName?: string
   participantsCount?: number
   maxParticipants?: number
   reactions?: { thumbs_up: number; clap: number; bulb: number; heart: number }
   isRegistered?: boolean
+  ownerId?: number
+  recordingUrl?: string
+  replayUrl?: string
+  autoStartOnSchedule?: boolean
 }
 
 // ============ DEMO EVENTS ============
@@ -116,7 +121,7 @@ export default function EventsPro() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { resolvedTheme } = useTheme()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   // SWR query avec chargement instantané (0ms) depuis le cache
   const {
@@ -166,13 +171,17 @@ export default function EventsPro() {
             attendees: item.attendees || 0, 
             revenue: item.revenue || 0 
           },
-          organizerName: item.organizer_name || 'Organisateur',
-          organizerAvatar: item.organizer_avatar,
+          organizerName: item.owner_name || item.organizer_name || 'Organisateur',
+          organizerAvatar: item.owner_avatar || item.organizer_avatar,
+          ownerId: item.owner_id,
           createdAt: item.created_at,
           publishedAt: item.published_at,
           price: item.price || 0,
           isLive: item.status === 'live' || item.is_live || false,
           liveRoomName: item.live_room_name,
+          recordingUrl: item.recording_url || item.replay_url,
+          replayUrl: item.replay_url,
+          autoStartOnSchedule: item.auto_start_on_schedule ?? true,
           liveStatus: item.live_status,
           speaker: item.speaker,
           jitsiRoom: item.jitsi_room,
@@ -200,6 +209,24 @@ export default function EventsPro() {
     navigate('/pro')
   }
   
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'live' | 'past' | 'replays' | 'mine'>('all')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null)
+  const [showTicketModal, setShowTicketModal] = useState(false)
+  const [showStatsModal, setShowStatsModal] = useState(false)
+  const [selectedReplayEvent, setSelectedReplayEvent] = useState<EventItem | null>(null)
+  const [showReplayModal, setShowReplayModal] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [dueEventReminder, setDueEventReminder] = useState<EventItem | null>(null)
+  const notifiedEventsRef = useRef<Set<string>>(new Set())
+  const [toast, setToast] = useState<string | null>(null)
+  const [showInstantLiveModal, setShowInstantLiveModal] = useState(false)
+  const [instantLiveTitle, setInstantLiveTitle] = useState('')
+  const [instantLiveCategory, setInstantLiveCategory] = useState('TECHNOLOGY')
+  const [isLaunchingLive, setIsLaunchingLive] = useState(false)
+
   // Open create modal if create=true query param is present
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -208,31 +235,21 @@ export default function EventsPro() {
     }
   }, [searchParams, navigate])
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'live' | 'past' | 'mine'>('all')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null)
-  const [showTicketModal, setShowTicketModal] = useState(false)
-  const [showStatsModal, setShowStatsModal] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
-
-  const CATEGORIES = [
-    { id: 'all', label: 'Toutes' },
-    { id: 'TECHNOLOGY', label: '💻 Technologie' },
-    { id: 'BUSINESS', label: '📈 Business & Finance' },
-    { id: 'DESIGN', label: '🎨 Design & UI/UX' },
-    { id: 'HEALTH', label: '🏥 Santé & Bien-être' },
-    { id: 'LAW', label: '⚖️ Droit & Fiscalité' },
-    { id: 'MARKETING', label: '📣 Marketing' },
-    { id: 'EDUCATION', label: '🎓 Masterclass' }
+    const CATEGORIES = [
+    { id: 'all', label: 'Toutes les catégories', icon: Layers },
+    { id: 'TECHNOLOGY', label: 'Technologie', icon: Laptop },
+    { id: 'BUSINESS', label: 'Business & Finance', icon: Briefcase },
+    { id: 'DESIGN', label: 'Design & UI/UX', icon: Palette },
+    { id: 'HEALTH', label: 'Santé & Bien-être', icon: HeartPulse },
+    { id: 'LAW', label: 'Droit & Fiscalité', icon: Scale },
+    { id: 'MARKETING', label: 'Marketing', icon: Megaphone },
+    { id: 'EDUCATION', label: 'Masterclass Pro', icon: GraduationCap }
   ]
 
   // Set active tab or open create from URL
   useEffect(() => {
     const tabParam = searchParams.get('tab')
-    if (tabParam === 'upcoming' || tabParam === 'live' || tabParam === 'past' || tabParam === 'mine') {
+    if (tabParam === 'upcoming' || tabParam === 'live' || tabParam === 'past' || tabParam === 'replays' || tabParam === 'mine') {
       setActiveTab(tabParam)
     }
   }, [searchParams])
@@ -260,22 +277,25 @@ export default function EventsPro() {
           text: `Rejoignez l'événement "${event.title}" sur EXILE`,
           url: shareUrl
         })
-        showToastMsg('✓ Événement partagé !')
+        showToastMsg('Événement partagé !')
         return
       } catch (e) {}
     }
     navigator.clipboard?.writeText(shareUrl)
-    showToastMsg('🔗 Lien de l\'événement copié dans le presse-papier !')
+    showToastMsg('Lien copié dans le presse-papier !')
   }, [showToastMsg])
 
-  const handleToggleRegister = useCallback((event: EventItem) => {
+  const handleToggleRegister = useCallback(async (event: EventItem) => {
     if (!isAuthenticated) {
       navigate('/login')
       return
     }
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+    const cleanId = String(event.id).replace('exile-', '').replace('evt_', '')
+
+    const newRegistered = !event.isRegistered
     setEvents(prev => prev.map(e => {
       if (e.id === event.id) {
-        const newRegistered = !e.isRegistered
         return {
           ...e,
           isRegistered: newRegistered,
@@ -287,7 +307,32 @@ export default function EventsPro() {
       }
       return e
     }))
-    showToastMsg(event.isRegistered ? 'Inscription annulée' : '🎉 Inscription confirmée avec succès !')
+    showToastMsg(newRegistered ? 'Inscription confirmée avec succès !' : 'Inscription annulée')
+
+    if (token && cleanId && !isNaN(Number(cleanId))) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/register/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setEvents(prev => prev.map(e => e.id === event.id ? {
+            ...e,
+            isRegistered: data.is_registered,
+            stats: {
+              ...e.stats,
+              registrations: data.registrations_count
+            }
+          } : e))
+        }
+      } catch (err) {
+        console.warn('Erreur API inscription:', err)
+      }
+    }
   }, [isAuthenticated, navigate, setEvents, showToastMsg])
 
   const addToGoogleCalendar = useCallback((event: EventItem) => {
@@ -309,34 +354,260 @@ export default function EventsPro() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    showToastMsg('📅 Fichier calendrier (.ics) téléchargé !')
+    showToastMsg('Fichier calendrier (.ics) téléchargé !')
   }, [showToastMsg])
 
-  const createEvent = useCallback((data: Omit<EventItem, 'id' | 'createdAt' | 'stats'>) => {
-    if (!isAuthenticated) {
-      navigate('/login')
-      return
+    // Helper pour vérifier si l'utilisateur actuel est le créateur / propriétaire de l'événement
+  const isEventOwner = useCallback((event: EventItem) => {
+    if (!isAuthenticated || !user) return false
+    if (event.ownerId !== undefined && event.ownerId !== null && String(event.ownerId) === String(user.id)) {
+      return true
     }
-    const newEvent: EventItem = {
-      ...data,
-      id: `evt_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      stats: { views: 0, registrations: 0, attendees: 0, revenue: 0 }
+    if (event.organizerName && (event.organizerName === user.username || event.organizerName === user.fullName || event.organizerName === 'Moi')) {
+      return true
     }
-    setEvents(prev => [newEvent, ...prev])
-    setShowCreateModal(false)
-    showToastMsg('Événement créé avec succès')
-  }, [showToastMsg, isAuthenticated, navigate])
+    return false
+  }, [isAuthenticated, user])
 
-  const deleteEvent = useCallback((id: string) => {
+  // Notification de rappel quand l'heure arrive (uniquement pour l'organisateur)
+  useEffect(() => {
+    const checkSchedule = () => {
+      const now = Date.now()
+      events.forEach(e => {
+        const start = new Date(e.startDate).getTime()
+        const end = new Date(e.endDate).getTime()
+        const isTimeDue = now >= start && now <= end
+        if (isTimeDue && !e.isLive && e.status !== 'completed' && e.status !== 'termine' && e.status !== 'cancelled') {
+          if (isEventOwner(e) && !notifiedEventsRef.current.has(e.id)) {
+            notifiedEventsRef.current.add(e.id)
+            setDueEventReminder(e)
+            showToastMsg(`L'heure de votre événement "${e.title}" est arrivée. Vous pouvez lancer le direct dès que vous êtes prêt.`)
+          }
+        }
+      })
+    }
+
+    checkSchedule()
+    const interval = setInterval(checkSchedule, 10000)
+    return () => clearInterval(interval)
+  }, [events, isEventOwner, showToastMsg])
+
+  const createEvent = useCallback(async (data: any) => {
     if (!isAuthenticated) {
       navigate('/login')
       return
     }
+
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+    const start = new Date(data.startDate)
+    const end = new Date(data.endDate)
+
+    try {
+      if (token) {
+        const formData = new FormData()
+        formData.append('title', data.title)
+        formData.append('name', data.title)
+        formData.append('description', data.description || '')
+        formData.append('date_debut', start.toISOString())
+        formData.append('date_fin', end.toISOString())
+
+        let fmt = 'online'
+        if (data.format === 'in-person') fmt = 'presentiel'
+        else if (data.format === 'hybrid') fmt = 'hybrid'
+        formData.append('format', fmt)
+
+        const categoryMap: { [key: string]: string } = {
+          'Tech': 'tech',
+          'TECHNOLOGY': 'tech',
+          'Business': 'business',
+          'BUSINESS': 'business',
+          'Design': 'design',
+          'DESIGN': 'design',
+          'Marketing': 'marketing',
+          'MARKETING': 'marketing',
+          'Santé': 'health',
+          'HEALTH': 'health',
+          'Droit': 'law',
+          'LAW': 'law',
+          'Education': 'education',
+          'EDUCATION': 'education',
+          'Autre': 'autre'
+        }
+        formData.append('categorie', categoryMap[data.category] || 'autre')
+        formData.append('capacite', String(data.capacity || 100))
+        formData.append('status', 'published')
+        formData.append('is_live', 'false')
+        formData.append('auto_start_on_schedule', data.autoStartOnSchedule !== false ? 'true' : 'false')
+
+        if (data.coverFile) {
+          formData.append('cover', data.coverFile)
+        }
+        if (data.location?.city) {
+          formData.append('location', data.location.city)
+        }
+
+        const res = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        })
+
+        if (res.ok) {
+          const item = await res.json()
+          const newEventItem: EventItem = {
+            id: String(item.id),
+            title: item.title || item.name,
+            description: item.description,
+            startDate: item.date_debut || item.start_date,
+            endDate: item.date_fin || item.end_date,
+            format: item.format || 'virtual',
+            status: item.status || 'published',
+            location: item.location ? { city: item.location, venue: item.venue || '' } : undefined,
+            coverImage: item.cover || item.cover_image,
+            category: item.categorie || item.category || 'OTHER',
+            capacity: item.capacite || item.capacity || 100,
+            stats: { views: 0, registrations: 0, attendees: 0, revenue: 0 },
+            organizerName: item.owner_name || user?.fullName || user?.username || 'Moi',
+            organizerAvatar: item.owner_avatar || user?.avatar,
+            ownerId: item.owner_id || (user?.id ? Number(user.id) : undefined),
+            createdAt: item.created_at || new Date().toISOString(),
+            price: item.price || 0,
+            isLive: false,
+            liveRoomName: item.live_room_name,
+            recordingUrl: item.recording_url || item.replay_url,
+            replayUrl: item.replay_url,
+            autoStartOnSchedule: item.auto_start_on_schedule ?? true,
+            isRegistered: false
+          }
+          setEvents(prev => [newEventItem, ...prev])
+          setShowCreateModal(false)
+          showToastMsg('Événement créé et enregistré avec succès !')
+          return
+        }
+      }
+
+      // Fallback local
+      const localEvent: EventItem = {
+        ...data,
+        id: `evt_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        stats: { views: 0, registrations: 0, attendees: 0, revenue: 0 },
+        organizerName: user?.fullName || user?.username || 'Moi',
+        organizerAvatar: user?.avatar,
+        ownerId: user?.id ? Number(user.id) : undefined,
+        isLive: false,
+        autoStartOnSchedule: data.autoStartOnSchedule !== false
+      }
+      setEvents(prev => [localEvent, ...prev])
+      setShowCreateModal(false)
+      showToastMsg('Événement créé avec succès')
+    } catch (err) {
+      console.error('Erreur création événement:', err)
+      setShowCreateModal(false)
+      showToastMsg('Événement créé')
+    }
+  }, [isAuthenticated, navigate, user, setEvents, showToastMsg])
+
+  const restartLive = useCallback(async (event: EventItem) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+    if (!isEventOwner(event)) {
+      showToastMsg("Seul l'organisateur peut relancer ce direct.")
+      return
+    }
+
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+    const cleanId = String(event.id).replace('exile-', '').replace('evt_', '')
+    const roomName = event.liveRoomName || `exile-${event.id}`
+
+    if (token && cleanId && !isNaN(Number(cleanId))) {
+      try {
+        await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/restart_live/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        showToastMsg('Direct relancé avec succès')
+      } catch (err) {
+        console.warn('Error restarting live:', err)
+      }
+    }
+
+    setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isLive: true, status: 'published', liveRoomName: roomName } : e))
+    navigate(`/pro/events/${event.id}/live?room=${roomName}`)
+  }, [isAuthenticated, isEventOwner, navigate, showToastMsg, setEvents])
+
+  const startLive = useCallback(async (event: EventItem) => {
+    // Si l'événement n'est pas encore en direct, SEUL l'organisateur peut le démarrer
+    const isOwner = isEventOwner(event)
+    if (!event.isLive && !isOwner) {
+      showToastMsg("Ce direct n'a pas encore été démarré par l'organisateur.")
+      return
+    }
+
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+    const cleanId = String(event.id).replace('exile-', '').replace('evt_', '')
+    const roomName = event.liveRoomName || `exile-${event.id}`
+
+    if (token && cleanId && !isNaN(Number(cleanId)) && isOwner) {
+      try {
+        await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/start_live/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+      } catch {}
+    }
+
+    if (isOwner) {
+      setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isLive: true, liveRoomName: roomName } : e))
+    }
+    navigate(`/pro/events/${event.id}/live?room=${roomName}`)
+  }, [isEventOwner, navigate, showToastMsg, setEvents])
+
+  const deleteEvent = useCallback(async (id: string) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+    const evt = events.find(e => e.id === id)
+    if (evt && !isEventOwner(evt)) {
+      showToastMsg("Seul l'organisateur peut supprimer cet événement.")
+      return
+    }
+
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+    const cleanId = String(id).replace('exile-', '').replace('evt_', '')
+
+    if (token && cleanId && !isNaN(Number(cleanId))) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        if (!res.ok && res.status !== 204) {
+          showToastMsg("Erreur lors de la suppression sur le serveur.")
+          return
+        }
+      } catch (err) {
+        console.warn('Erreur suppression événement:', err)
+      }
+    }
+
     setEvents(prev => prev.filter(e => e.id !== id))
     setDeleteConfirm(null)
-    showToastMsg('Événement supprimé')
-  }, [showToastMsg, isAuthenticated, navigate])
+    showToastMsg('Événement supprimé avec succès')
+  }, [events, isEventOwner, showToastMsg, isAuthenticated, navigate, setEvents])
 
   const publishEvent = useCallback((id: string) => {
     if (!isAuthenticated) {
@@ -347,15 +618,57 @@ export default function EventsPro() {
     showToastMsg('Événement publié')
   }, [showToastMsg, isAuthenticated, navigate])
 
-  const startLive = useCallback((event: EventItem) => {
-    if (!event.liveRoomName) {
-      const roomName = `exile-${event.id}`
-      setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isLive: true, liveRoomName: roomName } : e))
-      navigate(`/pro/events/${event.id}/live?room=${roomName}`)
-    } else {
-      navigate(`/pro/events/${event.id}/live?room=${event.liveRoomName}`)
+  const handleLaunchInstantLive = useCallback(async () => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
     }
-  }, [navigate])
+    const title = instantLiveTitle.trim() || `Session Live de @${user?.username || 'mon_compte'}`
+    setIsLaunchingLive(true)
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+      const now = new Date()
+      const endDate = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+
+      let createdId = `evt_${Date.now()}`
+
+      if (token) {
+        const formData = new FormData()
+        formData.append('title', title)
+        formData.append('name', title)
+        formData.append('description', 'Diffusion en direct interactive sur EXILE.')
+        formData.append('format', 'online')
+        formData.append('categorie', instantLiveCategory.toLowerCase())
+        formData.append('capacite', '500')
+        formData.append('status', 'live')
+        formData.append('is_live', 'true')
+        formData.append('date_debut', now.toISOString())
+        formData.append('date_fin', endDate.toISOString())
+
+        const res = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        })
+        if (res.ok) {
+          const newEvt = await res.json()
+          if (newEvt.id) createdId = String(newEvt.id)
+        }
+      }
+
+      const roomName = `exile-${createdId}`
+      setShowInstantLiveModal(false)
+      navigate(`/pro/events/${createdId}/live?room=${roomName}`)
+    } catch {
+      const fallbackId = `evt_${Date.now()}`
+      setShowInstantLiveModal(false)
+      navigate(`/pro/events/${fallbackId}/live?room=exile-${fallbackId}`)
+    } finally {
+      setIsLaunchingLive(false)
+    }
+  }, [isAuthenticated, instantLiveTitle, instantLiveCategory, user, navigate])
 
   const isUpcoming = (date: string) => new Date(date) > new Date()
   const isPast = (date: string) => new Date(date) < new Date()
@@ -364,8 +677,21 @@ export default function EventsPro() {
   const activeLiveEvents = events.filter(e => e.isLive)
 
   const filtered = events.filter(e => {
-    // Catégorie
-    if (selectedCategory !== 'all' && e.category !== selectedCategory) return false
+        // Catégorie
+    if (selectedCategory !== 'all') {
+      const cat = (e.category || '').toLowerCase()
+      const sel = selectedCategory.toLowerCase()
+      if (sel === 'technology' && !cat.includes('tech')) return false
+      else if (sel === 'business' && !cat.includes('bus') && !cat.includes('fin')) return false
+      else if (sel === 'design' && !cat.includes('des')) return false
+      else if (sel === 'health' && !cat.includes('sant') && !cat.includes('heal')) return false
+      else if (sel === 'law' && !cat.includes('droit') && !cat.includes('law')) return false
+      else if (sel === 'marketing' && !cat.includes('market')) return false
+      else if (sel === 'education' && !cat.includes('educ') && !cat.includes('master')) return false
+      else if (sel !== 'technology' && sel !== 'business' && sel !== 'design' && sel !== 'health' && sel !== 'law' && sel !== 'marketing' && sel !== 'education') {
+        if (!cat.includes(sel)) return false
+      }
+    }
 
     // Onglet horizontal
     if (activeTab === 'live') {
@@ -373,9 +699,11 @@ export default function EventsPro() {
     } else if (activeTab === 'upcoming') {
       if (!isUpcoming(e.startDate) || e.isLive) return false
     } else if (activeTab === 'past') {
-      if (!isPast(e.endDate || e.startDate) || e.isLive) return false
+      if ((!isPast(e.endDate || e.startDate) && e.status !== 'completed' && e.status !== 'termine') || e.isLive) return false
+    } else if (activeTab === 'replays') {
+      if (!e.recordingUrl && !e.replayUrl) return false
     } else if (activeTab === 'mine') {
-      if (!e.isRegistered && e.status !== 'draft') return false
+      if (!isEventOwner(e) && !e.isRegistered && e.status !== 'draft') return false
     }
 
     // Recherche
@@ -428,14 +756,25 @@ export default function EventsPro() {
             </div>
           </div>
 
-          <button
-            onClick={() => isAuthenticated ? setShowCreateModal(true) : navigate('/login')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl shadow-md text-xs font-bold transition-all active:scale-95 flex-shrink-0"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span className="hidden sm:inline">Créer un événement</span>
-            <span className="sm:hidden">Créer</span>
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => isAuthenticated ? setShowInstantLiveModal(true) : navigate('/login')}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl shadow-md shadow-red-600/30 text-xs font-bold transition-all active:scale-95 flex-shrink-0 animate-pulse"
+              title="Démarrer un live vidéo immédiatement"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Lancer un Live</span>
+            </button>
+
+            <button
+              onClick={() => isAuthenticated ? setShowCreateModal(true) : navigate('/login')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl shadow-md text-xs font-bold transition-all active:scale-95 flex-shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span className="hidden sm:inline">Créer un événement</span>
+              <span className="sm:hidden">Créer</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -455,16 +794,18 @@ export default function EventsPro() {
           )}
         </div>
 
-        {/* 1. STATUS TABS FILTER (YouTube Style) */}
+                {/* 1. STATUS TABS FILTER */}
         <div className="flex gap-1.5 pt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {[
-            { id: 'all', label: 'Tous', count: events.length },
-            { id: 'upcoming', label: 'À venir', count: events.filter(e => isUpcoming(e.startDate) && !e.isLive).length },
-            { id: 'live', label: 'En direct', count: activeLiveEvents.length },
-            { id: 'past', label: 'Passés', count: events.filter(e => isPast(e.endDate || e.startDate) && !e.isLive).length },
-            { id: 'mine', label: 'Mes événements', count: events.filter(e => e.isRegistered || e.status === 'draft').length }
+            { id: 'all', label: 'Tous', icon: Layers, count: events.length },
+            { id: 'live', label: 'En direct', icon: Radio, count: activeLiveEvents.length },
+            { id: 'upcoming', label: 'À venir', icon: Calendar, count: events.filter(e => isUpcoming(e.startDate) && !e.isLive).length },
+            { id: 'past', label: 'Passés', icon: CheckCircle, count: events.filter(e => (isPast(e.endDate || e.startDate) || e.status === 'completed' || e.status === 'termine') && !e.isLive).length },
+            { id: 'replays', label: 'Rediffusions', icon: PlayCircle, count: events.filter(e => Boolean(e.recordingUrl || e.replayUrl)).length },
+            { id: 'mine', label: 'Mes événements', icon: User, count: events.filter(e => isEventOwner(e) || e.isRegistered).length }
           ].map(tab => {
             const active = activeTab === tab.id
+            const TabIcon = tab.icon
             return (
               <button
                 key={tab.id}
@@ -477,9 +818,7 @@ export default function EventsPro() {
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-100/70'
                 }`}
               >
-                {tab.id === 'live' && activeLiveEvents.length > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                )}
+                <TabIcon className={`w-3.5 h-3.5 ${tab.id === 'live' && activeLiveEvents.length > 0 ? 'text-red-500 animate-pulse' : ''}`} />
                 <span>{tab.label}</span>
                 <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${active ? 'bg-white/20 text-white' : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300' : 'bg-slate-200 text-slate-700'}`}>
                   {tab.count}
@@ -489,15 +828,16 @@ export default function EventsPro() {
           })}
         </div>
 
-        {/* 2. CATEGORIES HORIZONTAL SCROLL CHIPS */}
+                {/* 2. CATEGORIES HORIZONTAL SCROLL CHIPS */}
         <div className="flex gap-1.5 overflow-x-auto pt-2 pb-0.5" style={{ scrollbarWidth: 'none' }}>
           {CATEGORIES.map(cat => {
             const isSelected = selectedCategory === cat.id
+            const CatIcon = cat.icon
             return (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
                   isSelected
                     ? 'bg-zinc-800 text-[#FF6B00] border border-[#FF6B00]/50 font-bold'
                     : resolvedTheme === 'dark'
@@ -505,12 +845,62 @@ export default function EventsPro() {
                     : 'text-slate-600 hover:text-slate-900 bg-slate-100/80 border border-slate-200'
                 }`}
               >
-                {cat.label}
+                <CatIcon className="w-3 h-3" />
+                <span>{cat.label}</span>
               </button>
             )
           })}
         </div>
       </div>
+
+      {/* ── ALERTE NOTIFICATION : L'HEURE DU DIRECT EST ARRIVÉE ── */}
+      {dueEventReminder && (
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-3">
+          <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg transition-all ${
+            resolvedTheme === 'dark'
+              ? 'bg-gradient-to-r from-amber-950/40 via-zinc-900 to-zinc-900 border-amber-500/40 text-white'
+              : 'bg-gradient-to-r from-amber-50 via-white to-orange-50 border-amber-300 text-slate-900'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1">
+                  "L'heure de votre événement est arrivée !"
+                </span>
+                <p className="text-xs font-medium line-clamp-1">
+                  {"L'événement « "}<strong className="font-bold">{dueEventReminder.title}</strong>{" » est prêt. Vous pouvez lancer le direct dès que vous êtes prêt."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
+              <button
+                onClick={() => {
+                  const evt = dueEventReminder
+                  setDueEventReminder(null)
+                  startLive(evt)
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-600/30 flex items-center gap-1.5 active:scale-95 transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Démarrer le Direct</span>
+              </button>
+
+              <button
+                onClick={() => setDueEventReminder(null)}
+                className={`p-2 rounded-xl border text-xs font-semibold transition-colors ${
+                  resolvedTheme === 'dark' ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+                }`}
+                title="Fermer ce rappel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contenu principal défilant */}
       <div className="flex-1 overflow-y-auto w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 pb-20 md:pb-8">
@@ -617,6 +1007,12 @@ export default function EventsPro() {
                           En Direct
                         </span>
                       )}
+                      {!event.isLive && new Date(event.startDate).getTime() <= Date.now() && new Date(event.endDate).getTime() >= Date.now() && event.status !== 'completed' && event.status !== 'termine' && (
+                        <span className="bg-amber-600/90 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                          <Clock className="w-2.5 h-2.5" />
+                          {"L'heure est arrivée"}
+                        </span>
+                      )}
                       {!event.isLive && event.status === 'published' && isUpcoming(event.startDate) && (
                         <span className="bg-emerald-600/90 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                           À venir
@@ -687,30 +1083,121 @@ export default function EventsPro() {
                   </div>
                 </div>
 
-                {/* BOUTONS D'ACTIONS EN BAS DE CARTE */}
-                <div className={`p-3 pt-0 flex flex-col gap-2`}>
+                                {/* BOUTONS D'ACTIONS EN BAS DE CARTE */}
+                <div className="p-3 pt-0 flex flex-col gap-2">
+                  {(() => {
+                    const isOwner = isEventOwner(event)
+                    const isFinished = isPast(event.endDate || event.startDate) || event.status === 'completed' || event.status === 'termine'
+                    const isDueNow = !event.isLive && new Date(event.startDate).getTime() <= Date.now() && new Date(event.endDate).getTime() >= Date.now() && !isFinished
+
+                    if (event.isLive) {
+                      return (
+                        <button
+                          onClick={() => startLive(event)}
+                          className="w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-red-600/30 active:scale-95 bg-red-600 hover:bg-red-700 text-white animate-pulse"
+                        >
+                          <Radio className="w-3.5 h-3.5 animate-pulse" />
+                          <span>{isOwner ? "Gérer mon Direct en cours" : "Rejoindre le Direct"}</span>
+                        </button>
+                      )
+                    }
+
+                    if (isFinished) {
+                      if (isOwner) {
+                        return (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => restartLive(event)}
+                              className="py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
+                              title="Relancer ce même direct en tant qu'organisateur"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Relancer</span>
+                            </button>
+                            <button
+                              onClick={() => { setSelectedReplayEvent(event); setShowReplayModal(true) }}
+                              className="py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-blue-600 hover:bg-blue-700 text-white"
+                              title="Visionner ou gérer la rediffusion"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <span>Rediffusion</span>
+                            </button>
+                          </div>
+                        )
+                      } else {
+                        return (event.recordingUrl || event.replayUrl) ? (
+                          <button
+                            onClick={() => { setSelectedReplayEvent(event); setShowReplayModal(true) }}
+                            className="w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Visionner la Rediffusion</span>
+                          </button>
+                        ) : (
+                          <div className={`w-full py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 border ${
+                            resolvedTheme === 'dark' ? 'bg-zinc-800/40 text-zinc-400 border-zinc-800' : 'bg-slate-100 text-slate-500 border-slate-200'
+                          }`}>
+                            <CheckCircle className="w-3.5 h-3.5 text-zinc-400" />
+                            <span>Session Terminée</span>
+                          </div>
+                        )
+                      }
+                    }
+
+                    // Événement à venir
+                    if (isOwner) {
+                      return (
+                        <button
+                          onClick={() => startLive(event)}
+                          className="w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white border border-red-500/30"
+                        >
+                          <Video className="w-3.5 h-3.5" />
+                          <span>Démarrer le Direct</span>
+                        </button>
+                      )
+                    } else {
+                      return (
+                        <div className={`w-full py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 border ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-900/60 text-zinc-400 border-zinc-800' : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}>
+                          <Clock className="w-3.5 h-3.5 text-amber-500" />
+                          <span>{isDueNow ? "En attente du lancement par l'organisateur" : "Direct programmé"}</span>
+                        </div>
+                      )
+                    }
+                  })()}
+
                   {/* Bouton d'inscription / participation principale */}
                   <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleToggleRegister(event)}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
-                        event.isRegistered
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          : 'bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-[#FF6B00]/25'
-                      }`}
-                    >
-                      {event.isRegistered ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>Inscrit ✓</span>
-                        </>
-                      ) : (
-                        <>
-                          <Ticket className="w-3.5 h-3.5" />
-                          <span>S'inscrire ({event.price === 0 ? 'Gratuit' : `${event.price}$`})</span>
-                        </>
-                      )}
-                    </button>
+                    {!isEventOwner(event) ? (
+                      <button
+                        onClick={() => handleToggleRegister(event)}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                          event.isRegistered
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-[#FF6B00]/25'
+                        }`}
+                      >
+                        {event.isRegistered ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>Inscrit</span>
+                          </>
+                        ) : (
+                          <>
+                            <Ticket className="w-3.5 h-3.5" />
+                            <span>S'inscrire ({event.price === 0 ? 'Gratuit' : `${event.price}$`})</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border ${
+                        resolvedTheme === 'dark' ? 'bg-indigo-950/40 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                      }`}>
+                        <Shield className="w-3.5 h-3.5" />
+                        <span>Organisateur</span>
+                      </div>
+                    )}
 
                     {/* Partager */}
                     <button
@@ -747,13 +1234,15 @@ export default function EventsPro() {
                       <span>Statistiques</span>
                     </button>
 
-                    <button
-                      onClick={() => deleteEvent(event.id)}
-                      className="text-red-400 hover:text-red-500 font-semibold transition-colors flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Supprimer</span>
-                    </button>
+                    {isEventOwner(event) && (
+                      <button
+                        onClick={() => setDeleteConfirm(event.id)}
+                        className="text-red-400 hover:text-red-500 font-semibold transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Supprimer</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -767,6 +1256,17 @@ export default function EventsPro() {
         <CreateEventModal
           onClose={() => setShowCreateModal(false)}
           onCreate={createEvent}
+        />
+      )}
+
+      {/* MODAL: REDIFFUSION / ENREGISTREMENT */}
+      {showReplayModal && selectedReplayEvent && (
+        <ReplayModal
+          isOpen={showReplayModal}
+          onClose={() => { setShowReplayModal(false); setSelectedReplayEvent(null) }}
+          event={selectedReplayEvent}
+          onRestartLive={restartLive}
+          onUploadRecording={handleUploadRecording}
         />
       )}
 
@@ -812,6 +1312,94 @@ export default function EventsPro() {
           eventTitle={selectedEvent.title}
         />
       )}
+
+      {/* MODAL: LANCER UN LIVE EN 1-CLIC */}
+      {showInstantLiveModal && (
+        <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl space-y-5 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-red-600/20 text-red-500 flex items-center justify-center">
+                  <Radio className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Lancer un Direct Live</h3>
+                  <p className="text-xs text-zinc-400">Diffusion vidéo & chat en temps réel</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowInstantLiveModal(false)}
+                className="p-1.5 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-zinc-400">
+                  Titre de votre session Live *
+                </label>
+                <input
+                  type="text"
+                  value={instantLiveTitle}
+                  onChange={e => setInstantLiveTitle(e.target.value)}
+                  placeholder="Ex: Q&A Tech, Démo projet, Masterclass..."
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-red-500 ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white placeholder-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'}`}
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-zinc-400">
+                  Catégorie
+                </label>
+                <select
+                  value={instantLiveCategory}
+                  onChange={e => setInstantLiveCategory(e.target.value)}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-red-500 ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
+                >
+                  <option value="TECHNOLOGY">Technologie</option>
+                  <option value="BUSINESS">Business & Finance</option>
+                  <option value="DESIGN">Design & UI/UX</option>
+                  <option value="HEALTH">Santé & Bien-être</option>
+                  <option value="EDUCATION">Masterclass</option>
+                  <option value="OTHER">Autre</option>
+                </select>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" /> WebRTC & Chat en direct activés
+                </p>
+                <p className="text-[11px] opacity-80">
+                  Votre caméra et micro seront prêts dès l'ouverture du salon. Vous pourrez partager votre écran et interagir avec vos spectateurs.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowInstantLiveModal(false)}
+                disabled={isLaunchingLive}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleLaunchInstantLive}
+                disabled={isLaunchingLive}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs shadow-lg shadow-red-600/30 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{isLaunchingLive ? 'Initialisation...' : 'Démarrer maintenant'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -837,6 +1425,8 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
     liveRoomName: '',
     maxParticipants: 100
   })
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [autoStartOnSchedule, setAutoStartOnSchedule] = useState(true)
   const [coverImagePreview, setCoverImagePreview] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -915,6 +1505,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
       return
     }
     
+    setCoverFile(file)
     const reader = new FileReader()
     reader.onloadend = () => {
       setCoverImagePreview(reader.result as string)
@@ -946,7 +1537,9 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
     
     onCreate({
       ...form,
-      status: 'draft',
+      coverFile,
+      autoStartOnSchedule,
+      status: 'published',
       isLive: false,
       organizerName: 'Moi',
       organizerAvatar: null,
@@ -1101,6 +1694,26 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
             </div>
           </div>
 
+          {/* Option: Notification de rappel à l'heure */}
+          <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${resolvedTheme === 'dark' ? 'bg-zinc-900/50 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="space-y-0.5">
+              <label htmlFor="autoStart" className="text-xs font-bold block cursor-pointer flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
+                M'avertir et envoyer une notification quand l'heure arrive
+              </label>
+              <p className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
+                Recevoir une alerte et une notification dès que l'heure de début arrive pour vous proposer de démarrer le direct sans forcer l'ouverture.
+              </p>
+            </div>
+            <input
+              id="autoStart"
+              type="checkbox"
+              checked={autoStartOnSchedule}
+              onChange={e => setAutoStartOnSchedule(e.target.checked)}
+              className="w-4 h-4 accent-[#FF6B00] rounded cursor-pointer flex-shrink-0"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-700'} font-bold mb-1.5 block`}>
@@ -1239,15 +1852,210 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
                 <h3 className="font-bold text-sm">{form.title || 'Titre de l\'événement'}</h3>
                 <p className="text-xs text-zinc-400 line-clamp-2">{form.description || 'Description de l\'événement...'}</p>
                 <div className="flex items-center gap-3 text-[11px] text-zinc-500 pt-2 border-t border-zinc-800">
-                  <span>{form.format === 'virtual' ? '🎥 En ligne' : '📍 ' + (form.location.city || 'Lieu')}</span>
-                  <span>👥 {form.capacity} places</span>
-                  <span>💰 {form.price === 0 ? 'Gratuit' : `${form.price}$`}</span>
+                  <span className="flex items-center gap-1">
+                    {form.format === 'virtual' ? <Video className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                    {form.format === 'virtual' ? 'En ligne' : (form.location.city || 'Lieu')}
+                  </span>
+                  <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {form.capacity} places</span>
+                  <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {form.price === 0 ? 'Gratuit' : `${form.price}$`}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ============ REPLAY & RECORDING MODAL ============
+interface ReplayModalProps {
+  isOpen: boolean
+  onClose: () => void
+  event: EventItem
+  onRestartLive: (event: EventItem) => void
+  onUploadRecording: (eventId: string, file?: File, replayUrl?: string) => Promise<void>
+}
+
+function ReplayModal({ isOpen, onClose, event, onRestartLive, onUploadRecording }: ReplayModalProps) {
+  const { resolvedTheme } = useTheme()
+  const { user, isAuthenticated } = useAuth()
+  const [customReplayUrl, setCustomReplayUrl] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
+  if (!isOpen) return null
+
+  const isOwner = Boolean(user?.id && event.ownerId && String(user.id) === String(event.ownerId))
+  const videoSource = event.recordingUrl || event.replayUrl
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedFile && !customReplayUrl.trim()) return
+    setIsUploading(true)
+    try {
+      await onUploadRecording(event.id, selectedFile || undefined, customReplayUrl.trim() || undefined)
+      setSelectedFile(null)
+      setCustomReplayUrl('')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100000] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+      <div className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+        {/* Header */}
+        <div className={`p-4 border-b flex items-center justify-between ${resolvedTheme === 'dark' ? 'border-zinc-800 bg-zinc-950/60' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-500 flex items-center justify-center">
+              <Play className="w-4 h-4 fill-current" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm sm:text-base leading-tight">Rediffusion & Enregistrement</h3>
+              <p className="text-[11px] text-zinc-400 truncate max-w-md">{event.title}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          {/* Lecteur Vidéo */}
+          <div className="relative aspect-video rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-zinc-800 shadow-inner">
+            {videoSource ? (
+              <video
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+                src={videoSource.startsWith('http') ? videoSource : `${API_BASE_URL.replace('/api/v1', '')}${videoSource}`}
+              />
+            ) : (
+              <div className="p-6 text-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-zinc-800/80 border border-zinc-700 text-zinc-400 flex items-center justify-center mx-auto">
+                  <Play className="w-6 h-6 fill-current opacity-60" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-zinc-200">Enregistrement en attente</p>
+                  <p className="text-xs text-zinc-500 max-w-xs mx-auto mt-1">
+                    Ce direct s'est achevé. Vous pouvez ajouter une vidéo MP4/WebM ou relancer une nouvelle session en direct.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Informations sur l'événement */}
+          <div className="space-y-2">
+            <h4 className="font-bold text-sm sm:text-base">{event.title}</h4>
+            <p className="text-xs text-zinc-400 leading-relaxed">{event.description}</p>
+
+            <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400 pt-2 border-t border-zinc-800/60">
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-purple-400" />
+                {event.stats.registrations} participants
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                {new Date(event.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              <span>Organisé par <strong className="text-zinc-200">{event.organizerName}</strong></span>
+            </div>
+          </div>
+
+          {/* Section Upload pour Organisateur si pas encore de vidéo */}
+          {isOwner && (
+            <form onSubmit={handleUploadSubmit} className={`p-4 rounded-2xl border space-y-3 ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  {videoSource ? "Remplacer l'enregistrement vidéo" : "Ajouter la vidéo d'enregistrement"}
+                </p>
+                {selectedFile && (
+                  <span className="text-[10px] text-emerald-400 font-semibold truncate max-w-[150px]">
+                    {selectedFile.name}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className={`border border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors flex flex-col items-center justify-center gap-1 ${resolvedTheme === 'dark' ? 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/50' : 'border-slate-300 hover:border-slate-400 bg-white'}`}>
+                  <Upload className="w-4 h-4 text-zinc-400" />
+                  <span className="text-[11px] font-semibold">Choisir un fichier (MP4, WebM)</span>
+                  <input
+                    type="file"
+                    accept="video/mp4,video/webm,video/ogg"
+                    onChange={e => e.target.files?.[0] && setSelectedFile(e.target.files[0])}
+                    className="hidden"
+                  />
+                </label>
+
+                <input
+                  type="url"
+                  placeholder="Ou lien de replay (ex: YouTube, Vimeo...)"
+                  value={customReplayUrl}
+                  onChange={e => setCustomReplayUrl(e.target.value)}
+                  className={`px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-blue-500 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                />
+              </div>
+
+              {(selectedFile || customReplayUrl.trim()) && (
+                <button
+                  type="submit"
+                  disabled={isUploading}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{isUploading ? 'Enregistrement en cours...' : 'Enregistrer la vidéo'}</span>
+                </button>
+              )}
+            </form>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className={`p-4 border-t flex items-center justify-between gap-3 ${resolvedTheme === 'dark' ? 'border-zinc-800 bg-zinc-950/60' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex items-center gap-2">
+            {isOwner && (
+              <button
+                onClick={() => {
+                  onClose()
+                  onRestartLive(event)
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Relancer ce Direct</span>
+              </button>
+            )}
+
+            {videoSource && (
+              <a
+                href={videoSource.startsWith('http') ? videoSource : `${API_BASE_URL.replace('/api/v1', '')}${videoSource}`}
+                download={`replay-${event.id}.webm`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs rounded-xl transition-colors flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Télécharger</span>
+              </a>
+            )}
+          </div>
+
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs rounded-xl transition-colors"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

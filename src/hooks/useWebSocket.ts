@@ -21,7 +21,7 @@ interface UseWebSocketReturn {
   isConnected: boolean
 }
 
-const MAX_RETRIES = 2
+const MAX_RETRIES = 10
 const BASE_DELAY_MS = 1000
 const MAX_DELAY_MS = 30000
 
@@ -55,15 +55,22 @@ export function useWebSocket({
       return
     }
 
-    const token = getJWT()
+    let token = getJWT()
     if (!token) {
       setConnectionState('error')
       return
     }
+    if (token.startsWith('Bearer ')) {
+      token = token.slice(7).trim()
+    }
+    const cleanToken = encodeURIComponent(token)
 
-    const url = `${WS_BASE}/ws/conversation/${conversationId}/?token=${token}`
+    const url = `${WS_BASE}/ws/conversation/${conversationId}/?token=${cleanToken}`
 
     try {
+      if (wsRef.current) {
+        try { wsRef.current.close() } catch {}
+      }
       const ws = new WebSocket(url)
       wsRef.current = ws
       setConnectionState('connecting')
@@ -84,9 +91,18 @@ export function useWebSocket({
         }
       }
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (!isMounted.current) return
         setConnectionState('disconnected')
+        // Automatically reconnect with backoff if not cleanly unmounted
+        if (enabled && event.code !== 1000 && retryCount.current < MAX_RETRIES) {
+          const delay = Math.min(BASE_DELAY_MS * Math.pow(1.5, retryCount.current), MAX_DELAY_MS)
+          retryCount.current += 1
+          if (retryTimer.current) clearTimeout(retryTimer.current)
+          retryTimer.current = setTimeout(() => {
+            if (isMounted.current && enabled) connect()
+          }, delay)
+        }
       }
 
       ws.onerror = () => {

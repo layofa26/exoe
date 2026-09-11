@@ -214,15 +214,13 @@ export default function EventPreview() {
 
             {/* ACTIONS */}
             <div className="flex flex-wrap gap-2 sm:gap-3">
-              {event.isLive && (
-                <button
-                  onClick={handleGoLive}
-                  className="flex-1 min-w-[100px] sm:min-w-[120px] bg-red-600 text-white py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 animate-pulse"
-                >
-                  <Play className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Rejoindre
-                </button>
-              )}
+              <button
+                onClick={handleGoLive}
+                className="flex-1 min-w-[120px] bg-red-600 text-white py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95"
+              >
+                <Video className="w-4 h-4 animate-pulse" />
+                <span>{event.isLive ? '🔴 Rejoindre le direct' : '🔴 Démarrer le direct'}</span>
+              </button>
               <button className={`flex-1 min-w-[100px] sm:min-w-[120px] ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2`}>
                 <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="hidden sm:inline">Partager</span>

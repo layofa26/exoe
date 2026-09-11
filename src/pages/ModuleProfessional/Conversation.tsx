@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Send, MoreVertical, Search, X, Paperclip,
   Reply, CheckCheck, Check, Pin, Archive, Shield, Phone,
-  Video, Star, Wifi, WifiOff, Loader2, Edit2, Trash2, Flag, Forward
+  Video, Star, Wifi, WifiOff, Loader2, Edit2, Trash2, Flag, Forward, Clock
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { useWebSocket, WSMessage } from '../../hooks/useWebSocket'
 import { TypingIndicator } from '../../components/TypingIndicator'
 import { MessageBubble, MessageBubbleData } from '../../components/MessageBubble'
@@ -85,6 +86,11 @@ export interface ConversationViewProps {
   partnerUsername?: string | null
   partnerAvatar?: string | null
   initialMessage?: string | null
+  demandeStatus?: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'blocked' | null
+  isDemandeSender?: boolean
+  onAcceptDemande?: () => void
+  onRejectDemande?: () => void
+  onBlockUser?: () => void
   onClose?: () => void
 }
 
@@ -94,6 +100,11 @@ export const ConversationView = ({
   partnerUsername,
   partnerAvatar,
   initialMessage,
+  demandeStatus,
+  isDemandeSender,
+  onAcceptDemande,
+  onRejectDemande,
+  onBlockUser,
   onClose,
 }: ConversationViewProps): JSX.Element => {
   const { resolvedTheme } = useTheme()
@@ -105,6 +116,12 @@ export const ConversationView = ({
     return null
   })
 
+  useEffect(() => {
+    if (conversationId) {
+      setActiveConvId(String(conversationId))
+    }
+  }, [conversationId])
+
   const id = activeConvId || (conversationId ? String(conversationId) : params.id)
   const navigate = useNavigate()
 
@@ -112,7 +129,11 @@ export const ConversationView = ({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const currentUserId = useRef<string | null>(getCurrentUserId()).current
+  const { user } = useAuth()
+  const currentUserId = useMemo(() => {
+    if (user?.id) return String(user.id)
+    return getCurrentUserId()
+  }, [user])
 
   // ─── State ──────────────────────────────────────────────────────────────────
   const [conversation, setConversation] = useState<any>(() => {
@@ -134,13 +155,14 @@ export const ConversationView = ({
     } catch {}
 
     if (initialMessage) {
+      const isMine = Boolean(isDemandeSender)
       return [{
         id: 'init-msg',
         content: initialMessage,
-        senderId: String(partnerId || ''),
-        senderName: partnerUsername || 'Utilisateur',
-        senderUsername: partnerUsername || '',
-        senderAvatar: partnerAvatar || undefined,
+        senderId: isMine ? String(currentUserId || '') : String(partnerId || ''),
+        senderName: isMine ? 'Moi' : (partnerUsername || 'Utilisateur'),
+        senderUsername: isMine ? '' : (partnerUsername || ''),
+        senderAvatar: isMine ? undefined : (partnerAvatar || undefined),
         createdAt: new Date().toISOString(),
         read: true,
         isImportant: false,
@@ -362,27 +384,35 @@ export const ConversationView = ({
     switch (msg.type) {
 
       case 'chat.message': {
+        const msgId = String(msg.id || msg.message_id || (msg as any).id || '')
+        const sId = String(msg.sender_id || (msg as any).sender?.id || '')
         const incoming: MessageBubbleData = {
-          id: String(msg.message_id as string),
-          content: msg.content as string,
-          senderId: String(msg.sender_id as string),
-          senderName: msg.sender_name as string || 'Utilisateur',
-          senderAvatar: msg.sender_avatar as string || undefined,
-          senderUsername: msg.sender_username as string || '',
-          createdAt: msg.created_at as string || new Date().toISOString(),
-          read: false,
-          isImportant: false,
+          id: msgId,
+          content: (msg.content as string) || '',
+          senderId: sId,
+          senderName: (msg.sender_name as string) || (msg as any).sender?.full_name || (msg as any).sender?.username || 'Utilisateur',
+          senderAvatar: (msg.sender_avatar as string) || (msg as any).sender?.avatar_url || undefined,
+          senderUsername: (msg.sender_username as string) || (msg as any).sender?.username || '',
+          createdAt: (msg.created_at as string) || new Date().toISOString(),
+          read: Boolean(msg.read),
+          isImportant: Boolean(msg.is_important),
           isEdited: false,
           replyToId: msg.reply_to_id as string | undefined,
         }
         setMessages(prev => {
-          // Remove optimistic duplicate if exists
-          const filtered = prev.filter(m => !m.id.startsWith('temp_'))
-          if (filtered.some(m => m.id === incoming.id)) return prev
-          return [...filtered, incoming]
+          if (prev.some(m => m.id === incoming.id)) return prev
+          if (String(sId) === String(currentUserId)) {
+            const optIdx = prev.findIndex(m => m.id.startsWith('temp_') && m.content === incoming.content)
+            if (optIdx !== -1) {
+              const updated = [...prev]
+              updated[optIdx] = incoming
+              return updated
+            }
+          }
+          return [...prev, incoming]
         })
         // If the sender is the other user, mark as read via WS
-        if (String(msg.sender_id) !== currentUserId) {
+        if (String(sId) !== String(currentUserId)) {
           wsSend({ type: 'chat.read' })
         }
         break
@@ -390,7 +420,7 @@ export const ConversationView = ({
 
       case 'chat.typing': {
         const uid = String(msg.user_id)
-        if (uid !== currentUserId) {
+        if (String(uid) !== String(currentUserId)) {
           if (msg.is_typing) {
             setTypingUser({ userId: uid, username: msg.username as string })
           } else {
@@ -402,10 +432,10 @@ export const ConversationView = ({
 
       case 'chat.read': {
         const readerId = String(msg.user_id)
-        if (readerId !== currentUserId) {
+        if (String(readerId) !== String(currentUserId)) {
           // Mark all my sent messages as read
           setMessages(prev => prev.map(m =>
-            m.senderId === currentUserId ? { ...m, read: true } : m
+            String(m.senderId) === String(currentUserId) ? { ...m, read: true } : m
           ))
         }
         break
@@ -431,7 +461,7 @@ export const ConversationView = ({
 
       case 'user.presence': {
         const uid = String(msg.user_id)
-        if (uid !== currentUserId) {
+        if (String(uid) !== String(currentUserId)) {
           setOnlineUserId(msg.status === 'online' ? uid : null)
         }
         break
@@ -532,6 +562,7 @@ export const ConversationView = ({
     }
 
     // Persist via REST to guarantee DB storage
+    let savedSuccessfully = false
     if (realConvId) {
       try {
         const postRes = await apiFetch('/conversations/messages/', {
@@ -540,26 +571,29 @@ export const ConversationView = ({
         })
         if (postRes.ok) {
           const savedMsg = await postRes.json()
+          savedSuccessfully = true
           setMessages(prev => prev.map(m => m.id === optimisticId ? {
             ...m,
             id: String(savedMsg.id),
             createdAt: savedMsg.created_at || m.createdAt
           } : m))
+          // Backend MessageViewSet automatically broadcasts via channel_layer to all WebSocket clients!
+          return
         }
       } catch {
-        if (!isConnected) {
-          showToast('Erreur lors de l\'envoi. Vérifiez votre connexion.')
-        }
+        // Fallback to WebSocket if REST failed
       }
     }
 
-    // Send via WebSocket for instant live broadcast
-    if (isConnected) {
+    // Send via WebSocket if REST was not performed or failed
+    if (!savedSuccessfully && isConnected) {
       wsSend({
         type: 'chat.message',
         content,
         reply_to_id: replyingTo?.id || null,
       })
+    } else if (!savedSuccessfully && !realConvId) {
+      showToast('Erreur lors de l\'envoi. Vérifiez votre connexion.')
     }
   }, [newMessage, id, activeConvId, partnerId, replyingTo, isConnected, currentUserId, wsSend, showToast])
 
@@ -710,13 +744,30 @@ export const ConversationView = ({
 
   // ─── Derived data ─────────────────────────────────────────────────────────────
   const otherParticipant = useMemo(() => {
-    if (!conversation) return null
-    // ConversationSerializer returns:
-    // participants: [{id, username, full_name, avatar_url}]
-    // participant_info: [{id, user: {id, username, full_name, avatar_url}, last_read_at}]
+    if (!conversation) {
+      if (partnerUsername || partnerId) {
+        return {
+          id: partnerId || 'other',
+          username: partnerUsername || 'Utilisateur',
+          full_name: partnerUsername || 'Utilisateur',
+          avatar_url: partnerAvatar || null,
+        }
+      }
+      return null
+    }
     const parts: any[] = conversation.participants || []
-    return parts.find((p: any) => String(p.id) !== currentUserId) || null
-  }, [conversation, currentUserId])
+    const found = parts.find((p: any) => String(p.id) !== String(currentUserId))
+    if (found) return found
+    if (partnerUsername || partnerId) {
+      return {
+        id: partnerId || 'other',
+        username: partnerUsername || 'Utilisateur',
+        full_name: partnerUsername || 'Utilisateur',
+        avatar_url: partnerAvatar || null,
+      }
+    }
+    return null
+  }, [conversation, currentUserId, partnerId, partnerUsername, partnerAvatar])
 
   const isOtherOnline = useMemo(() => {
     if (!otherParticipant) return false
@@ -917,6 +968,60 @@ export const ConversationView = ({
         </div>
       )}
 
+      {/* ── Pending Demande Banner ── */}
+      {demandeStatus === 'pending' && (
+        <div className={`flex-shrink-0 px-4 py-3 border-b transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+          isDark ? 'bg-amber-950/40 border-amber-500/20 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
+        }`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0">
+              <Clock size={16} />
+            </div>
+            <div className="min-w-0 text-xs">
+              <p className="font-semibold truncate">
+                {isDemandeSender ? 'Demande envoyée — En attente' : 'Nouvelle demande reçue'}
+              </p>
+              <p className={isDark ? 'text-amber-300/70' : 'text-amber-700/80'}>
+                {isDemandeSender
+                  ? 'Votre correspondant peut lire vos messages et accepter votre demande.'
+                  : 'Vous pouvez échanger des messages directement ci-dessous ou confirmer la demande.'}
+              </p>
+            </div>
+          </div>
+
+          {!isDemandeSender && onAcceptDemande && (
+            <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+              {onRejectDemande && (
+                <button
+                  onClick={onRejectDemande}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                    isDark ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-100 text-red-700 hover:bg-red-200'
+                  }`}
+                >
+                  Refuser
+                </button>
+              )}
+              {onBlockUser && (
+                <button
+                  onClick={onBlockUser}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                    isDark ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                  }`}
+                >
+                  Bloquer
+                </button>
+              )}
+              <button
+                onClick={onAcceptDemande}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/20 hover:scale-105 transition-all flex items-center gap-1.5"
+              >
+                <Check size={13} /> Accepter
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Messages Area ── */}
       <div className="flex-1 overflow-y-auto py-4 space-y-0.5 scroll-smooth" id="messages-container">
         {isLoading ? (
@@ -936,7 +1041,7 @@ export const ConversationView = ({
               <MessageBubble
                 key={msg.id}
                 message={msg}
-                isMine={msg.senderId === currentUserId}
+                isMine={String(msg.senderId) === String(currentUserId)}
                 theme={resolvedTheme as 'dark' | 'light'}
                 isSelected={selectedMessageIds.has(msg.id)}
                 isSelectionMode={isSelectionMode}
