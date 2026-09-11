@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   TrendingUp,
   Users,
@@ -45,45 +46,46 @@ const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: StatC
   </div>
 )
 
-const DEFAULT_STATS = [
-  {
-    title: 'Vues totales',
-    value: '125.4K',
-    change: '+12.5% ce mois',
-    isPositive: true,
-    icon: Eye,
-    color: 'bg-blue-500'
-  },
-  {
-    title: 'Nouveaux abonnés',
-    value: '2,847',
-    change: '+8.2% ce mois',
-    isPositive: true,
-    icon: Users,
-    color: 'bg-green-500'
-  },
-  {
-    title: 'Likes reçus',
-    value: '8.9K',
-    change: '+15.3% ce mois',
-    isPositive: true,
-    icon: ThumbsUp,
-    color: 'bg-red-500'
-  },
-  {
-    title: 'Commentaires',
-    value: '1,234',
-    change: '-2.1% ce mois',
-    isPositive: false,
-    icon: MessageSquare,
-    color: 'bg-purple-500'
-  }
-]
-
 export const Statistics = (): JSX.Element => {
+  const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [period, setPeriod] = useState<'7d' | '30d' | '90d' | '1y'>('30d')
+
+  const DEFAULT_STATS = [
+    {
+      title: t('pro.stats.totalViews', 'Vues totales'),
+      value: '125.4K',
+      change: `+12.5% ${t('pro.stats.thisMonth', 'ce mois')}`,
+      isPositive: true,
+      icon: Eye,
+      color: 'bg-blue-500'
+    },
+    {
+      title: t('pro.stats.newSubscribers', 'Nouveaux abonnés'),
+      value: '2,847',
+      change: `+8.2% ${t('pro.stats.thisMonth', 'ce mois')}`,
+      isPositive: true,
+      icon: Users,
+      color: 'bg-green-500'
+    },
+    {
+      title: t('pro.stats.likesReceived', 'Likes reçus'),
+      value: '8.9K',
+      change: `+15.3% ${t('pro.stats.thisMonth', 'ce mois')}`,
+      isPositive: true,
+      icon: ThumbsUp,
+      color: 'bg-red-500'
+    },
+    {
+      title: t('pro.stats.comments', 'Commentaires'),
+      value: '1,234',
+      change: `-2.1% ${t('pro.stats.thisMonth', 'ce mois')}`,
+      isPositive: false,
+      icon: MessageSquare,
+      color: 'bg-purple-500'
+    }
+  ]
 
   // SWR query avec chargement instantané (0ms) depuis le cache
   const {
@@ -164,17 +166,21 @@ export const Statistics = (): JSX.Element => {
             </button>
             <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div>
-                <h1 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Statistiques</h1>
-                <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Analysez vos performances</p>
+                <h1 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  {t('pro.stats.title', 'Statistiques')}
+                </h1>
+                <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                  {t('pro.stats.subtitle', 'Analysez vos performances')}
+                </p>
               </div>
 
               {/* Period selector */}
               <div className={`flex gap-1 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-lg p-1 shadow-sm border`}>
                 {[
-                  { id: '7d', label: '7j' },
-                  { id: '30d', label: '30j' },
-                  { id: '90d', label: '90j' },
-                  { id: '1y', label: '1an' }
+                  { id: '7d', label: `7${t('common.dayShort', 'j')}` },
+                  { id: '30d', label: `30${t('common.dayShort', 'j')}` },
+                  { id: '90d', label: `90${t('common.dayShort', 'j')}` },
+                  { id: '1y', label: `1${t('common.yearShort', 'an')}` }
                 ].map((p) => (
                   <button
                     key={p.id}
@@ -206,10 +212,14 @@ export const Statistics = (): JSX.Element => {
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Évolution des vues</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                {t('pro.stats.viewsEvolution', 'Évolution des vues')}
+              </h2>
             </div>
             <div className="h-48 sm:h-64 bg-gray-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center">
-              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center px-4`}>Graphique d'évolution (à implémenter avec une librairie de charts)</p>
+              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center px-4`}>
+                {t('pro.stats.viewsEvolutionDesc', "Graphique d'évolution (à implémenter avec une librairie de charts)")}
+              </p>
             </div>
           </div>
 
@@ -217,10 +227,14 @@ export const Statistics = (): JSX.Element => {
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Engagement par vidéo</h2>
+              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {t('pro.stats.engagementPerVideo', 'Engagement par vidéo')}
+              </h2>
             </div>
             <div className={`h-48 sm:h-64 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'} rounded-lg flex items-center justify-center`}>
-              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Graphique d'engagement (à implémenter)</p>
+              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                {t('pro.stats.engagementDesc', "Graphique d'engagement (à implémenter)")}
+              </p>
             </div>
           </div>
         </div>
@@ -231,10 +245,14 @@ export const Statistics = (): JSX.Element => {
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <PieChart className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Démographie</h2>
+              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {t('pro.stats.demographics', 'Démographie')}
+              </h2>
             </div>
             <div className={`h-48 sm:h-64 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'} rounded-lg flex items-center justify-center`}>
-              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Graphique démographique (à implémenter)</p>
+              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                {t('pro.stats.demographicsDesc', "Graphique démographique (à implémenter)")}
+              </p>
             </div>
           </div>
 
@@ -242,7 +260,9 @@ export const Statistics = (): JSX.Element => {
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Répartition géographique</h2>
+              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {t('pro.stats.geographicDistribution', 'Répartition géographique')}
+              </h2>
             </div>
             <div className="space-y-2 sm:space-y-3">
               {[
@@ -250,7 +270,7 @@ export const Statistics = (): JSX.Element => {
                 { country: 'Belgique', percentage: 12, flag: '🇧🇪' },
                 { country: 'Suisse', percentage: 8, flag: '🇨🇭' },
                 { country: 'Canada', percentage: 7, flag: '🇨🇦' },
-                { country: 'Autres', percentage: 8, flag: '🌍' }
+                { country: t('common.other', 'Autres'), percentage: 8, flag: '🌍' }
               ].map((item, index) => (
                 <div key={index} className="flex items-center gap-2 sm:gap-3">
                   <span className="text-base sm:text-lg">{item.flag}</span>
@@ -275,7 +295,9 @@ export const Statistics = (): JSX.Element => {
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Meilleures vidéos</h2>
+              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {t('pro.stats.bestVideos', 'Meilleures vidéos')}
+              </h2>
             </div>
             <div className="space-y-3 sm:space-y-4">
               {[
@@ -291,7 +313,9 @@ export const Statistics = (): JSX.Element => {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>{video.title}</p>
-                    <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{video.views} vues • {video.likes} likes</p>
+                    <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      {video.views} {t('pro.myVideos.views', 'vues')} • {video.likes} {t('pro.myVideos.likes', 'likes')}
+                    </p>
                   </div>
                 </div>
               ))}

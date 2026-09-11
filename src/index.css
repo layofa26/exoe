@@ -242,3 +242,19 @@ body {
 .dark textarea::placeholder {
   color: #94a3b8;
 }
+
+/* RTL (Arabic & Right-to-Left languages) Support */
+[dir="rtl"] {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] input,
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+  text-align: right;
+}

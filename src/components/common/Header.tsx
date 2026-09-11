@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -6,7 +6,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useRecentSearches } from '../../hooks/useRecentSearches'
 import { unwrapList } from '../../services/videoApi'
 import type { NavLinkType } from '../../types'
-import { notificationService, type AppNotification } from '../../services/notificationService'
+import { notificationService, formatRelativeTime, getNotificationCategory, type AppNotification, type NotificationCategory } from '../../services/notificationService'
+import { syncRemotePubNotifications } from '../../services/pubNotificationService'
 import {
   User,
   LogOut,
@@ -27,13 +28,20 @@ import {
   Video as VideoIcon,
   Calendar as CalendarIcon,
   Sparkles,
-  Megaphone
+  Megaphone,
+  Radio,
+  ArrowRight,
+  Trash2
 } from 'lucide-react'
 import { UploadVideo } from '../video/UploadVideo'
+import { useTranslation } from 'react-i18next'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 export const Header = (): JSX.Element => {
+  const { t } = useTranslation()
   const { isAuthenticated, user, logout, hasModuleAccess } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const navigate = useNavigate()
@@ -124,13 +132,15 @@ export const Header = (): JSX.Element => {
   const notifRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    notificationService.setUserUuid(user?.uuid || (user as any)?.id)
+  }, [user?.uuid, (user as any)?.id])
+
+  useEffect(() => {
     const syncNotifications = () => {
-      const stored = JSON.parse(localStorage.getItem('exile_notifications') || '[]')
-      if (stored.length > 0) {
-        setNotifications(stored)
-      }
+      setNotifications(notificationService.getNotifications())
     }
     syncNotifications()
+    syncRemotePubNotifications()
 
     const handleNotifAdded = (e: any) => {
       if (e.detail) {
@@ -155,20 +165,101 @@ export const Header = (): JSX.Element => {
       window.removeEventListener('storage', syncNotifications)
       unsubscribe()
     }
-  }, [])
+  }, [user?.uuid, (user as any)?.id])
 
-  // Fermer le menu notification lors d'un clic extérieur
+  // Fermer le menu notification lors d'un clic extérieur (en protégeant le portail mobile)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setShowNotifications(false)
-      }
+      const target = event.target as HTMLElement | null
+      if (!target) return
+      // Ne jamais fermer lors d'un clic dans le portail mobile des notifications
+      if (target.closest('[data-notif-portal]')) return
+      if (notifRef.current && notifRef.current.contains(target)) return
+      setShowNotifications(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   const unreadCount = notifications.filter(n => !n.read).length
+
+  // État de recherche et filtrage pour les notifications
+  const [notifSearchQuery, setNotifSearchQuery] = useState('')
+  const [notifCategoryFilter, setNotifCategoryFilter] = useState<NotificationCategory>('all')
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((notif) => {
+      // 1. Filtrage par onglet de catégorie
+      if (notifCategoryFilter !== 'all') {
+        const cat = getNotificationCategory(notif)
+        if (cat !== notifCategoryFilter) return false
+      }
+      // 2. Recherche textuelle dans le titre et le contenu
+      if (notifSearchQuery.trim()) {
+        const q = notifSearchQuery.toLowerCase()
+        const titleMatch = (notif.title || '').toLowerCase().includes(q)
+        const msgMatch = (notif.message || '').toLowerCase().includes(q)
+        if (!titleMatch && !msgMatch) return false
+      }
+      return true
+    })
+  }, [notifications, notifCategoryFilter, notifSearchQuery])
+
+  // Routage dynamique et intelligent des clics selon le type précis de notification
+  const handleNotificationClick = (notif: AppNotification) => {
+    notificationService.markAsRead(notif.id)
+    setNotifications(notificationService.getNotifications())
+    setShowNotifications(false)
+
+    // 1. Bouton d'action avec URL explicite
+    if (notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl) {
+      navigate(notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl)
+      return
+    }
+
+    // 2. Notification de campagne publicitaire active / clic PUB -> scroll avec halo
+    if (notif.type === 'campaign_active' || notif.data?.isPub || notif.data?.adId) {
+      const adId = notif.data?.adId || notif.data?.id || ''
+      navigate(`/pro?highlightAd=${encodeURIComponent(adId)}`)
+      return
+    }
+
+    // 3. Demande publicitaire reçue -> panneau des demandes
+    if (notif.type === 'inquiry_received') {
+      navigate('/pro/demandes')
+      return
+    }
+
+    // 4. Campagne terminée / relancer une pub
+    if (notif.type === 'campaign_ended') {
+      const adId = notif.data?.adId || notif.data?.id || ''
+      navigate(`/pub/demande?prefill=${encodeURIComponent(adId)}`)
+      return
+    }
+
+    // 5. Message direct -> ouvrir la conversation ciblée
+    if (notif.type === 'message') {
+      const convId = notif.data?.conversationId
+      if (convId) {
+        navigate(`/pro/conversations?id=${encodeURIComponent(convId)}`)
+      } else {
+        navigate('/pro/conversations')
+      }
+      return
+    }
+
+    // 6. Demandes de contact (reçue, acceptée, nouveau contact)
+    if (notif.type === 'request_accepted' || notif.type === 'new_contact' || notif.type === 'request_received') {
+      navigate('/pro/demandes')
+      return
+    }
+
+    // 7. URL générique présente dans data
+    if (notif.data?.url) {
+      navigate(notif.data.url)
+      return
+    }
+  }
 
   // État pour le bouton + Publier
   const [showPublishMenu, setShowPublishMenu] = useState(false)
@@ -303,16 +394,8 @@ export const Header = (): JSX.Element => {
 
       const professionals = unwrapList<any>(profilsData).map((p: any) => {
         const rawPhoto = p.photo_url || p.photo || p.avatar || ''
-        let resolvedPhoto = ''
-        if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto !== 'null' && rawPhoto !== 'undefined') {
-          if (rawPhoto.startsWith('http') || rawPhoto.startsWith('data:') || rawPhoto.startsWith('blob:')) {
-            resolvedPhoto = rawPhoto
-          } else if (rawPhoto.startsWith('/media/') || rawPhoto.startsWith('media/')) {
-            resolvedPhoto = `http://localhost:8000${rawPhoto.startsWith('/') ? rawPhoto : `/${rawPhoto}`}`
-          } else {
-            resolvedPhoto = `https://rmbvwaemgiijitumhnys.supabase.co/storage/v1/object/public/Exile_images/${rawPhoto.replace(/^\/+/, '')}`
-          }
-        }
+        const resolvedPhoto = resolveMediaUrl(rawPhoto)
+
 
         return {
           id: p.user ?? p.id,
@@ -416,8 +499,8 @@ export const Header = (): JSX.Element => {
   }
 
   const navLinks: NavLinkType[] = [
-    { to: '/pro', label: 'Professionnel', icon: Briefcase, show: true, module: 'pro' },
-    { to: '/social', label: 'Social', icon: Building2, show: true, module: 'social' },
+    { to: '/pro', label: t('nav.professional', 'Professionnel'), icon: Briefcase, show: true, module: 'pro' },
+    { to: '/social', label: t('nav.social', 'Social'), icon: Building2, show: true, module: 'social' },
   ]
 
   return (
@@ -427,18 +510,18 @@ export const Header = (): JSX.Element => {
           {/* Logo - Gauche */}
           <div className="flex-shrink-0 flex items-center z-10">
             <Link to="/" className="flex items-center">
-              <img src="/logo_exile_SVG.svg" alt="EXILE" className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14" />
+              <img src="/logo_exile_SVG.svg" alt="EXILE" className="w-13 h-13 sm:w-16 sm:h-16 md:w-16 md:h-16 object-contain" />
             </Link>
           </div>
 
-          {/* Navigation - Centrée EXACTEMENT au milieu sur Desktop, Tablette et Mobile (Ajustement hauteur mobile) */}
-          <nav className="absolute left-1/2 -translate-x-1/2 flex items-center space-x-3 sm:space-x-6 md:space-x-8 z-10 pointer-events-auto mt-1.5 lg:mt-0">
+          {/* Navigation - Parfaitement centrée sur desktop, positionnée en bas du header sur mobile et tablette sans toucher les icônes */}
+          <nav className="absolute left-1/2 -translate-x-1/2 bottom-1 sm:bottom-1 md:bottom-1 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto flex items-center space-x-2 sm:space-x-4 md:space-x-8 z-10 pointer-events-auto">
             {navLinks.map((link) => (
               link.show && (
                 <div key={link.to} className="relative group">
                   <Link
                     to={link.disabled ? '#' : link.to}
-                    className={`relative text-xs sm:text-sm md:text-base font-bold transition-colors whitespace-nowrap ${
+                    className={`relative text-[12px] sm:text-[13px] md:text-sm lg:text-base font-extrabold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-1.5 ${
                       isActive(link.to)
                         ? 'text-[#FF6B00]'
                         : link.disabled
@@ -466,7 +549,103 @@ export const Header = (): JSX.Element => {
           </nav>
 
           {/* Droite : Recherche & Boutons d'action (Compact sur mobile et tablette) */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 z-10">
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 z-10 ml-auto pl-2">
+            {/* Bouton + Publier (Visible toujours, connecté ou pas, sur desktop et tablette) */}
+            <div className="relative hidden md:block" ref={publishRef}>
+              <button
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    navigate('/login')
+                    return
+                  }
+                  setShowPublishMenu(!showPublishMenu)
+                }}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl shadow-md font-semibold text-xs sm:text-sm transition-all duration-200 hover:shadow-orange-500/25 active:scale-95 flex-shrink-0"
+                title={t('header.publishMenu.title', "Publier du contenu ou créer un événement")}
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span className="hidden sm:inline font-bold">{t('common.publish', 'Publier')}</span>
+              </button>
+
+              {/* Publish Menu Dropdown */}
+              {showPublishMenu && (
+                <div className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-2xl py-2 z-50 border ${
+                  resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
+                } animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}>
+                  <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800">
+                    <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">{t('header.publishMenu.expertiseCreation', "Création d'expertise")}</p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsUploadModalOpen(true)
+                      setShowPublishMenu(false)
+                    }}
+                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-orange-500/10 hover:text-orange-500 dark:hover:bg-orange-500/10 dark:hover:text-orange-400 flex items-center gap-3 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <VideoIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{t('header.publishMenu.expertiseVideo', "Vidéo d'expertise")}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.expertiseVideoDesc', "Tutoriel, conseil, projet")}</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/pro/events?create=true')
+                      setShowPublishMenu(false)
+                    }}
+                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-purple-500/10 hover:text-purple-500 dark:hover:bg-purple-500/10 dark:hover:text-purple-400 flex items-center gap-3 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <CalendarIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{t('header.publishMenu.eventWebinar', "Événement & Webinaire")}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.eventWebinarDesc', "Conférence, atelier, masterclass")}</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/pro/events?create=true&live=true')
+                      setShowPublishMenu(false)
+                    }}
+                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-red-500/10 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 flex items-center gap-3 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Radio className="w-4 h-4 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold">{t('header.publishMenu.launchLive', "Lancer un Live")}</p>
+                        <span className="px-1.5 py-0.2 bg-red-600 text-white text-[8px] font-bold rounded">{t('common.live', "DIRECT")}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.launchLiveDesc', "Diffusion en direct et chat live")}</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/pub/demande')
+                      setShowPublishMenu(false)
+                    }}
+                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Megaphone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{t('header.publishMenu.adCampaign', "Campagne Publicitaire")}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.adCampaignDesc', "Promouvoir votre entreprise (PUB)")}</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
             {!isAuthenticated ? (
               <div className="flex items-center space-x-2">
                 {/* Search Icon - Non connecté avec logique complète - Caché sur page d'accueil et auth pages */}
@@ -480,7 +659,7 @@ export const Header = (): JSX.Element => {
                           setShowDropdown(!showDropdown)
                         }
                       }}
-                      className="p-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"
+                      className="p-1.5 sm:p-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg flex-shrink-0"
                     >
                       <Search className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
@@ -494,7 +673,7 @@ export const Header = (): JSX.Element => {
                         <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
                         <input
                           type="text"
-                          placeholder="Rechercher..."
+                          placeholder={t('common.search', 'Rechercher...')}
                           value={searchQuery}
                           onChange={handleSearchChange}
                           className={`w-full pl-10 pr-10 py-2 rounded-lg border ${
@@ -530,19 +709,19 @@ export const Header = (): JSX.Element => {
                             onClick={() => { setFilterType('all'); setShowFilterMenu(false); searchQuery && handleSearch(searchQuery) }}
                             className={`w-full px-4 py-2 text-left text-sm ${filterType === 'all' ? 'bg-gray-50 dark:bg-zinc-800 text-orange-500 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                           >
-                            Tout
+                            {t('common.all', 'Tout')}
                           </button>
                           <button
                             onClick={() => { setFilterType('video'); setShowFilterMenu(false); searchQuery && handleSearch(searchQuery) }}
                             className={`w-full px-4 py-2 text-left text-sm ${filterType === 'video' ? 'bg-gray-50 dark:bg-zinc-800 text-orange-500 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                           >
-                            Vidéos
+                            {t('common.videos', 'Vidéos')}
                           </button>
                           <button
                             onClick={() => { setFilterType('professional'); setShowFilterMenu(false); searchQuery && handleSearch(searchQuery) }}
                             className={`w-full px-4 py-2 text-left text-sm ${filterType === 'professional' ? 'bg-gray-50 dark:bg-zinc-800 text-orange-500 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                           >
-                            Professionnels
+                            {t('common.professionals', 'Professionnels')}
                           </button>
                         </div>
                       )}
@@ -550,14 +729,14 @@ export const Header = (): JSX.Element => {
                       {/* Résultats de recherche */}
                       {searchLoading ? (
                         <div className="p-4 text-center text-sm text-gray-500 dark:text-zinc-400">
-                          Recherche en cours...
+                          {t('common.searching', 'Recherche en cours...')}
                         </div>
                       ) : !searchQuery ? (
                         recentSearches.length > 0 && (
                           <div className="mt-2 border-t border-gray-100 dark:border-zinc-800">
                             <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase flex items-center gap-2">
                               <History className="w-3 h-3" />
-                              Recherches récentes
+                              {t('common.recentSearches', 'Recherches récentes')}
                             </div>
                             {recentSearches.map((search, index) => (
                               <button
@@ -580,7 +759,7 @@ export const Header = (): JSX.Element => {
                             {searchResults.professionals.length > 0 && (
                               <div>
                                 <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                                  Professionnels
+                                  {t('common.professionals', 'Professionnels')}
                                 </div>
                                 {searchResults.professionals.map((pro: any) => (
                                   <button
@@ -597,7 +776,7 @@ export const Header = (): JSX.Element => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{pro.fullName || pro.username}</p>
-                                      <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || 'Professionnel'}</p>
+                                      <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || t('common.professional', 'Professionnel')}</p>
                                     </div>
                                   </button>
                                 ))}
@@ -606,7 +785,7 @@ export const Header = (): JSX.Element => {
                             {searchResults.videos.length > 0 && (
                               <div className="border-t border-gray-100 dark:border-zinc-800">
                                 <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                                  Vidéos
+                                  {t('common.videos', 'Vidéos')}
                                 </div>
                                 {searchResults.videos.map((video: any) => (
                                   <button
@@ -629,7 +808,7 @@ export const Header = (): JSX.Element => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{video.title}</p>
-                                      <p className="text-xs text-gray-500 dark:text-zinc-400">{video.views} vues</p>
+                                      <p className="text-xs text-gray-500 dark:text-zinc-400">{video.views} {t('common.views', 'vues')}</p>
                                     </div>
                                   </button>
                                 ))}
@@ -638,7 +817,7 @@ export const Header = (): JSX.Element => {
                           </div>
                         ) : (
                           <div className="p-4 text-center text-gray-500 dark:text-zinc-400 text-sm">
-                            Aucun résultat trouvé
+                            {t('common.noResultsFound', 'Aucun résultat trouvé')}
                           </div>
                         )
                       )}
@@ -666,7 +845,7 @@ export const Header = (): JSX.Element => {
                       <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`} />
                       <input
                         type="text"
-                        placeholder="Rechercher..."
+                        placeholder={t('common.search', 'Rechercher...')}
                         value={searchQuery}
                         onChange={handleSearchChange}
                         onFocus={() => setShowDropdown(true)}
@@ -706,7 +885,7 @@ export const Header = (): JSX.Element => {
                       className="lg:hidden p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"
                       title="Rechercher"
                     >
-                      <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <Search className="w-5 h-5 sm:w-5 sm:h-5" />
                     </button>
 
                     {/* Filter Type Floating Menu */}
@@ -715,9 +894,9 @@ export const Header = (): JSX.Element => {
                         resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'
                       }`}>
                         {[
-                          { id: 'all', label: 'Tout' },
-                          { id: 'video', label: 'Vidéos' },
-                          { id: 'professional', label: 'Professionnels' }
+                          { id: 'all', label: t('common.all', 'Tout') },
+                          { id: 'video', label: t('common.videos', 'Vidéos') },
+                          { id: 'professional', label: t('common.professionals', 'Professionnels') }
                         ].map((f) => (
                           <button
                             key={f.id}
@@ -745,14 +924,14 @@ export const Header = (): JSX.Element => {
                       } animate-in fade-in zoom-in-95 duration-100`}>
                         {searchLoading ? (
                           <div className="p-4 text-center text-xs text-gray-500 dark:text-zinc-400">
-                            Recherche en cours...
+                            {t('common.searching', 'Recherche en cours...')}
                           </div>
                         ) : !searchQuery ? (
                           recentSearches.length > 0 && (
                             <div>
                               <div className="px-3 py-1.5 text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase flex items-center gap-1.5">
                                 <History className="w-3 h-3" />
-                                <span>Recherches récentes</span>
+                                <span>{t('common.recentSearches', 'Recherches récentes')}</span>
                               </div>
                               {recentSearches.map((search, index) => (
                                 <button
@@ -775,7 +954,7 @@ export const Header = (): JSX.Element => {
                               {searchResults.professionals.length > 0 && (
                                 <div className="py-1">
                                   <div className="px-3 py-1 text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase">
-                                    Professionnels
+                                    {t('common.professionals', 'Professionnels')}
                                   </div>
                                   {searchResults.professionals.map((pro: any) => {
                                     const proUsername = pro.username?.startsWith('@') ? pro.username : `@${pro.username || 'Utilisateur'}`
@@ -798,7 +977,7 @@ export const Header = (): JSX.Element => {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{proUsername}</p>
-                                          <p className="text-[11px] text-gray-500 dark:text-zinc-400 truncate">{pro.profession || 'Professionnel'}</p>
+                                          <p className="text-[11px] text-gray-500 dark:text-zinc-400 truncate">{pro.profession || t('common.professional', 'Professionnel')}</p>
                                         </div>
                                       </button>
                                     )
@@ -808,7 +987,7 @@ export const Header = (): JSX.Element => {
                               {searchResults.videos.length > 0 && (
                                 <div className="py-1">
                                   <div className="px-3 py-1 text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase">
-                                    Vidéos
+                                    {t('common.videos', 'Vidéos')}
                                   </div>
                                   {searchResults.videos.map((video: any) => (
                                     <button
@@ -831,7 +1010,7 @@ export const Header = (): JSX.Element => {
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{video.title}</p>
-                                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{video.views || 0} vues</p>
+                                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{video.views || 0} {t('common.views', 'vues')}</p>
                                       </div>
                                     </button>
                                   ))}
@@ -840,7 +1019,7 @@ export const Header = (): JSX.Element => {
                             </div>
                           ) : (
                             <div className="p-4 text-center text-xs text-gray-500 dark:text-zinc-400">
-                              Aucun résultat trouvé
+                              {t('common.noResultsFound', 'Aucun résultat trouvé')}
                             </div>
                           )
                         )}
@@ -849,110 +1028,16 @@ export const Header = (): JSX.Element => {
                   </div>
                 )}
 
-                {/* Bouton + Publier Professionnel (Desktop uniquement, sur mobile c'est dans ProSidebar) */}
-                <div className="relative hidden md:block" ref={publishRef}>
-                  <button
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        navigate('/login')
-                        return
-                      }
-                      setShowPublishMenu(!showPublishMenu)
-                    }}
-                    className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl shadow-md font-semibold text-xs sm:text-sm transition-all duration-200 hover:shadow-orange-500/25 active:scale-95 flex-shrink-0"
-                    title="Publier du contenu ou créer un événement"
-                  >
-                    <Plus className="w-4 h-4 stroke-[2.5]" />
-                    <span className="hidden sm:inline font-bold">Publier</span>
-                  </button>
 
-                  {/* Publish Menu Dropdown */}
-                  {showPublishMenu && (
-                    <div className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-2xl py-2 z-50 border ${
-                      resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
-                    } animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}>
-                      <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800">
-                        <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">Création d'expertise</p>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          setIsUploadModalOpen(true)
-                          setShowPublishMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-orange-500/10 hover:text-orange-500 dark:hover:bg-orange-500/10 dark:hover:text-orange-400 flex items-center gap-3 transition-colors group"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <VideoIcon className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">Vidéo d'expertise</p>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Tutoriel, conseil, projet</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          navigate('/pro/events?create=true')
-                          setShowPublishMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-purple-500/10 hover:text-purple-500 dark:hover:bg-purple-500/10 dark:hover:text-purple-400 flex items-center gap-3 transition-colors group"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <CalendarIcon className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">Événement & Webinaire</p>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Conférence, atelier, masterclass</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          navigate('/pro/events?create=true&live=true')
-                          setShowPublishMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-red-500/10 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 flex items-center gap-3 transition-colors group"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Radio className="w-4 h-4 animate-pulse" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-semibold">Lancer un Live</p>
-                            <span className="px-1.5 py-0.2 bg-red-600 text-white text-[8px] font-bold rounded">DIRECT</span>
-                          </div>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Diffusion en direct et chat live</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          navigate('/pub/d4sh-m4n4g3r_adm!n99')
-                          setShowPublishMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors group"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Megaphone className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">Campagne Publicitaire</p>
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Promouvoir votre entreprise (PUB)</p>
-                        </div>
-                      </button>
-                    </div>
-                  )}
-                </div>
 
                 {/* Notifications */}
                 <div className="relative" ref={notifRef}>
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className="relative p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-                    title="Notifications"
+                    title={t('notifications.title', "Notifications")}
                   >
-                    <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <Bell className="w-5 h-5 sm:w-5 sm:h-5" />
                     {(unreadCount > 0 || newRequestsCount > 0) && (
                       <span className="absolute top-1 right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
                         {unreadCount + newRequestsCount > 9 ? '9+' : unreadCount + newRequestsCount}
@@ -960,17 +1045,229 @@ export const Header = (): JSX.Element => {
                     )}
                   </button>
 
-                  {/* Notification Dropdown */}
-                  {showNotifications && (
-                    <div className={`absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl shadow-2xl py-2 z-50 border ${
-                      resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'
-                    } animate-in fade-in zoom-in-95 duration-150`}>
-                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-zinc-700/60">
+                  {/* Mobile Notification Modal (Portal dans document.body pour plein écran réel sans interférence CSS) */}
+                  {showNotifications && typeof document !== 'undefined' && createPortal(
+                    <div data-notif-portal="true" className="fixed inset-0 z-[99999] w-screen h-screen bg-white dark:bg-zinc-950 flex flex-col sm:hidden animate-in fade-in duration-200">
+                      {/* En-tête Mobile */}
+                      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-950">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-gray-900 dark:text-white">Notifications</span>
+                          <span className="text-lg font-black text-gray-900 dark:text-white">{t('notifications.title', 'Notifications')}</span>
                           {unreadCount > 0 && (
-                            <span className="px-2 py-0.5 text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
-                              {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
+                            <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
+                              {unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {notifications.length > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                notificationService.markAllAsRead()
+                                setNotifications(notificationService.getNotifications())
+                              }}
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold"
+                            >
+                              <CheckCheck className="w-4 h-4" />
+                              {t('notifications.markAllAsRead', 'Tout lire')}
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setShowNotifications(false)
+                              setNotifSearchQuery('')
+                            }}
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-zinc-300"
+                          >
+                            <X className="w-6 h-6" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Barre de Recherche Notifications (Mobile) */}
+                      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50 dark:bg-zinc-900/70 flex-shrink-0">
+                        <div className="relative flex items-center" onClick={(e) => e.stopPropagation()}>
+                          <Search className="absolute left-3 w-4 h-4 text-gray-400 dark:text-zinc-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={notifSearchQuery}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setNotifSearchQuery(e.target.value)}
+                            placeholder={t('notifications.searchPlaceholder', 'Rechercher une notification...')}
+                            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/40"
+                          />
+                          {notifSearchQuery && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setNotifSearchQuery('')
+                              }}
+                              className="absolute right-2.5 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400 dark:text-zinc-400"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Onglets Filtres de Catégories (Mobile) */}
+                        <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar pb-0.5" onClick={(e) => e.stopPropagation()}>
+                          {[
+                            { key: 'all', label: t('notifications.tabs.all', 'Toutes') },
+                            { key: 'message', label: t('notifications.tabs.message', 'Messages') },
+                            { key: 'pub', label: t('notifications.tabs.pub', 'Publicités') },
+                            { key: 'request', label: t('notifications.tabs.request', 'Demandes') },
+                            { key: 'system', label: t('notifications.tabs.system', 'Système') }
+                          ].map((tab) => (
+                            <button
+                              key={tab.key}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setNotifCategoryFilter(tab.key as NotificationCategory)
+                              }}
+                              className={`px-3 py-1 text-[11px] font-bold rounded-full whitespace-nowrap transition-all ${
+                                notifCategoryFilter === tab.key
+                                  ? 'bg-[#FF6B00] text-white shadow-sm'
+                                  : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border border-gray-200/80 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-700/60'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Liste Déroulante Notifications (Mobile) */}
+                      <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800/60 pb-20 no-scrollbar">
+                        {filteredNotifications.length === 0 ? (
+                          <div className="py-24 px-4 text-center">
+                            <Bell className="w-12 h-12 mx-auto text-gray-300 dark:text-zinc-600 mb-3 opacity-60" />
+                            <p className="text-base font-bold text-gray-700 dark:text-zinc-300">
+                              {notifSearchQuery ? t('notifications.emptySearch', 'Aucune notification trouvée') : t('notifications.empty', 'Aucune notification')}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-1">
+                              {notifSearchQuery ? `${t('notifications.noResultsFor', 'Aucun résultat pour')} "${notifSearchQuery}"` : t('notifications.emptyDesc', "Vous serez notifié dès qu'il y aura du nouveau.")}
+                            </p>
+                            {notifSearchQuery && (
+                              <button
+                                onClick={() => {
+                                  setNotifSearchQuery('')
+                                  setNotifCategoryFilter('all')
+                                }}
+                                className="mt-3 text-xs font-bold text-blue-600 dark:text-blue-400 underline"
+                              >
+                                {t('notifications.resetFilters', 'Réinitialiser les filtres')}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          filteredNotifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              onClick={() => handleNotificationClick(notif)}
+                              className={`p-4 flex items-start gap-3.5 cursor-pointer transition-colors relative group ${
+                                !notif.read
+                                  ? resolvedTheme === 'dark' ? 'bg-blue-950/30 hover:bg-blue-900/30' : 'bg-blue-50/70 hover:bg-blue-100/60'
+                                  : resolvedTheme === 'dark' ? 'hover:bg-zinc-800/60' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              {/* Logo ou icône */}
+                              {notif.iconUrl || (notif.data?.isPub && localStorage.getItem('exile_pub_platform_logo')) ? (
+                                <img
+                                  src={notif.iconUrl || localStorage.getItem('exile_pub_platform_logo') || ''}
+                                  alt="PUB"
+                                  className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
+                                />
+                              ) : (
+                                <div className={`p-2.5 rounded-xl flex-shrink-0 ${
+                                  notif.type === 'message'
+                                    ? 'bg-blue-500/10 text-blue-500'
+                                    : notif.type === 'request_accepted'
+                                    ? 'bg-emerald-500/10 text-emerald-500'
+                                    : notif.type === 'campaign_active' || notif.data?.isPub
+                                    ? 'bg-orange-500/10 text-orange-500'
+                                    : notif.type === 'system'
+                                    ? 'bg-purple-500/10 text-purple-500'
+                                    : 'bg-amber-500/10 text-amber-500'
+                                }`}>
+                                  {notif.type === 'message' ? (
+                                    <MessageSquare className="w-5 h-5" />
+                                  ) : notif.type === 'request_accepted' ? (
+                                    <CheckCircle className="w-5 h-5" />
+                                  ) : notif.type === 'campaign_active' || notif.data?.isPub ? (
+                                    <Megaphone className="w-5 h-5" />
+                                  ) : (
+                                    <AlertCircle className="w-5 h-5" />
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <p className={`text-sm font-bold truncate ${
+                                    !notif.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-zinc-300'
+                                  }`}>
+                                    {notif.title}
+                                  </p>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {!notif.read && (
+                                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                                    )}
+                                    {/* Suppression individuelle */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        notificationService.deleteNotification(notif.id)
+                                        setNotifications(notificationService.getNotifications())
+                                      }}
+                                      title={t('notifications.delete', 'Supprimer la notification')}
+                                      className="p-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                                  {notif.message}
+                                </p>
+
+                                {(notif.actionButton || notif.data?.actionButton) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      notificationService.markAsRead(notif.id)
+                                      setShowNotifications(false)
+                                      const url = notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl || '/pub/demande'
+                                      navigate(url)
+                                    }}
+                                    className="mt-2.5 px-4 py-1.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                                  >
+                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || t('notifications.makeAnotherInquiry', 'Faire encore une demande')}</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-2 block font-medium">
+                                  {formatRelativeTime(notif.createdAt)}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>,
+                    document.body
+                  )}
+
+                  {/* Desktop/Tablet Notification Dropdown */}
+                  {showNotifications && (
+                    <div className="hidden sm:flex flex-col absolute right-0 mt-2 w-96 max-h-[560px] rounded-2xl shadow-2xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-zinc-700/60 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">{t('notifications.title', 'Notifications')}</span>
+                          {unreadCount > 0 && (
+                            <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full">
+                              {unreadCount}
                             </span>
                           )}
                         </div>
@@ -980,58 +1277,110 @@ export const Header = (): JSX.Element => {
                               notificationService.markAllAsRead()
                               setNotifications(notificationService.getNotifications())
                             }}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
                           >
                             <CheckCheck className="w-3.5 h-3.5" />
-                            Tout marquer comme lu
+                            {t('notifications.markAllAsRead', 'Tout marquer comme lu')}
                           </button>
                         )}
                       </div>
 
+                      {/* Barre de Recherche Notifications (Desktop) */}
+                      <div className="px-3.5 py-2.5 border-b border-gray-100 dark:border-zinc-700/60 bg-gray-50/70 dark:bg-zinc-850/60 flex-shrink-0">
+                        <div className="relative flex items-center">
+                          <Search className="absolute left-2.5 w-3.5 h-3.5 text-gray-400 dark:text-zinc-500 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={notifSearchQuery}
+                            onChange={(e) => setNotifSearchQuery(e.target.value)}
+                            placeholder={t('common.search', 'Rechercher...')}
+                            className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-white dark:bg-zinc-750 border border-gray-200 dark:border-zinc-600/80 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                          />
+                          {notifSearchQuery && (
+                            <button
+                              onClick={() => setNotifSearchQuery('')}
+                              className="absolute right-2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Onglets Filtres de Catégories (Desktop) */}
+                        <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-0.5">
+                          {[
+                            { key: 'all', label: t('notifications.tabs.all', 'Toutes') },
+                            { key: 'message', label: t('notifications.tabs.message', 'Messages') },
+                            { key: 'pub', label: t('notifications.tabs.pub', 'Publicités') },
+                            { key: 'request', label: t('notifications.tabs.request', 'Demandes') },
+                            { key: 'system', label: t('notifications.tabs.system', 'Système') }
+                          ].map((tab) => (
+                            <button
+                              key={tab.key}
+                              onClick={() => setNotifCategoryFilter(tab.key as NotificationCategory)}
+                              className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full whitespace-nowrap transition-all ${
+                                notifCategoryFilter === tab.key
+                                  ? 'bg-[#FF6B00] text-white shadow-xs'
+                                  : 'bg-white dark:bg-zinc-700 text-gray-600 dark:text-zinc-300 border border-gray-200/80 dark:border-zinc-600'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-700/40">
-                        {notifications.length === 0 ? (
+                        {filteredNotifications.length === 0 ? (
                           <div className="py-8 px-4 text-center">
-                            <Bell className="w-8 h-8 mx-auto text-gray-300 dark:text-zinc-600 mb-2" />
-                            <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">Aucune notification</p>
-                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">Vous serez notifié dès qu'il y aura du nouveau.</p>
+                            <Bell className="w-8 h-8 mx-auto text-gray-300 dark:text-zinc-600 mb-2 opacity-60" />
+                            <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">
+                              {notifSearchQuery ? t('notifications.emptySearch', 'Aucune notification trouvée') : t('notifications.empty', 'Aucune notification')}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
+                              {notifSearchQuery ? `${t('notifications.noResultsFor', 'Aucun résultat pour')} "${notifSearchQuery}"` : t('notifications.emptyDesc', "Vous serez notifié dès qu'il y aura du nouveau.")}
+                            </p>
                           </div>
                         ) : (
-                          notifications.map((notif) => (
+                          filteredNotifications.map((notif) => (
                             <div
                               key={notif.id}
-                              onClick={() => {
-                                notificationService.markAsRead(notif.id)
-                                setNotifications(notificationService.getNotifications())
-                                setShowNotifications(false)
-                                if (notif.type === 'message') {
-                                  navigate('/pro/conversations')
-                                } else if (notif.type === 'request_accepted' || notif.type === 'new_contact') {
-                                  navigate('/pro/demandes')
-                                }
-                              }}
-                              className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
+                              onClick={() => handleNotificationClick(notif)}
+                              className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors group relative ${
                                 !notif.read
                                   ? resolvedTheme === 'dark' ? 'bg-blue-950/30 hover:bg-blue-900/30' : 'bg-blue-50/70 hover:bg-blue-100/60'
                                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-700/50' : 'hover:bg-gray-50'
                               }`}
                             >
-                              <div className={`p-2 rounded-xl flex-shrink-0 ${
-                                notif.type === 'message'
-                                  ? 'bg-blue-500/10 text-blue-500'
-                                  : notif.type === 'request_accepted'
-                                  ? 'bg-emerald-500/10 text-emerald-500'
-                                  : notif.type === 'system'
-                                  ? 'bg-purple-500/10 text-purple-500'
-                                  : 'bg-amber-500/10 text-amber-500'
-                              }`}>
-                                {notif.type === 'message' ? (
-                                  <MessageSquare className="w-4 h-4" />
-                                ) : notif.type === 'request_accepted' ? (
-                                  <CheckCircle className="w-4 h-4" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4" />
-                                )}
-                              </div>
+                              {notif.iconUrl || (notif.data?.isPub && localStorage.getItem('exile_pub_platform_logo')) ? (
+                                <img
+                                  src={notif.iconUrl || localStorage.getItem('exile_pub_platform_logo') || ''}
+                                  alt="PUB"
+                                  className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-white/20 shadow-sm"
+                                />
+                              ) : (
+                                <div className={`p-2 rounded-xl flex-shrink-0 ${
+                                  notif.type === 'message'
+                                    ? 'bg-blue-500/10 text-blue-500'
+                                    : notif.type === 'request_accepted'
+                                    ? 'bg-emerald-500/10 text-emerald-500'
+                                    : notif.type === 'campaign_active' || notif.data?.isPub
+                                    ? 'bg-orange-500/10 text-orange-500'
+                                    : notif.type === 'system'
+                                    ? 'bg-purple-500/10 text-purple-500'
+                                    : 'bg-amber-500/10 text-amber-500'
+                                }`}>
+                                  {notif.type === 'message' ? (
+                                    <MessageSquare className="w-4 h-4" />
+                                  ) : notif.type === 'request_accepted' ? (
+                                    <CheckCircle className="w-4 h-4" />
+                                  ) : notif.type === 'campaign_active' || notif.data?.isPub ? (
+                                    <Megaphone className="w-4 h-4" />
+                                  ) : (
+                                    <AlertCircle className="w-4 h-4" />
+                                  )}
+                                </div>
+                              )}
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-1 mb-0.5">
@@ -1040,15 +1389,46 @@ export const Header = (): JSX.Element => {
                                   }`}>
                                     {notif.title}
                                   </p>
-                                  {!notif.read && (
-                                    <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
-                                  )}
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {!notif.read && (
+                                      <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
+                                    )}
+                                    {/* Bouton de suppression individuelle */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        notificationService.deleteNotification(notif.id)
+                                        setNotifications(notificationService.getNotifications())
+                                      }}
+                                      title={t('notifications.delete', 'Supprimer la notification')}
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-500 transition-all"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">
                                   {notif.message}
                                 </p>
-                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1 block">
-                                  {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+
+                                {(notif.actionButton || notif.data?.actionButton) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      notificationService.markAsRead(notif.id)
+                                      setShowNotifications(false)
+                                      const url = notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl || '/pub/demande'
+                                      navigate(url)
+                                    }}
+                                    className="mt-2 px-3 py-1 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-[11px] font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                                  >
+                                    <span>{notif.actionButton?.label || notif.data?.actionButton?.label || t('notifications.makeAnotherInquiry', 'Faire encore une demande')}</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </button>
+                                )}
+
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1 block font-medium">
+                                  {formatRelativeTime(notif.createdAt)}
                                 </span>
                               </div>
                             </div>
@@ -1065,7 +1445,7 @@ export const Header = (): JSX.Element => {
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
                     className="flex items-center space-x-2 p-1 md:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
                   >
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-zinc-800 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm overflow-hidden shadow-sm ring-1 ring-white/10 flex-shrink-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-zinc-800 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden shadow-sm ring-1 ring-white/10 flex-shrink-0">
                       {headerAvatar && !headerAvatarError && isOnline ? (
                         <img
                           src={headerAvatar}
@@ -1089,7 +1469,7 @@ export const Header = (): JSX.Element => {
                       resolvedTheme === 'dark' ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-gray-200'
                     }`}>
                       <div className="px-4 py-2 border-b border-gray-200 dark:border-zinc-700">
-                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400">Connecté en tant que</p>
+                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400">{t('pro.header.connectedAs', 'Connecté en tant que')}</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">@{displayName.replace(/^@/, '')}</p>
                       </div>
                       <Link
@@ -1097,14 +1477,14 @@ export const Header = (): JSX.Element => {
                         className="block px-4 py-2 text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700"
                         onClick={() => setShowProfileMenu(false)}
                       >
-                        Mon profil
+                        {t('pro.header.myProfile', 'Mon profil')}
                       </Link>
                       <Link
                         to="/pro/settings"
                         className="block px-4 py-2 text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700"
                         onClick={() => setShowProfileMenu(false)}
                       >
-                        Paramètres
+                        {t('pro.header.settings', 'Paramètres')}
                       </Link>
                       <hr className="my-2 border-gray-200 dark:border-zinc-700" />
                       <button
@@ -1114,7 +1494,7 @@ export const Header = (): JSX.Element => {
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-zinc-700"
                       >
-                        Déconnexion
+                        {t('pro.header.logout', 'Déconnexion')}
                       </button>
                     </div>
                   )}
@@ -1141,7 +1521,7 @@ export const Header = (): JSX.Element => {
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchChange}
-                placeholder="Rechercher..."
+                placeholder={t('common.search', 'Rechercher...')}
                 autoFocus
                 className={`w-full pl-12 pr-12 py-3 rounded-xl text-base ${
                   resolvedTheme === 'dark'
@@ -1163,7 +1543,7 @@ export const Header = (): JSX.Element => {
           <div className="flex-1 overflow-y-auto p-4">
             {searchLoading ? (
               <div className="text-center text-sm text-gray-500 dark:text-zinc-400">
-                Recherche en cours...
+                {t('common.searching', 'Recherche en cours...')}
               </div>
             ) : !searchQuery ? (
               recentSearches.length > 0 && (
@@ -1171,13 +1551,13 @@ export const Header = (): JSX.Element => {
                   <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <History className="w-3 h-3" />
-                      Recherches récentes
+                      {t('common.recentSearches', 'Recherches récentes')}
                     </div>
                     <button
                       onClick={() => clearRecentSearches()}
                       className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300"
                     >
-                      Effacer
+                      {t('common.clear', 'Effacer')}
                     </button>
                   </div>
                   {recentSearches.map((search, index) => (
@@ -1201,7 +1581,7 @@ export const Header = (): JSX.Element => {
                   {searchResults.professionals.length > 0 && (
                     <div className="mt-4">
                       <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                        Professionnels
+                        {t('common.professionals', 'Professionnels')}
                       </div>
                       {searchResults.professionals.map((pro: any) => (
                         <button
@@ -1225,7 +1605,7 @@ export const Header = (): JSX.Element => {
                             <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
                               {pro.username?.startsWith('@') ? pro.username : `@${pro.username || 'Utilisateur'}`}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || 'Professionnel'}</p>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{pro.profession || t('common.professional', 'Professionnel')}</p>
                           </div>
                         </button>
                       ))}
@@ -1235,7 +1615,7 @@ export const Header = (): JSX.Element => {
                   {searchResults.videos.length > 0 && (
                     <div className="mt-4">
                       <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase">
-                        Vidéos
+                        {t('common.videos', 'Vidéos')}
                       </div>
                       {searchResults.videos.map((video: any) => (
                         <button
@@ -1259,7 +1639,7 @@ export const Header = (): JSX.Element => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-base font-medium text-gray-900 dark:text-white truncate">{video.title}</p>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">{video.views} vues</p>
+                            <p className="text-sm text-gray-500 dark:text-zinc-400">{video.views} {t('common.views', 'vues')}</p>
                           </div>
                         </button>
                       ))}
@@ -1268,7 +1648,7 @@ export const Header = (): JSX.Element => {
                 </>
               ) : (
                 <div className="p-8 text-center text-gray-500 dark:text-zinc-400 text-base">
-                  Aucun résultat trouvé
+                  {t('common.noResultsFound', 'Aucun résultat trouvé')}
                 </div>
               )
             )}

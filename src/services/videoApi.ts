@@ -1,8 +1,8 @@
 import type { Video as FeedVideo } from '../types/video'
+import { API_BASE_URL as CONFIG_API_BASE_URL } from '../config/api'
 
-const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 // S'assurer que l'URL de base est toujours propre et sans double /v1
-const API_BASE_URL = RAW_API_BASE.replace(/\/+$/, '')
+const API_BASE_URL = CONFIG_API_BASE_URL.replace(/\/+$/, '')
 
 const getEndpoint = (path: string): string => {
   const clean = path.replace(/^\/+/, '')
@@ -75,57 +75,56 @@ export const unwrapList = <T,>(data: any): T[] => {
 
 const AVATAR_COLORS = ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#0EA5E9']
 
-export const resolveMediaUrl = (url?: string | null): string => {
-  if (!url || typeof url !== 'string' || !url.trim()) return ''
-  const trimmed = url.trim()
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
-    return trimmed
-  }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
-  const origin = apiBase.replace(/\/api.*$/, '').replace(/\/$/, '')
-  return `${origin}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`
-}
+import { resolveMediaUrl } from '../utils/mediaUtils'
+export { resolveMediaUrl }
+
 
 export const cleanUsername = (str?: string | null): string => {
   if (!str) return 'utilisateur'
   return str.replace(/^@+/, '').trim() || 'utilisateur'
 }
 
-export const mapApiVideo = (v: Video): FeedVideo => {
-  const resolvedVideoUrl = resolveMediaUrl(v.file_url || (v.file ? `/media/${v.file}` : ''))
-  const resolvedThumbnailUrl = resolveMediaUrl(v.cover_url || (v.cover ? `/media/${v.cover}` : ''))
-  const resolvedAvatarUrl = resolveMediaUrl(v.owner_avatar)
+export const mapApiVideo = (v: any): FeedVideo => {
+  const resolvedVideoUrl = resolveMediaUrl(v.videoUrl || v.file_url || (v.file ? `/media/${v.file}` : ''))
+  const resolvedThumbnailUrl = resolveMediaUrl(v.thumbnailUrl || v.thumbnail || v.cover_url || (v.cover ? `/media/${v.cover}` : ''))
+  const resolvedAvatarUrl = resolveMediaUrl(v.owner_avatar || v.author?.avatarUrl || v.author?.avatar)
 
-  const cleanName = cleanUsername(v.owner_username || v.owner_full_name || `user_${v.owner}`)
-  const displayName = v.owner_full_name?.trim() || cleanName
+  // Extraire le créateur réel sans écraser par un utilisateur par défaut
+  const realOwnerUsername = v.owner_username || (v.owner && typeof v.owner === 'object' ? v.owner.username : '') || v.author?.username || ''
+  const realOwnerFullName = v.owner_full_name || (v.owner && typeof v.owner === 'object' ? v.owner.full_name : '') || v.author?.name || ''
+  const ownerUuid = String(v.owner_uuid || v.owner_id || (v.owner && typeof v.owner === 'object' ? v.owner.id : v.owner) || v.author?.id || 'unknown')
+
+  const cleanName = cleanUsername(realOwnerUsername || realOwnerFullName || `user_${ownerUuid}`)
+  const displayName = realOwnerFullName.trim() || cleanName
   const authorInitials = (displayName.replace(/^@+/, '').charAt(0) || cleanName.charAt(0) || 'U').toUpperCase()
   const avatarColor = AVATAR_COLORS[Math.abs(Number(v.owner) || 0) % AVATAR_COLORS.length]
 
   return {
     id: String(v.id),
     title: v.title,
-    description: v.description,
+    description: v.description || '',
     videoUrl: resolvedVideoUrl,
     thumbnailUrl: resolvedThumbnailUrl,
     thumbnail: resolvedThumbnailUrl,
-    views: v.views ?? v.views_count ?? 0,
-    viewsCount: v.views ?? v.views_count ?? 0,
-    likes: v.likes_count ?? 0,
-    dislikes: v.dislikes_count ?? 0,
-    commentsCount: 0,
-    createdAt: v.created_at,
-    postedAt: v.created_at,
-    mimeType: v.mime_type || undefined,
+    views: v.views ?? v.views_count ?? v.viewsCount ?? 0,
+    viewsCount: v.views ?? v.views_count ?? v.viewsCount ?? 0,
+    likes: v.likes_count ?? v.likes ?? v.likesCount ?? 0,
+    dislikes: v.dislikes_count ?? v.dislikes ?? 0,
+    commentsCount: v.commentsCount ?? 0,
+    createdAt: v.created_at || v.createdAt || v.postedAt || '',
+    postedAt: v.created_at || v.createdAt || v.postedAt || '',
+    mimeType: v.mime_type || v.mimeType || undefined,
     author: {
-      id: String(v.owner),
+      id: ownerUuid,
+      uuid: ownerUuid,
       name: displayName,
       username: `@${cleanName}`,
-      profession: v.owner_profession || '',
+      profession: v.owner_profession || v.author?.profession || 'Expert',
       avatarUrl: resolvedAvatarUrl || undefined,
       avatar: resolvedAvatarUrl || undefined,
       avatarColor,
       initials: authorInitials,
-      followers: v.subscribers_count ?? 0,
+      followers: v.subscribers_count ?? v.author?.followers ?? 0,
       verified: false,
     },
   }
@@ -160,11 +159,13 @@ export const videoApi = {
         method: 'GET',
         headers,
       })
-      if (!response.ok) {
-        return { success: false, error: 'Erreur lors de la récupération des vidéos' }
+      if (response.ok) {
+        const data = await response.json()
+        const backendVideos = unwrapList<Video>(data)
+        return { success: true, data: backendVideos }
       }
-      const data = await response.json()
-      return { success: true, data: unwrapList<Video>(data) }
+
+      return { success: true, data: [] }
     } catch {
       return { success: false, error: 'Erreur de connexion au serveur' }
     }

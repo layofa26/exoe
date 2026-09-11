@@ -1,0 +1,16 @@
+{
+  "build": {
+    "env": {
+      "VITE_API_BASE_URL": "https://exile-backend-9q6o.onrender.com/api/v1",
+      "VITE_APP_URL": "https://exile-backend-9q6o.onrender.com",
+      "VITE_SUPABASE_URL": "https://yovqbztvqotktkmkkqsq.supabase.co",
+      "VITE_SUPABASE_ANON_KEY": "sb_publishable_b7EtZ7i353XAcu2wvj94jA_MviTaZZD"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}

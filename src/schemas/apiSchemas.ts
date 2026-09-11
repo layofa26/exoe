@@ -75,6 +75,16 @@ export const AbonnementSchema = z.object({
   id: z.union([z.string(), z.number()]),
   user: z.union([z.string(), z.number()]),
   professionnel: z.union([z.string(), z.number()]),
+  professionnel_id: z.number().optional(),
+  professionnel_username: z.string().optional(),
+  professionnel_name: z.string().optional(),
+  professionnel_avatar: z.string().nullable().optional(),
+  professionnel_profession: z.string().optional(),
+  professionnel_speciality: z.string().optional(),
+  subscribers_count: z.number().optional(),
+  notifications_enabled: z.boolean().optional(),
+  is_vip: z.boolean().optional(),
+  vip_tier: z.string().optional(),
   created_at: z.string(),
 })
 

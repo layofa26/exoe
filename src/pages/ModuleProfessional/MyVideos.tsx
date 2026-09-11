@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Video,
   Plus,
@@ -23,8 +24,10 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useQuery } from '../../hooks/useQuery'
 import { cacheService } from '../../services/cacheService'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
 interface MyVideo {
   id: string
@@ -46,6 +49,7 @@ interface MyVideo {
 }
 
 export const MyVideos = (): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -79,12 +83,13 @@ export const MyVideos = (): JSX.Element => {
       
       const data = await response.json()
       const videosData = Array.isArray(data) ? data : (data.results || [])
-      
       return videosData.map((video: any) => ({
+
         id: String(video.id),
         title: video.title,
-        thumbnailUrl: video.cover_url || video.cover,
+        thumbnailUrl: resolveMediaUrl(video.cover_url || video.cover || (video.thumbnailUrl ? video.thumbnailUrl : null)),
         duration: video.duration,
+
         viewsCount: video.views_count || video.views || 0,
         likesCount: video.likes_count || 0,
         commentsCount: video.comments_count || 0,
@@ -95,7 +100,14 @@ export const MyVideos = (): JSX.Element => {
       }))
     },
     {
-      cacheKey: 'pro:videos:my',
+      cacheKey: (() => {
+        try {
+          const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
+          return `pro:videos:my:${profile?.id || localStorage.getItem('exile_client_uuid') || 'guest'}`;
+        } catch {
+          return 'pro:videos:my:guest';
+        }
+      })(),
       cacheTime: 3 * 60 * 1000,
       initialData: []
     }
@@ -174,10 +186,10 @@ export const MyVideos = (): JSX.Element => {
             <div>
               <div className="flex items-center gap-2">
                 <Film className="w-6 h-6 text-blue-500" />
-                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Mes vidéos</h1>
+                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">{t('pro.myVideos.manageTitle', 'Mes vidéos')}</h1>
               </div>
               <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                Gérez, organisez et suivez la performance de vos publications
+                {t('pro.myVideos.subtitle', 'Gérez, organisez et suivez la performance de vos publications')}
               </p>
             </div>
           </div>
@@ -187,7 +199,7 @@ export const MyVideos = (): JSX.Element => {
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span>Nouvelle vidéo</span>
+            <span>{t('pro.myVideos.uploadNew', 'Nouvelle vidéo')}</span>
           </Link>
         </div>
 
@@ -197,7 +209,7 @@ export const MyVideos = (): JSX.Element => {
             resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
           } shadow-sm`}>
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Total Vidéos</span>
+              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.allVideos', 'Total Vidéos')}</span>
               <Film className="w-4 h-4 text-blue-500" />
             </div>
             <p className="text-2xl font-extrabold">{stats.total}</p>
@@ -207,7 +219,7 @@ export const MyVideos = (): JSX.Element => {
             resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
           } shadow-sm`}>
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Publiées</span>
+              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.publishedVideos', 'Publiées')}</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             </div>
             <p className="text-2xl font-extrabold text-emerald-500">{stats.published}</p>
@@ -217,7 +229,7 @@ export const MyVideos = (): JSX.Element => {
             resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
           } shadow-sm`}>
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Brouillons</span>
+              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.draftVideos', 'Brouillons')}</span>
               <FileEdit className="w-4 h-4 text-amber-500" />
             </div>
             <p className="text-2xl font-extrabold text-amber-500">{stats.draft}</p>
@@ -227,7 +239,7 @@ export const MyVideos = (): JSX.Element => {
             resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
           } shadow-sm`}>
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Vues Totales</span>
+              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.totalViews', 'Vues Totales')}</span>
               <Eye className="w-4 h-4 text-purple-500" />
             </div>
             <p className="text-2xl font-extrabold text-purple-500">
@@ -245,7 +257,7 @@ export const MyVideos = (): JSX.Element => {
             <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
             <input
               type="text"
-              placeholder="Rechercher par titre..."
+              placeholder={t('pro.myVideos.searchPlaceholder', 'Rechercher par titre...')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full pl-10 pr-9 py-2 rounded-xl text-sm border transition-colors ${
@@ -267,9 +279,9 @@ export const MyVideos = (): JSX.Element => {
           {/* Filter tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {[
-              { id: 'all', label: 'Toutes', count: stats.total },
-              { id: 'published', label: 'Publiées', count: stats.published },
-              { id: 'draft', label: 'Brouillons', count: stats.draft }
+              { id: 'all', label: t('common.all', 'Toutes'), count: stats.total },
+              { id: 'published', label: t('pro.myVideos.published', 'Publiées'), count: stats.published },
+              { id: 'draft', label: t('pro.myVideos.drafts', 'Brouillons'), count: stats.draft }
             ].map((f) => (
               <button
                 key={f.id}
@@ -304,7 +316,7 @@ export const MyVideos = (): JSX.Element => {
                     ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300'
                 }`}
-                title="Vue grille"
+                title={t('common.grid', 'Vue grille')}
               >
                 <Grid3X3 className="w-4 h-4" />
               </button>
@@ -315,7 +327,7 @@ export const MyVideos = (): JSX.Element => {
                     ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300'
                 }`}
-                title="Vue liste"
+                title={t('common.list', 'Vue liste')}
               >
                 <List className="w-4 h-4" />
               </button>
@@ -350,10 +362,10 @@ export const MyVideos = (): JSX.Element => {
               <Film className="w-8 h-8" />
             </div>
             <h3 className="text-lg font-bold mb-1">
-              {searchQuery ? 'Aucune vidéo trouvée' : 'Aucune vidéo pour le moment'}
+              {searchQuery ? t('pro.myVideos.noResults', 'Aucune vidéo trouvée') : t('pro.myVideos.noVideos', 'Aucune vidéo pour le moment')}
             </h3>
             <p className={`text-xs sm:text-sm mb-6 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-              {searchQuery ? 'Modifiez vos termes de recherche pour trouver du contenu.' : 'Partagez votre première création avec votre communauté dès aujourd\'hui.'}
+              {searchQuery ? t('pro.myVideos.noResultsDesc', 'Modifiez vos termes de recherche pour trouver du contenu.') : t('pro.myVideos.noVideosDesc', "Partagez votre première création avec votre communauté dès aujourd'hui.")}
             </p>
             {!searchQuery && (
               <Link
@@ -361,7 +373,7 @@ export const MyVideos = (): JSX.Element => {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md transition-all active:scale-95"
               >
                 <Plus className="w-4 h-4" />
-                <span>Publier une vidéo</span>
+                <span>{t('pro.feed.publishVideo', 'Publier une vidéo')}</span>
               </Link>
             )}
           </div>
@@ -388,7 +400,7 @@ export const MyVideos = (): JSX.Element => {
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500">
                         <Play className="w-10 h-10 mb-1 opacity-40" />
-                        <span className="text-[11px] font-medium">Aperçu indisponible</span>
+                        <span className="text-[11px] font-medium">{t('pro.myVideos.noThumbnail', 'Aperçu indisponible')}</span>
                       </div>
                     )}
 
@@ -399,7 +411,7 @@ export const MyVideos = (): JSX.Element => {
                           ? 'bg-emerald-600 text-white'
                           : 'bg-amber-600 text-white'
                       }`}>
-                        {video.status === 'PUBLISHED' ? 'Publiée' : 'Brouillon'}
+                        {video.status === 'PUBLISHED' ? t('pro.myVideos.published', 'Publiée') : t('pro.myVideos.drafts', 'Brouillon')}
                       </span>
                     </div>
 
@@ -415,14 +427,14 @@ export const MyVideos = (): JSX.Element => {
                       <button
                         onClick={() => navigate(`/pro/video/${video.id}`)}
                         className="p-2.5 rounded-full bg-white/90 hover:bg-white text-gray-900 shadow-lg transition-transform hover:scale-110"
-                        title="Regarder"
+                        title={t('common.view', 'Regarder')}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(video.id)}
                         className="p-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-transform hover:scale-110"
-                        title="Supprimer"
+                        title={t('common.delete', 'Supprimer')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -462,7 +474,7 @@ export const MyVideos = (): JSX.Element => {
                     </span>
                   </div>
                   <span className="text-[11px]">
-                    {new Date(video.createdAt).toLocaleDateString('fr-FR')}
+                    {new Date(video.createdAt).toLocaleDateString(i18n.language || 'fr-FR')}
                   </span>
                 </div>
               </div>
@@ -502,10 +514,10 @@ export const MyVideos = (): JSX.Element => {
                       <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
                         video.status === 'PUBLISHED' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                       }`}>
-                        {video.status === 'PUBLISHED' ? 'Publiée' : 'Brouillon'}
+                        {video.status === 'PUBLISHED' ? t('pro.myVideos.published', 'Publiée') : t('pro.myVideos.drafts', 'Brouillon')}
                       </span>
                       <span className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                        {new Date(video.createdAt).toLocaleDateString('fr-FR')}
+                        {new Date(video.createdAt).toLocaleDateString(i18n.language || 'fr-FR')}
                       </span>
                     </div>
                     <h3
@@ -515,9 +527,9 @@ export const MyVideos = (): JSX.Element => {
                       {video.title}
                     </h3>
                     <div className={`flex items-center gap-3 text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mt-1`}>
-                      <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {video.viewsCount} vues</span>
-                      <span className="flex items-center gap-1"><ThumbsUp className="w-3.5 h-3.5" /> {video.likesCount} likes</span>
-                      <span className="flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" /> {video.commentsCount} comm.</span>
+                      <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {video.viewsCount} {t('pro.myVideos.views', 'vues')}</span>
+                      <span className="flex items-center gap-1"><ThumbsUp className="w-3.5 h-3.5" /> {video.likesCount} {t('pro.myVideos.likes', 'likes')}</span>
+                      <span className="flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" /> {video.commentsCount} {t('pro.feed.comments', 'comm.')}</span>
                     </div>
                   </div>
                 </div>
@@ -526,14 +538,14 @@ export const MyVideos = (): JSX.Element => {
                   <button
                     onClick={() => navigate(`/pro/video/${video.id}`)}
                     className="p-2 rounded-xl border border-gray-200 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-700 dark:text-zinc-300 transition-colors"
-                    title="Voir"
+                    title={t('common.view', 'Voir')}
                   >
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(video.id)}
                     className="p-2 rounded-xl border border-red-200 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
-                    title="Supprimer"
+                    title={t('common.delete', 'Supprimer')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

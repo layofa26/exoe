@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { VideoPlayerPage } from '../../components/video/VideoPlayerPage';
 import { videoApi, mapApiVideo } from '../../services/videoApi';
 import type { Video } from '../../types/video';
 
 export default function VideoPage() {
+  const { t } = useTranslation();
   const { videoId } = useParams<{ videoId: string }>();
   const navigate = useNavigate();
   const [video, setVideo] = useState<Video | null>(null);
@@ -89,12 +91,12 @@ export default function VideoPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="text-center p-8">
-          <p className="text-white text-lg mb-4">{error || 'Vidéo non trouvée'}</p>
+          <p className="text-white text-lg mb-4">{error || t('pro.video.notFound', 'Vidéo non trouvée')}</p>
           <button
             onClick={handleBack}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            Retour au feed
+            {t('pro.video.backToFeed', 'Retour au feed')}
           </button>
         </div>
       </div>

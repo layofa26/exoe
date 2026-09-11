@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Play, Eye, MessageCircle, ThumbsUp, Lock, Globe, FileText, GraduationCap, Briefcase, Calendar as CalendarIcon, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { ContactModal } from '../modals/ContactModal'
+import { VideoPoster } from '../video/VideoPoster'
 
 interface InstitutionVideoCardProps {
   id: string
@@ -155,20 +156,24 @@ export const InstitutionVideoCard = ({
             src={videoUrl}
             controls
             autoPlay
+            preload="none"
             className="w-full aspect-video"
             onPause={() => setIsPlaying(false)}
           />
         ) : (
           <div className="relative w-full aspect-video">
-            {thumbnailUrl ? (
-              <img src={thumbnailUrl} alt={title} className="w-full h-full object-cover" />
-            ) : (
-              <video src={videoUrl} className="w-full h-full object-cover" />
-            )}
+            <VideoPoster
+              thumbnail={thumbnailUrl}
+              videoUrl={videoUrl}
+              title={title}
+              className="w-full h-full object-cover"
+            />
             <div className="absolute inset-0 flex items-center justify-center bg-black/40">
               <button
+                type="button"
                 onClick={() => setIsPlaying(true)}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/95 flex items-center justify-center hover:bg-white transition-all hover:scale-105 shadow-xl"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/95 flex items-center justify-center hover:bg-white transition-all hover:scale-105 shadow-xl cursor-pointer"
+                aria-label="Lire la vidéo"
               >
                 <Play className="w-8 h-8 sm:w-10 sm:h-10 text-gray-900 ml-0.5 sm:ml-1" />
               </button>

@@ -19,6 +19,8 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<LoginResult>;
+  verify2FA: (sessionTemp: string, code: string) => Promise<LoginResult>;
+  resend2FAOtp: (sessionTemp: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   registerPro: (userData: ProRegistrationData) => Promise<RegisterResult>;
   registerInstitution: (step1Data: InstitutionStep1, step2Data: InstitutionStep2) => Promise<RegisterResult>;
   logout: () => void;
@@ -32,6 +34,10 @@ export interface LoginResult {
   success: boolean;
   user?: User;
   error?: string;
+  requires2FA?: boolean;
+  sessionTemp?: string;
+  twoFactorMethod?: 'totp' | 'email';
+  emailMasked?: string;
 }
 
 export interface RegisterResult {

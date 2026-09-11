@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
+import './i18n'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -20,5 +21,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </AuthProvider>
       </NotificationProvider>
     </BrowserRouter>
-  </React.StrictMode>,
+    </React.StrictMode>,
 )
+
+// Enregistrement du Service Worker pour les notifications push mobiles hors-ligne
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

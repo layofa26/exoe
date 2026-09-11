@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Video } from '../../types/video';
 import { VideoPlayerPage } from '../../components/video/VideoPlayerPage';
 import SectionPub from '../../pages/PUB/SectionPub';
@@ -37,6 +38,7 @@ const VideoSkeleton = ({ resolvedTheme }: { resolvedTheme: string }) => {
 }
 
 export default function VideoFeed() {
+  const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const { isAuthenticated, user } = useAuth()
@@ -104,13 +106,14 @@ export default function VideoFeed() {
         const result = await videoApi.getVideos()
         const backendVideos: Video[] = result.success && result.data ? result.data.map(mapApiVideo) : []
         return backendVideos
-      } catch {
+      } catch (err) {
+        console.error('[VideoFeed] Error loading videos from backend:', err)
         return []
       }
     },
     {
-      cacheKey: 'pro:videos:feed:v6',
-      cacheTime: 15 * 1000,
+      cacheKey: 'pro:videos:feed:v8',
+      cacheTime: 2 * 60 * 1000,
       refetchOnMount: true,
     }
   )
@@ -387,7 +390,7 @@ export default function VideoFeed() {
         {query && results && results.videos.length > 0 && type !== 'professionals' && (
           <div ref={searchResultsRef} className="px-4 md:px-6 lg:px-8 py-4 max-h-[600px] overflow-y-auto">
             <h3 className={`text-lg font-semibold mb-4 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Vidéos ({results.videos.length})
+              {t('pro.profile.videos', 'Vidéos')} ({results.videos.length})
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {results.videos.map((video: Video) => (
@@ -406,7 +409,7 @@ export default function VideoFeed() {
                 disabled={searchLoading}
                 className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {searchLoading ? 'Chargement...' : 'Charger plus de résultats'}
+                {searchLoading ? t('common.loading', 'Chargement...') : t('pro.feed.loadMore', 'Charger plus de résultats')}
               </button>
             )}
           </div>
@@ -429,7 +432,7 @@ export default function VideoFeed() {
                     onClick={() => loadVideos()}
                     className={`mt-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} text-sm hover:underline`}
                   >
-                    Réessayer
+                    {t('common.retry', 'Réessayer')}
                   </button>
                 </div>
               ) : displayVideos.length > 0 ? (
@@ -442,9 +445,9 @@ export default function VideoFeed() {
                         onContact={handleContact}
                         onProfileClick={handleProfileClick}
                       />
-                      {/* SectionPub après 2 vidéos sur Mobile/Tablette */}
+                      {/* SectionPub après 2 vidéos sur Mobile/Tablette - Espacement compact et fluide sans vide */}
                       {idx === 1 && (
-                        <div className="col-span-full py-2">
+                        <div className="col-span-full my-0.5 sm:my-1">
                           <SectionPub />
                         </div>
                       )}
@@ -454,10 +457,10 @@ export default function VideoFeed() {
               ) : (
                 <div className="col-span-full py-16 px-4 text-center space-y-3">
                   <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                    {query ? 'Aucun résultat trouvé pour votre recherche' : 'Aucune vidéo sur la plateforme pour le moment'}
+                    {query ? t('pro.feed.noResults', 'Aucun résultat trouvé pour votre recherche') : t('pro.feed.emptyFeed', 'Aucune vidéo sur la plateforme pour le moment')}
                   </p>
                   <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                    Soyez le premier à publier du contenu sur EXILE !
+                    {t('pro.feed.beFirst', 'Soyez le premier à publier du contenu sur EXILE !')}
                   </p>
                   {!query && (
                     <button
@@ -465,7 +468,7 @@ export default function VideoFeed() {
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-lg transition-all"
                     >
                       <Plus size={16} />
-                      <span>Publier une vidéo</span>
+                      <span>{t('pro.feed.publishVideo', 'Publier une vidéo')}</span>
                     </button>
                   )}
                 </div>
@@ -495,7 +498,7 @@ export default function VideoFeed() {
                       onClick={() => loadVideos()}
                       className={`mt-2 ${resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} text-sm hover:underline`}
                     >
-                      Réessayer
+                      {t('common.retry', 'Réessayer')}
                     </button>
                   </div>
                 ) : displayVideos.length > 0 ? (
@@ -511,10 +514,10 @@ export default function VideoFeed() {
                 ) : (
                   <div className="col-span-full py-20 px-4 text-center space-y-3">
                     <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                      {query ? 'Aucun résultat trouvé pour votre recherche' : 'Aucune vidéo disponible pour le moment'}
+                      {query ? t('pro.feed.noResults', 'Aucun résultat trouvé pour votre recherche') : t('pro.feed.noVideosAvailable', 'Aucune vidéo disponible pour le moment')}
                     </p>
                     <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`}>
-                      Soyez le premier à publier du contenu sur EXILE !
+                      {t('pro.feed.beFirst', 'Soyez le premier à publier du contenu sur EXILE !')}
                     </p>
                     {!query && (
                       <button
@@ -522,7 +525,7 @@ export default function VideoFeed() {
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-lg transition-all"
                       >
                         <Plus size={16} />
-                        <span>Publier une vidéo</span>
+                        <span>{t('pro.feed.publishVideo', 'Publier une vidéo')}</span>
                       </button>
                     )}
                   </div>

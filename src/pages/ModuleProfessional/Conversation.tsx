@@ -6,10 +6,17 @@ import {
   Video, Star, Wifi, WifiOff, Loader2, Edit2, Trash2, Flag, Forward, Clock
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+
 import { useAuth } from '../../contexts/AuthContext'
+
+import { useTranslation } from 'react-i18next'
+import i18n from '../../i18n'
+
 import { useWebSocket, WSMessage } from '../../hooks/useWebSocket'
 import { TypingIndicator } from '../../components/TypingIndicator'
 import { MessageBubble, MessageBubbleData } from '../../components/MessageBubble'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
@@ -68,15 +75,15 @@ async function apiFetch(path: string, options?: RequestInit) {
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, lang = 'fr'): string {
   try {
     const d = new Date(iso)
     const now = new Date()
     const diff = (now.getTime() - d.getTime()) / 1000
-    if (diff < 60) return "À l'instant"
-    if (diff < 3600) return `${Math.floor(diff / 60)} min`
-    if (diff < 86400) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    if (diff < 60) return i18n.t('notifications.time.justNow', "À l'instant")
+    if (diff < 3600) return i18n.t('notifications.time.minutesAgo', { count: Math.floor(diff / 60), defaultValue: `${Math.floor(diff / 60)} min` })
+    if (diff < 86400) return d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString(lang, { day: 'numeric', month: 'short' })
   } catch { return '' }
 }
 
@@ -107,6 +114,7 @@ export const ConversationView = ({
   onBlockUser,
   onClose,
 }: ConversationViewProps): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   const params = useParams<{ id: string }>()
@@ -582,6 +590,9 @@ export const ConversationView = ({
         }
       } catch {
         // Fallback to WebSocket if REST failed
+        if (!isConnected) {
+          showToast(t('pro.requests.sendError', 'Erreur lors de l\'envoi. Vérifiez votre connexion.'))
+        }
       }
     }
 
@@ -595,7 +606,7 @@ export const ConversationView = ({
     } else if (!savedSuccessfully && !realConvId) {
       showToast('Erreur lors de l\'envoi. Vérifiez votre connexion.')
     }
-  }, [newMessage, id, activeConvId, partnerId, replyingTo, isConnected, currentUserId, wsSend, showToast])
+  }, [newMessage, id, activeConvId, partnerId, replyingTo, isConnected, currentUserId, wsSend, showToast, t])
 
   const sendMessage = () => sendDirectMessage()
 
@@ -605,7 +616,7 @@ export const ConversationView = ({
     if (!file) return
 
     if (file.size > 8 * 1024 * 1024) {
-      showToast('Image trop volumineuse (max 8 Mo)', 'error')
+      showToast(t('pro.requests.imageTooLarge', 'Image trop volumineuse (max 8 Mo)'), 'error')
       return
     }
 
@@ -614,7 +625,7 @@ export const ConversationView = ({
       const dataUrl = reader.result as string
       if (dataUrl) {
         sendDirectMessage(`[image:${dataUrl}]`)
-        showToast('Image envoyée !')
+        showToast(t('pro.requests.imageSent', 'Image envoyée !'))
       }
     }
     reader.readAsDataURL(file)
@@ -627,7 +638,7 @@ export const ConversationView = ({
     if (!file) return
 
     if (file.size > 25 * 1024 * 1024) {
-      showToast('Document trop volumineux (max 25 Mo)', 'error')
+      showToast(t('pro.requests.docTooLarge', 'Document trop volumineux (max 25 Mo)'), 'error')
       return
     }
 
@@ -640,7 +651,7 @@ export const ConversationView = ({
       const dataUrl = reader.result as string
       if (dataUrl) {
         sendDirectMessage(`[document:${file.name}|${sizeStr}|${dataUrl}]`)
-        showToast('Document envoyé !')
+        showToast(t('pro.requests.docSent', 'Document envoyé !'))
       }
     }
     reader.readAsDataURL(file)
@@ -650,7 +661,7 @@ export const ConversationView = ({
   // ─── Submit Pro Proposal ──────────────────────────────────────────────────────
   const handleSendProProposal = () => {
     if (!offerTitle.trim() || !offerAmount.trim()) {
-      showToast('Veuillez remplir au moins le titre et le montant', 'error')
+      showToast(t('pro.requests.offerRequired', 'Veuillez remplir au moins le titre et le montant'), 'error')
       return
     }
     const amountFormatted = `${offerAmount.trim()} ${offerCurrency}`
@@ -660,7 +671,7 @@ export const ConversationView = ({
     setOfferTitle('')
     setOfferAmount('')
     setOfferDesc('')
-    showToast('💼 Proposition & Devis Pro envoyé !')
+    showToast(t('pro.requests.offerSent', '💼 Proposition & Devis Pro envoyé !'))
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -687,8 +698,8 @@ export const ConversationView = ({
       m.id === msgId ? { ...m, content, isEdited: true } : m
     ))
     setEditingMessage(null)
-    showToast('Message modifié')
-  }, [editingMessage, isConnected, wsSend, showToast])
+    showToast(t('pro.requests.messageEdited', 'Message modifié'))
+  }, [editingMessage, isConnected, wsSend, showToast, t])
 
   // ─── Delete ──────────────────────────────────────────────────────────────────
   const deleteForMe = useCallback((msgId: string) => {
@@ -702,8 +713,8 @@ export const ConversationView = ({
       await apiFetch(`/conversations/messages/${msgId}/`, { method: 'DELETE' })
     }
     setMessages(prev => prev.filter(m => m.id !== msgId))
-    showToast('Message supprimé pour tous')
-  }, [isConnected, wsSend, showToast])
+    showToast(t('pro.requests.messageDeletedAll', 'Message supprimé pour tous'))
+  }, [isConnected, wsSend, showToast, t])
 
   // ─── Toggle important ─────────────────────────────────────────────────────────
   const toggleImportant = useCallback(async (msgId: string) => {
@@ -711,13 +722,13 @@ export const ConversationView = ({
       m.id === msgId ? { ...m, isImportant: !m.isImportant } : m
     ))
     await apiFetch(`/conversations/messages/${msgId}/mark_important/`, { method: 'POST' })
-    showToast('Marqué comme important ⭐')
-  }, [showToast])
+    showToast(t('pro.requests.markedImportant', 'Marqué comme important ⭐'))
+  }, [showToast, t])
 
   // ─── Copy ────────────────────────────────────────────────────────────────────
   const copyMessage = useCallback((content: string) => {
-    navigator.clipboard.writeText(content).then(() => showToast('Copié !')).catch(() => {})
-  }, [showToast])
+    navigator.clipboard.writeText(content).then(() => showToast(t('pro.requests.copied', 'Copié !'))).catch(() => {})
+  }, [showToast, t])
 
   // ─── Selection ───────────────────────────────────────────────────────────────
   const toggleSelect = useCallback((msgId: string) => {
@@ -738,9 +749,9 @@ export const ConversationView = ({
     const text = messages
       .filter(m => selectedMessageIds.has(m.id))
       .map(m => m.content).join('\n')
-    navigator.clipboard.writeText(text).then(() => showToast('Messages copiés !')).catch(() => {})
+    navigator.clipboard.writeText(text).then(() => showToast(t('pro.requests.messagesCopied', 'Messages copiés !'))).catch(() => {})
     setIsSelectionMode(false)
-  }, [messages, selectedMessageIds, showToast])
+  }, [messages, selectedMessageIds, showToast, t])
 
   // ─── Derived data ─────────────────────────────────────────────────────────────
   const otherParticipant = useMemo(() => {
@@ -802,7 +813,7 @@ export const ConversationView = ({
             }}
             className="px-6 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 transition-colors"
           >
-            ← Retour
+            ← {t('common.back', 'Retour')}
           </button>
         </div>
       </div>
@@ -848,10 +859,9 @@ export const ConversationView = ({
           <div className="relative flex-shrink-0">
             {otherParticipant?.avatar_url ? (
               <img
-                src={otherParticipant.avatar_url.startsWith('http') || otherParticipant.avatar_url.startsWith('data:')
-                  ? otherParticipant.avatar_url
-                  : `${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace('/api/v1', '')}${otherParticipant.avatar_url.startsWith('/') ? '' : '/'}${otherParticipant.avatar_url}`}
+                src={resolveMediaUrl(otherParticipant.avatar_url)}
                 alt=""
+
                 onError={(e) => { (e.target as HTMLElement).style.display = 'none' }}
                 className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-500/30"
               />
@@ -871,7 +881,7 @@ export const ConversationView = ({
               @{((otherParticipant?.username || otherParticipant?.full_name || 'Utilisateur')).replace(/^@/, '')}
             </h2>
             <p className={`text-xs truncate ${isOtherOnline ? 'text-emerald-400' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
-              {isOtherOnline ? 'En ligne' : 'Hors ligne'}
+              {isOtherOnline ? t('pro.requests.online', 'En ligne') : t('pro.requests.offline', 'Hors ligne')}
             </p>
           </div>
         </div>
@@ -888,7 +898,7 @@ export const ConversationView = ({
           <button
             onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
             className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
-            title="Rechercher"
+            title={t('common.search', 'Rechercher')}
           >
             <Search size={18} />
           </button>
@@ -908,11 +918,11 @@ export const ConversationView = ({
             <div className={`absolute top-16 right-3 z-50 w-52 rounded-2xl shadow-2xl border overflow-hidden
               ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
               {[
-                { icon: Pin, label: 'Épingler', action: () => { apiFetch(`/conversations/${id}/toggle_pin/`, { method: 'POST' }); setShowMenu(false) } },
-                { icon: Archive, label: 'Archiver', action: () => { setShowMenu(false) } },
-                { icon: CheckCheck, label: 'Sélection multiple', action: () => { setIsSelectionMode(true); setShowMenu(false) } },
-                { icon: Shield, label: 'Bloquer', action: () => { setShowConfirm({ type: 'block' }); setShowMenu(false) }, danger: true },
-                { icon: Trash2, label: 'Supprimer la conv.', action: () => { setShowConfirm({ type: 'delete' }); setShowMenu(false) }, danger: true },
+                { icon: Pin, label: t('pro.requests.pin', 'Épingler'), action: () => { apiFetch(`/conversations/${id}/toggle_pin/`, { method: 'POST' }); setShowMenu(false) } },
+                { icon: Archive, label: t('pro.requests.archive', 'Archiver'), action: () => { setShowMenu(false) } },
+                { icon: CheckCheck, label: t('pro.requests.multiSelect', 'Sélection multiple'), action: () => { setIsSelectionMode(true); setShowMenu(false) } },
+                { icon: Shield, label: t('pro.requests.block', 'Bloquer'), action: () => { setShowConfirm({ type: 'block' }); setShowMenu(false) }, danger: true },
+                { icon: Trash2, label: t('pro.requests.deleteConversation', 'Supprimer la conv.'), action: () => { setShowConfirm({ type: 'delete' }); setShowMenu(false) }, danger: true },
               ].map((item, i) => (
                 <button
                   key={i}
@@ -939,12 +949,12 @@ export const ConversationView = ({
             autoFocus
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Rechercher dans la conversation..."
+            placeholder={t('pro.conversations.searchPlaceholder', 'Rechercher dans la conversation...')}
             className={`flex-1 bg-transparent outline-none text-sm ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
           />
           {searchQuery && (
             <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {filteredMessages.length} résultat{filteredMessages.length !== 1 ? 's' : ''}
+              {filteredMessages.length} {t('common.results', 'résultats')}
             </span>
           )}
           <button onClick={() => { setShowSearch(false); setSearchQuery('') }}>
@@ -958,12 +968,12 @@ export const ConversationView = ({
         <div className={`flex-shrink-0 flex items-center justify-between px-4 py-2 border-b
           ${isDark ? 'bg-violet-900/30 border-violet-800' : 'bg-violet-50 border-violet-200'}`}>
           <span className="text-sm font-medium text-violet-400">
-            {selectedMessageIds.size} sélectionné{selectedMessageIds.size > 1 ? 's' : ''}
+            {selectedMessageIds.size} {t('common.selected', 'sélectionné(s)')}
           </span>
           <div className="flex gap-2">
-            <button onClick={batchCopy} className="px-3 py-1 rounded-lg bg-violet-600/20 text-violet-400 text-xs hover:bg-violet-600/30">Copier</button>
-            <button onClick={batchDelete} className="px-3 py-1 rounded-lg bg-red-600/20 text-red-400 text-xs hover:bg-red-600/30">Supprimer</button>
-            <button onClick={() => { setIsSelectionMode(false); setSelectedMessageIds(new Set()) }} className={`px-3 py-1 rounded-lg text-xs ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
+            <button onClick={batchCopy} className="px-3 py-1 rounded-lg bg-violet-600/20 text-violet-400 text-xs hover:bg-violet-600/30">{t('common.copy', 'Copier')}</button>
+            <button onClick={batchDelete} className="px-3 py-1 rounded-lg bg-red-600/20 text-red-400 text-xs hover:bg-red-600/30">{t('common.delete', 'Supprimer')}</button>
+            <button onClick={() => { setIsSelectionMode(false); setSelectedMessageIds(new Set()) }} className={`px-3 py-1 rounded-lg text-xs ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>{t('common.cancel', 'Annuler')}</button>
           </div>
         </div>
       )}
@@ -1090,11 +1100,11 @@ export const ConversationView = ({
       {hasDraft && !newMessage && (
         <div className={`flex-shrink-0 flex items-center justify-between px-4 py-1.5 border-t text-xs
           ${isDark ? 'bg-amber-900/20 border-amber-800/30 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
-          <span>📝 Brouillon enregistré</span>
+          <span>{t('pro.requests.draftSaved', '📝 Brouillon enregistré')}</span>
           <button
             onClick={() => { localStorage.removeItem(`draft_${id}`); setHasDraft(false) }}
             className="underline hover:no-underline"
-          >Effacer</button>
+          >{t('pro.requests.clearDraft', 'Effacer')}</button>
         </div>
       )}
 
@@ -1139,7 +1149,7 @@ export const ConversationView = ({
                   🖼️
                 </div>
                 <div className="text-left">
-                  <p>Photo / Image</p>
+                  <p>{t('pro.requests.photoImage', 'Photo / Image')}</p>
                   <p className="text-[10px] text-slate-400 font-normal">PNG, JPG, WebP</p>
                 </div>
               </button>
@@ -1156,7 +1166,7 @@ export const ConversationView = ({
                   📄
                 </div>
                 <div className="text-left">
-                  <p>Document / Fichier</p>
+                  <p>{t('pro.requests.docFile', 'Document / Fichier')}</p>
                   <p className="text-[10px] text-slate-400 font-normal">PDF, DOCX, ZIP</p>
                 </div>
               </button>
@@ -1173,8 +1183,8 @@ export const ConversationView = ({
                   💼
                 </div>
                 <div className="text-left">
-                  <p>Devis / Proposition Pro</p>
-                  <p className="text-[10px] text-slate-400 font-normal">Offre & contrat chiffré</p>
+                  <p>{t('pro.requests.proOffer', 'Devis / Proposition Pro')}</p>
+                  <p className="text-[10px] text-slate-400 font-normal">{t('pro.requests.proOfferDesc', 'Offre & contrat chiffré')}</p>
                 </div>
               </button>
             </div>
@@ -1187,7 +1197,7 @@ export const ConversationView = ({
           {/* Attachment button */}
           <button
             onClick={() => setShowAttachMenu(v => !v)}
-            title="Partager un fichier, image ou devis pro"
+            title={t('pro.requests.attachTitle', 'Partager un fichier, image ou devis pro')}
             className={`p-1.5 rounded-xl transition-colors mb-0.5 ${showAttachMenu ? 'bg-emerald-500/20 text-emerald-400' : isDark ? 'text-slate-400 hover:text-emerald-400 hover:bg-slate-700' : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-200'}`}
           >
             <Paperclip size={18} />
@@ -1196,11 +1206,11 @@ export const ConversationView = ({
           {/* Quick Devis Pro button */}
           <button
             onClick={() => setShowProOfferModal(true)}
-            title="Créer un Devis / Proposition Professionnelle"
+            title={t('pro.requests.createProOffer', 'Créer un Devis / Proposition Professionnelle')}
             className="p-1.5 rounded-xl transition-colors mb-0.5 text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1 font-bold text-xs"
           >
             <span>💼</span>
-            <span className="hidden sm:inline text-[11px]">Devis Pro</span>
+            <span className="hidden sm:inline text-[11px]">{t('pro.requests.quickOffer', 'Devis Pro')}</span>
           </button>
 
           {/* Textarea */}
@@ -1209,15 +1219,15 @@ export const ConversationView = ({
             value={newMessage}
             onChange={e => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Écrivez un message..."
+            placeholder={t('pro.conversations.typeMessage', 'Écrivez un message...')}
             rows={1}
             style={{ resize: 'none', minHeight: 36, maxHeight: 120 }}
             className={`flex-1 bg-transparent outline-none text-sm leading-relaxed py-1
               ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
             onInput={e => {
-              const t = e.target as HTMLTextAreaElement
-              t.style.height = 'auto'
-              t.style.height = Math.min(t.scrollHeight, 120) + 'px'
+              const tEl = e.target as HTMLTextAreaElement
+              tEl.style.height = 'auto'
+              tEl.style.height = Math.min(tEl.scrollHeight, 120) + 'px'
             }}
           />
 
@@ -1236,7 +1246,7 @@ export const ConversationView = ({
 
         {/* Hint */}
         <p className={`text-center text-[10px] mt-1 ${isDark ? 'text-slate-700' : 'text-slate-300'}`}>
-          Entrée pour envoyer · Maj+Entrée pour nouvelle ligne
+          {t('pro.requests.enterToSend', 'Entrée pour envoyer · Maj+Entrée pour nouvelle ligne')}
         </p>
       </div>
 
@@ -1249,14 +1259,14 @@ export const ConversationView = ({
           >
             <div className="flex items-center justify-between mb-3 border-b pb-2 border-white/10">
               <h3 className="font-bold text-sm flex items-center gap-2">
-                💼 Créer une Proposition & Devis Pro
+                💼 {t('pro.requests.createProOffer', 'Créer une Proposition & Devis Pro')}
               </h3>
               <button onClick={() => setShowProOfferModal(false)}><X size={18} /></button>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Intitulé de la prestation / projet</label>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">{t('pro.requests.offerTitleLabel', 'Intitulé de la prestation / projet')}</label>
                 <input
                   value={offerTitle}
                   onChange={e => setOfferTitle(e.target.value)}
@@ -1267,7 +1277,7 @@ export const ConversationView = ({
 
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Montant chiffré</label>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">{t('pro.requests.offerAmountLabel', 'Montant chiffré')}</label>
                   <input
                     value={offerAmount}
                     onChange={e => setOfferAmount(e.target.value)}
@@ -1276,7 +1286,7 @@ export const ConversationView = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Devise</label>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">{t('pro.requests.offerCurrencyLabel', 'Devise')}</label>
                   <select
                     value={offerCurrency}
                     onChange={e => setOfferCurrency(e.target.value)}
@@ -1292,35 +1302,35 @@ export const ConversationView = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Délai estimé</label>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">{t('pro.requests.offerDurationLabel', 'Délai estimé')}</label>
                   <select
                     value={offerDuration}
                     onChange={e => setOfferDuration(e.target.value)}
                     className={`w-full px-2.5 py-2 rounded-xl text-xs sm:text-sm border outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
                   >
-                    <option value="24 heures">24 heures</option>
-                    <option value="3 jours">3 jours</option>
-                    <option value="1 semaine">1 semaine</option>
-                    <option value="15 jours">15 jours</option>
-                    <option value="1 mois">1 mois</option>
+                    <option value="24 heures">24 {t('common.hours', 'heures')}</option>
+                    <option value="3 jours">3 {t('common.days', 'jours')}</option>
+                    <option value="1 semaine">1 {t('common.week', 'semaine')}</option>
+                    <option value="15 jours">15 {t('common.days', 'jours')}</option>
+                    <option value="1 mois">1 {t('common.month', 'mois')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Conditions de paiement</label>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">{t('pro.requests.offerPaymentTermsLabel', 'Conditions de paiement')}</label>
                   <select
                     value={offerPaymentTerms}
                     onChange={e => setOfferPaymentTerms(e.target.value)}
                     className={`w-full px-2.5 py-2 rounded-xl text-xs sm:text-sm border outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'}`}
                   >
                     <option value="100% à la livraison">100% à la livraison</option>
-                    <option value="50% acompte + 50% solde">50% acompte + solde</option>
-                    <option value="30% acompte + 70% solde">30% acompte + solde</option>
+                    <option value="50% acompte + 50% solde">50% acompte + 50% solde</option>
+                    <option value="30% acompte + 70% solde">30% acompte + 70% solde</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Détails et livrables inclus</label>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">{t('pro.requests.offerDetailsLabel', 'Détails et livrables inclus')}</label>
                 <textarea
                   value={offerDesc}
                   onChange={e => setOfferDesc(e.target.value)}
@@ -1331,12 +1341,12 @@ export const ConversationView = ({
               </div>
 
               <div className="flex gap-2 justify-end pt-2">
-                <button onClick={() => setShowProOfferModal(false)} className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700">Annuler</button>
+                <button onClick={() => setShowProOfferModal(false)} className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700">{t('common.cancel', 'Annuler')}</button>
                 <button
                   onClick={handleSendProProposal}
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md hover:scale-105 transition-all"
                 >
-                  Envoyer la proposition
+                  {t('pro.requests.sendProposal', 'Envoyer la proposition')}
                 </button>
               </div>
             </div>
@@ -1349,7 +1359,7 @@ export const ConversationView = ({
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className={`w-full max-w-lg rounded-2xl p-5 shadow-2xl
             ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>Modifier le message</h3>
+            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('pro.requests.editMessage', 'Modifier le message')}</h3>
             <textarea
               autoFocus
               value={editingMessage.content}
@@ -1359,8 +1369,8 @@ export const ConversationView = ({
                 ${isDark ? 'bg-slate-800 text-white border-slate-600 focus:border-violet-500' : 'bg-slate-50 text-slate-900 border-slate-300 focus:border-violet-500'}`}
             />
             <div className="flex gap-2 mt-3 justify-end">
-              <button onClick={() => setEditingMessage(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
-              <button onClick={submitEdit} className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm hover:bg-violet-700">Enregistrer</button>
+              <button onClick={() => setEditingMessage(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>{t('common.cancel', 'Annuler')}</button>
+              <button onClick={submitEdit} className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm hover:bg-violet-700">{t('common.save', 'Enregistrer')}</button>
             </div>
           </div>
         </div>
@@ -1371,16 +1381,16 @@ export const ConversationView = ({
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className={`w-full max-w-md rounded-2xl p-5 shadow-2xl
             ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>Transférer le message</h3>
+            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('pro.requests.forwardMessage', 'Transférer le message')}</h3>
             <div className={`p-3 rounded-xl text-sm mb-4 ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
               {forwardModal.content}
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setForwardModal(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Fermer</button>
+              <button onClick={() => setForwardModal(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>{t('common.close', 'Fermer')}</button>
               <button
-                onClick={() => { copyMessage(forwardModal.content); setForwardModal(null); showToast('Contenu copié — collez dans une autre conversation') }}
+                onClick={() => { copyMessage(forwardModal.content); setForwardModal(null); showToast(t('pro.requests.copiedToClipboard', 'Contenu copié — collez dans une autre conversation')) }}
                 className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm hover:bg-violet-700"
-              >Copier & Transférer</button>
+              >{t('pro.requests.copyAndForward', 'Copier & Transférer')}</button>
             </div>
           </div>
         </div>
@@ -1391,23 +1401,29 @@ export const ConversationView = ({
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className={`w-full max-w-md rounded-2xl p-5 shadow-2xl
             ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>🚩 Signaler le message</h3>
+            <h3 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>🚩 {t('pro.requests.reportMessage', 'Signaler le message')}</h3>
             <select
               value={reportReason}
               onChange={e => setReportReason(e.target.value)}
               className={`w-full rounded-xl p-3 text-sm outline-none border mb-4
                 ${isDark ? 'bg-slate-800 text-white border-slate-600' : 'bg-slate-50 text-slate-900 border-slate-300'}`}
             >
-              {['Contenu inapproprié ou spam', 'Harcèlement ou intimidation', 'Discours haineux', 'Informations fausses', 'Autre raison'].map(r => (
+              {[
+                t('pro.requests.reasonInappropriate', 'Contenu inapproprié ou spam'),
+                t('pro.requests.reasonHarassment', 'Harcèlement ou intimidation'),
+                t('pro.requests.reasonHate', 'Discours haineux'),
+                t('pro.requests.reasonFake', 'Informations fausses'),
+                t('pro.requests.reasonOther', 'Autre raison')
+              ].map(r => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setReportModal(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
+              <button onClick={() => setReportModal(null)} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>{t('common.cancel', 'Annuler')}</button>
               <button
-                onClick={() => { showToast('Signalement envoyé. Merci.'); setReportModal(null) }}
+                onClick={() => { showToast(t('pro.requests.reportSent', 'Signalement envoyé. Merci.')); setReportModal(null) }}
                 className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700"
-              >Signaler</button>
+              >{t('pro.requests.report', 'Signaler')}</button>
             </div>
           </div>
         </div>
@@ -1419,15 +1435,15 @@ export const ConversationView = ({
           <div className={`w-full max-w-sm rounded-2xl p-5 shadow-2xl
             ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
             <h3 className={`font-semibold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {showConfirm.type === 'block' ? '🛡️ Bloquer cet utilisateur ?' : '🗑️ Supprimer la conversation ?'}
+              {showConfirm.type === 'block' ? `🛡️ ${t('pro.requests.blockUserConfirm', 'Bloquer cet utilisateur ?')}` : `🗑️ ${t('pro.requests.deleteConversationConfirm', 'Supprimer la conversation ?')}`}
             </h3>
             <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {showConfirm.type === 'block'
-                ? 'Vous ne pourrez plus vous envoyer de messages.'
-                : 'Cette action est irréversible. Tous les messages seront supprimés.'}
+                ? t('pro.requests.blockUserDesc', 'Vous ne pourrez plus vous envoyer de messages.')
+                : t('pro.requests.deleteConversationDesc', 'Cette action est irréversible. Tous les messages seront supprimés.')}
             </p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowConfirm({ type: null })} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>Annuler</button>
+              <button onClick={() => setShowConfirm({ type: null })} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>{t('common.cancel', 'Annuler')}</button>
               <button
                 onClick={async () => {
                   if (showConfirm.type === 'delete') {
@@ -1435,10 +1451,10 @@ export const ConversationView = ({
                     navigate('/pro/conversations')
                   }
                   setShowConfirm({ type: null })
-                  showToast(showConfirm.type === 'block' ? 'Utilisateur bloqué' : 'Conversation supprimée')
+                  showToast(showConfirm.type === 'block' ? t('pro.requests.userBlockedToast', 'Utilisateur bloqué') : t('pro.requests.chatDeletedToast', 'Conversation supprimée'))
                 }}
                 className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700"
-              >Confirmer</button>
+              >{t('common.confirm', 'Confirmer')}</button>
             </div>
           </div>
         </div>

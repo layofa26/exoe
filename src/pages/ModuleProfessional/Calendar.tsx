@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -37,6 +38,7 @@ const DEFAULT_CALENDAR_EVENTS: CalendarEvent[] = [
 ]
 
 export const Calendar = (): JSX.Element => {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -124,8 +126,11 @@ export const Calendar = (): JSX.Element => {
     }
   }
 
-  const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
-  const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+  const dayNames = Array.from({ length: 7 }, (_, i) => {
+    // 2024-01-07 was a Sunday
+    const d = new Date(2024, 0, 7 + i)
+    return d.toLocaleDateString(i18n.language || 'fr-FR', { weekday: 'short' })
+  })
 
   const days = getDaysInMonth(currentDate)
   const today = new Date()
@@ -151,12 +156,16 @@ export const Calendar = (): JSX.Element => {
           </button>
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
             <div>
-              <h1 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Mon calendrier</h1>
-              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Gérez votre emploi du temps</p>
+              <h1 className={`text-lg sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {t('pro.calendar.title', 'Mon calendrier')}
+              </h1>
+              <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                {t('pro.calendar.manageSchedule', 'Gérez votre emploi du temps')}
+              </p>
             </div>
             <button className="inline-flex items-center gap-2 bg-primary text-white px-3 sm:px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors text-xs sm:text-sm">
               <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Nouveau</span>
+              <span className="hidden sm:inline">{t('common.new', 'Nouveau')}</span>
               <span className="sm:hidden">+</span>
             </button>
           </div>
@@ -169,8 +178,8 @@ export const Calendar = (): JSX.Element => {
               {/* Calendar Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <h2 className={`text-base sm:text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                  <h2 className={`text-base sm:text-lg md:text-xl font-bold capitalize ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {currentDate.toLocaleDateString(i18n.language || 'fr-FR', { month: 'long', year: 'numeric' })}
                   </h2>
                   <div className="flex gap-1">
                     <button
@@ -188,17 +197,17 @@ export const Calendar = (): JSX.Element => {
                   </div>
                 </div>
                 <div className={`flex gap-1 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-100'} rounded-lg p-1`}>
-                  {['month', 'week', 'day'].map((mode) => (
+                  {(['month', 'week', 'day'] as const).map((mode) => (
                     <button
                       key={mode}
-                      onClick={() => setViewMode(mode as any)}
-                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-sm font-medium capitalize transition-colors ${
+                      onClick={() => setViewMode(mode)}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-sm font-medium transition-colors ${
                         viewMode === mode
                           ? 'bg-white dark:bg-zinc-600 text-gray-900 dark:text-white shadow-sm'
                           : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                       }`}
                     >
-                      {mode === 'month' ? 'Mois' : mode === 'week' ? 'Semaine' : 'Jour'}
+                      {mode === 'month' ? t('pro.calendar.month', 'Mois') : mode === 'week' ? t('pro.calendar.week', 'Semaine') : t('pro.calendar.day', 'Jour')}
                     </button>
                   ))}
                 </div>
@@ -270,8 +279,8 @@ export const Calendar = (): JSX.Element => {
             <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
               <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>
                 {selectedDate
-                  ? selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-                  : 'Sélectionnez une date'
+                  ? selectedDate.toLocaleDateString(i18n.language || 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+                  : t('pro.calendar.selectDate', 'Sélectionnez une date')
                 }
               </h2>
 
@@ -288,7 +297,7 @@ export const Calendar = (): JSX.Element => {
                           <div className="flex-1">
                             <p className="font-medium text-xs sm:text-sm">{event.title}</p>
                             <p className="text-[10px] sm:text-xs opacity-80">{event.time} {event.duration && `(${event.duration})`}</p>
-                            {event.with && <p className="text-[10px] sm:text-xs opacity-80">avec {event.with}</p>}
+                            {event.with && <p className="text-[10px] sm:text-xs opacity-80">{t('pro.calendar.with', 'avec')} {event.with}</p>}
                             {event.description && <p className="text-[10px] sm:text-xs opacity-70 mt-0.5 sm:mt-1">{event.description}</p>}
                           </div>
                           <button className={`${resolvedTheme === 'dark' ? 'text-zinc-500 hover:text-zinc-400' : 'text-gray-400 hover:text-gray-600'}`}>
@@ -298,22 +307,28 @@ export const Calendar = (): JSX.Element => {
                       </div>
                     ))
                   ) : (
-                    <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-3 sm:py-4 text-xs sm:text-sm`}>Aucun événement ce jour</p>
+                    <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-3 sm:py-4 text-xs sm:text-sm`}>
+                      {t('pro.calendar.noEventsDay', 'Aucun événement ce jour')}
+                    </p>
                   )}
                 </div>
               ) : (
-                <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-3 sm:py-4 text-xs sm:text-sm`}>Cliquez sur une date pour voir les événements</p>
+                <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-center py-3 sm:py-4 text-xs sm:text-sm`}>
+                  {t('pro.calendar.clickDatePrompt', 'Cliquez sur une date pour voir les événements')}
+                </p>
               )}
 
               <button className={`w-full mt-3 sm:mt-4 py-2 border ${resolvedTheme === 'dark' ? 'border-zinc-600 text-zinc-300 hover:bg-zinc-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2`}>
                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                Ajouter un événement
+                {t('pro.calendar.addEvent', 'Ajouter un événement')}
               </button>
             </div>
 
             {/* Upcoming Events */}
             <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
-              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>Prochains événements</h2>
+              <h2 className={`text-base sm:text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>
+                {t('pro.calendar.upcomingEvents', 'Prochains événements')}
+              </h2>
               <div className="space-y-2 sm:space-y-3">
                 {events.slice(0, 4).map((event) => (
                   <div key={event.id} className={`flex items-start gap-2 sm:gap-3 p-2 ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-50'} rounded-lg transition-colors`}>
@@ -322,7 +337,9 @@ export const Calendar = (): JSX.Element => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`font-medium text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>{event.title}</p>
-                      <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{new Date(event.date).toLocaleDateString('fr-FR')} à {event.time}</p>
+                      <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {new Date(event.date).toLocaleDateString(i18n.language || 'fr-FR')} {t('common.at', 'à')} {event.time}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -331,13 +348,15 @@ export const Calendar = (): JSX.Element => {
 
             {/* Legend */}
             <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm p-4 sm:p-6 border`}>
-              <h2 className={`text-xs sm:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2 sm:mb-3`}>Légende</h2>
+              <h2 className={`text-xs sm:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2 sm:mb-3`}>
+                {t('pro.calendar.legend', 'Légende')}
+              </h2>
               <div className="space-y-1.5 sm:space-y-2">
                 {[
-                  { type: 'meeting', label: 'Rendez-vous', color: 'bg-blue-500' },
-                  { type: 'video', label: 'Tournage', color: 'bg-purple-500' },
-                  { type: 'reminder', label: 'Rappel', color: 'bg-amber-500' },
-                  { type: 'event', label: 'Événement', color: 'bg-green-500' }
+                  { type: 'meeting', label: t('pro.calendar.meeting', 'Rendez-vous'), color: 'bg-blue-500' },
+                  { type: 'video', label: t('pro.calendar.shooting', 'Tournage'), color: 'bg-purple-500' },
+                  { type: 'reminder', label: t('pro.calendar.reminder', 'Rappel'), color: 'bg-amber-500' },
+                  { type: 'event', label: t('pro.calendar.event', 'Événement'), color: 'bg-green-500' }
                 ].map((item) => (
                   <div key={item.type} className="flex items-center gap-2">
                     <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${item.color}`} />

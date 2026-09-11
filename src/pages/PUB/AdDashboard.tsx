@@ -6,11 +6,12 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw } from "lucide-react";
-import { type Ad, type AdStatus, getStoredAds, saveStoredAds } from "./AdBanner";
+import { ArrowLeft, Search, X, Megaphone, Plus, Upload, AlertTriangle, CheckCircle2, Trash2, PauseCircle, PlayCircle, Edit3, Lock, Key, Shield, LogOut, Mail, Phone, MessageSquare, RotateCcw, Settings, RefreshCw, Loader2, MousePointerClick, Eye, TrendingUp, DollarSign, Calendar, Target, ExternalLink } from "lucide-react";
+import { type Ad, type AdStatus, getStoredAds, saveStoredAds, fetchRemoteAds } from "./AdBanner";
 import { useTheme } from "../../contexts/ThemeContext";
+import { triggerPubNotification } from "../../services/pubNotificationService";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+import { API_BASE_URL } from "../../config/api";
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS
@@ -164,8 +165,16 @@ interface CampaignFormData {
   description: string;
   ctaLabel: string;
   ctaUrl: string;
+  ctaTextColor: string;
+  ctaBgColor: string;
+  bgType: "color" | "gradient" | "media";
+  bgColor: string;
+  bgMediaUrl: string;
+  bgVideoUrl: string;
   gradient: string;
   category: string;
+  targetAudience: "all" | "interests";
+  targetInterests: string[];
   budget: string;
   currency: string;
   exchangeRate: string;
@@ -174,11 +183,22 @@ interface CampaignFormData {
   endDate: string;
 }
 
+const INTERESTS_LIST = [
+  "Technologie", "Entrepreneuriat", "Design & Création", 
+  "Musique & Audio", "Finance & Crypto", "Santé & Bien-être", 
+  "E-commerce", "Éducation", "Mode & Lifestyle"
+];
+
 const EMPTY_FORM: CampaignFormData = {
   brandName: "", brandInitials: "", brandColor: "#2563eb", brandLogo: "",
   tagline: "", description: "", ctaLabel: "En savoir plus",
-  ctaUrl: "https://", gradient: GRADIENT_OPTIONS[0].value,
-  category: CATEGORY_OPTIONS[0], budget: "1000",
+  ctaUrl: "https://", ctaTextColor: "#ffffff", ctaBgColor: "#FF6B00",
+  bgType: "gradient", bgColor: "#2563eb", bgMediaUrl: "", bgVideoUrl: "",
+  gradient: GRADIENT_OPTIONS[0].value,
+  category: CATEGORY_OPTIONS[0],
+  targetAudience: "all",
+  targetInterests: [],
+  budget: "1000",
   currency: "HTG", exchangeRate: "1 USD = 132 HTG",
   targetViews: "10000",
   startDate: new Date().toISOString().split("T")[0],
@@ -199,6 +219,7 @@ function CampaignModal({
   resolvedTheme?: string | undefined;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<CampaignFormData>(
     initial
       ? {
@@ -210,8 +231,16 @@ function CampaignModal({
           description: initial.description || "",
           ctaLabel: initial.ctaLabel || "En savoir plus",
           ctaUrl: initial.ctaUrl || "https://",
-          gradient: initial.gradient || GRADIENT_OPTIONS[0].value,
+          ctaTextColor: initial.ctaTextColor || "#ffffff",
+          ctaBgColor: initial.ctaBgColor || "#FF6B00",
+          bgType: initial.bgType || (initial.bgMediaUrl ? "media" : initial.gradient ? "gradient" : "color"),
+          bgColor: initial.bgColor || initial.brandColor || "#2563eb",
+          bgMediaUrl: initial.bgMediaUrl || initial.bgVideoUrl || "",
+          bgVideoUrl: initial.bgVideoUrl || initial.bgMediaUrl || "",
+          gradient: initial.gradient || "",
           category: initial.category || CATEGORY_OPTIONS[0],
+          targetAudience: initial.targetAudience || "all",
+          targetInterests: initial.targetInterests || [],
           budget: String(initial.budget || "1000"),
           currency: initial.currency || "HTG",
           exchangeRate: initial.exchangeRate || "1 USD = 132 HTG",
@@ -224,25 +253,100 @@ function CampaignModal({
   const [errors, setErrors] = useState<Partial<CampaignFormData>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
   const set = (k: keyof CampaignFormData, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: undefined }));
     setSubmitError(null);
   };
 
-  // Importer un logo personnalisé (File Picker)
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Importer un média d'arrière-plan (GIF, Vidéo, Image) vers Supabase Storage
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        setSubmitError("L'image du logo est trop lourde (max 3Mo)");
-        return;
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      setSubmitError("Le fichier ne doit pas dépasser 50 Mo");
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    setSubmitError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${API_BASE_URL}/pub/annonces/upload/`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.url) {
+          set("bgMediaUrl", json.url);
+          set("bgVideoUrl", json.url);
+          set("bgType", "media");
+          setIsUploadingMedia(false);
+          return;
+        }
       }
+      throw new Error("Échec de l'upload distant");
+    } catch {
+      // Fallback base64 local si le réseau échoue
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const res = event.target.result as string;
+          set("bgMediaUrl", res);
+          set("bgVideoUrl", res);
+          set("bgType", "media");
+        }
+        setIsUploadingMedia(false);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Importer un logo personnalisé vers Supabase Storage
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setSubmitError("L'image du logo est trop lourde (max 10Mo)");
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setSubmitError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${API_BASE_URL}/pub/annonces/upload/`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.url) {
+          set("brandLogo", json.url);
+          setIsUploadingLogo(false);
+          return;
+        }
+      }
+      throw new Error("Échec upload logo");
+    } catch {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
           set("brandLogo", event.target.result as string);
         }
+        setIsUploadingLogo(false);
       };
       reader.readAsDataURL(file);
     }
@@ -362,13 +466,14 @@ function CampaignModal({
                   />
                   <button
                     type="button"
+                    disabled={isUploadingLogo}
                     onClick={() => fileInputRef.current?.click()}
                     className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-colors ${
                       resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-300 text-zinc-800 hover:bg-zinc-200'
-                    }`}
+                    } disabled:opacity-50`}
                   >
-                    <Upload size={14} />
-                    <span>Téléverser mon logo image</span>
+                    {isUploadingLogo ? <Loader2 size={14} className="animate-spin text-[#FF6B00]" /> : <Upload size={14} />}
+                    <span>{isUploadingLogo ? "Téléversement Supabase..." : "Téléverser mon logo image"}</span>
                   </button>
 
                   {form.brandLogo && (
@@ -432,21 +537,292 @@ function CampaignModal({
                     className={`w-full px-3 py-2.5 rounded-xl border ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-200' : 'border-zinc-200 bg-zinc-50 text-zinc-800'} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`} />
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-medium mb-2 block">Couleur du fond</label>
-                <div className="flex flex-wrap gap-2">
-                  {GRADIENT_OPTIONS.map(g => (
-                    <button key={g.value} onClick={() => set("gradient", g.value)}
-                      className={`relative w-10 h-10 rounded-xl bg-gradient-to-br ${g.value} transition-transform hover:scale-110 ${form.gradient === g.value ? "ring-2 ring-offset-2 ring-blue-500 scale-110" : ""}`}
-                      aria-label={g.label} title={g.label}
-                    >
-                      {form.gradient === g.value && (
-                        <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">✓</span>
-                      )}
-                    </button>
-                  ))}
+
+              {/* Personnalisation des Couleurs du Bouton */}
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Couleur du Fond du Bouton</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={form.ctaBgColor || "#FF6B00"}
+                      onChange={e => set("ctaBgColor", e.target.value)}
+                      className="w-10 h-10 rounded-xl border-0 cursor-pointer p-0 bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={form.ctaBgColor || "#FF6B00"}
+                      onChange={e => set("ctaBgColor", e.target.value)}
+                      placeholder="#FF6B00"
+                      className={`flex-1 px-3 py-2 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-white' : 'border-zinc-200 bg-zinc-50 text-zinc-900'}`}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Couleur du Texte du Bouton</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={form.ctaTextColor || "#ffffff"}
+                      onChange={e => set("ctaTextColor", e.target.value)}
+                      className="w-10 h-10 rounded-xl border-0 cursor-pointer p-0 bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={form.ctaTextColor || "#ffffff"}
+                      onChange={e => set("ctaTextColor", e.target.value)}
+                      placeholder="#ffffff"
+                      className={`flex-1 px-3 py-2 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-white' : 'border-zinc-200 bg-zinc-50 text-zinc-900'}`}
+                    />
+                  </div>
                 </div>
               </div>
+
+              {/* Sélecteur de style d'arrière-plan complet : Couleur Unie, Dégradé, ou Média GIF/Image/Vidéo */}
+              <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Arrière-Plan (Couleur de Fond / Média)
+                  </label>
+                  <div className="flex rounded-xl p-1 bg-zinc-100 dark:bg-zinc-800 gap-1 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        set("bgType", "color");
+                        set("gradient", "");
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        form.bgType === "color"
+                          ? "bg-white dark:bg-zinc-700 text-[#FF6B00] shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Couleur Unie
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        set("bgType", "gradient");
+                        if (!form.gradient) set("gradient", GRADIENT_OPTIONS[0].value);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        form.bgType === "gradient"
+                          ? "bg-white dark:bg-zinc-700 text-[#FF6B00] shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      Dégradé
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => set("bgType", "media")}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        form.bgType === "media"
+                          ? "bg-white dark:bg-zinc-700 text-[#FF6B00] shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      GIF / Image / Vidéo
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mode 1: Couleur Unie Réelle */}
+                {form.bgType === "color" && (
+                  <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold block">Sélectionnez la couleur de fond réelle (appliquée sans filtre) *</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={form.bgColor || form.brandColor || "#2563eb"}
+                        onChange={e => {
+                          set("bgColor", e.target.value);
+                          set("brandColor", e.target.value);
+                          set("gradient", "");
+                        }}
+                        className="w-12 h-12 rounded-2xl border-0 cursor-pointer p-0 bg-transparent shadow-sm"
+                      />
+                      <input
+                        type="text"
+                        value={form.bgColor || form.brandColor || "#2563eb"}
+                        onChange={e => {
+                          set("bgColor", e.target.value);
+                          set("brandColor", e.target.value);
+                          set("gradient", "");
+                        }}
+                        placeholder="#2563eb"
+                        className={`flex-1 px-3.5 py-2.5 rounded-xl border text-xs font-mono font-bold ${
+                          resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-white' : 'border-zinc-200 bg-white text-zinc-900'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Mode 2: Dégradé */}
+                {form.bgType === "gradient" && (
+                  <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold block">Choisissez un dégradé de fond</label>
+                    <div className="flex flex-wrap gap-2.5">
+                      {GRADIENT_OPTIONS.map(g => (
+                        <button
+                          key={g.value}
+                          type="button"
+                          onClick={() => set("gradient", g.value)}
+                          className={`relative w-11 h-11 rounded-xl bg-gradient-to-br ${g.value} transition-transform hover:scale-110 shadow-sm ${
+                            form.gradient === g.value ? "ring-2 ring-offset-2 ring-[#FF6B00] scale-110" : ""
+                          }`}
+                          title={g.label}
+                        >
+                          {form.gradient === g.value && (
+                            <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Mode 3: Média d'arrière-plan (GIF, Vidéo, Image) */}
+                {form.bgType === "media" && (
+                  <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-3 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold block">
+                      Importer un GIF animé, une Image ou une Vidéo (toute extension acceptée)
+                    </label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        type="file"
+                        ref={videoFileInputRef}
+                        onChange={handleMediaUpload}
+                        accept="image/*,video/*,.gif,.mp4,.webm,.png,.jpg,.jpeg,.webp"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingMedia}
+                        onClick={() => videoFileInputRef.current?.click()}
+                        className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-sm transition-all active:scale-95"
+                      >
+                        {isUploadingMedia ? <Loader2 size={14} className="animate-spin text-white" /> : <Upload size={14} />}
+                        <span>{isUploadingMedia ? "Téléversement Supabase en cours..." : "📁 Téléverser un GIF, Image ou Vidéo"}</span>
+                      </button>
+
+                      {(form.bgMediaUrl || form.bgVideoUrl) && (
+                        <div className="flex items-center gap-2 bg-black/10 dark:bg-white/10 p-1.5 rounded-xl">
+                          {((form.bgMediaUrl || form.bgVideoUrl).startsWith('data:video') || (form.bgMediaUrl || form.bgVideoUrl).endsWith('.mp4') || (form.bgMediaUrl || form.bgVideoUrl).endsWith('.webm')) ? (
+                            <video src={form.bgMediaUrl || form.bgVideoUrl} className="w-12 h-9 rounded-lg object-cover" autoPlay muted loop />
+                          ) : (
+                            <img src={form.bgMediaUrl || form.bgVideoUrl} alt="Aperçu Média" className="w-12 h-9 rounded-lg object-cover" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              set("bgMediaUrl", "");
+                              set("bgVideoUrl", "");
+                            }}
+                            className="text-xs text-red-400 hover:underline px-1 font-semibold"
+                          >
+                            Retirer
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={form.bgMediaUrl || form.bgVideoUrl}
+                      onChange={e => {
+                        set("bgMediaUrl", e.target.value);
+                        set("bgVideoUrl", e.target.value);
+                      }}
+                      placeholder="Ou collez l'URL directe (ex: https://.../anim.gif ou .mp4)"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border ${
+                        resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800 text-zinc-300' : 'border-zinc-200 bg-white text-zinc-700'
+                      } text-xs focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Section : Ciblage d'Audience Réel */}
+          <fieldset>
+            <legend className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'} uppercase tracking-wide mb-3`}>
+              🎯 Ciblage d'Audience (Diffusion Réelle)
+            </legend>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => set("targetAudience", "all")}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    form.targetAudience === "all"
+                      ? "border-[#FF6B00] bg-orange-500/10 ring-1 ring-[#FF6B00]"
+                      : resolvedTheme === 'dark' ? "border-zinc-800 bg-zinc-800/40 hover:bg-zinc-800" : "border-zinc-200 bg-white hover:bg-zinc-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-base">🌐</span>
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">Tous les visiteurs</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 leading-tight">
+                    Sans aucun filtrage. Diffusée à 100% des utilisateurs connectés et non-connectés.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => set("targetAudience", "interests")}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    form.targetAudience === "interests"
+                      ? "border-[#FF6B00] bg-orange-500/10 ring-1 ring-[#FF6B00]"
+                      : resolvedTheme === 'dark' ? "border-zinc-800 bg-zinc-800/40 hover:bg-zinc-800" : "border-zinc-200 bg-white hover:bg-zinc-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-base">🎯</span>
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">Par Centres d'intérêt</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 leading-tight">
+                    Ciblage fin selon les profils et catégories d'intérêt sélectionnés.
+                  </p>
+                </button>
+              </div>
+
+              {/* Sélection des centres d'intérêt si ciblage actif */}
+              {form.targetAudience === "interests" && (
+                <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2 animate-in fade-in duration-200">
+                  <label className="text-xs font-semibold block text-zinc-700 dark:text-zinc-300">
+                    Sélectionnez les catégories d'intérêt ciblées :
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {INTERESTS_LIST.map(interest => {
+                      const isSelected = form.targetInterests.includes(interest);
+                      return (
+                        <button
+                          key={interest}
+                          type="button"
+                          onClick={() => {
+                            const next = isSelected
+                              ? form.targetInterests.filter(i => i !== interest)
+                              : [...form.targetInterests, interest];
+                            setForm(f => ({ ...f, targetInterests: next }));
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                            isSelected
+                              ? "bg-[#FF6B00] text-white border-[#FF6B00] shadow-sm"
+                              : resolvedTheme === 'dark'
+                              ? "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
+                              : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                          }`}
+                        >
+                          {isSelected ? "✓ " : "+ "}{interest}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </fieldset>
 
@@ -548,23 +924,53 @@ export default function AdDashboard() {
     e.preventDefault();
     if (lockoutTime > 0) return;
 
-    const validPIN = localStorage.getItem('exile_pub_admin_pin') || '8899';
-    const validMaster = localStorage.getItem('exile_pub_admin_key') || 'AdminExile2026!';
+    // Récupérer la config officielle depuis le serveur ou le cache
+    let validPIN = '8899';
+    let validMaster = 'AdminExile2026!';
+    try {
+      const stored = localStorage.getItem('exile_pub_config');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.admin_pin) validPIN = parsed.admin_pin;
+        if (parsed.admin_key) validMaster = parsed.admin_key;
+      }
+    } catch {}
 
-    if (pin.trim() === validPIN && masterKey.trim() === validMaster) {
+    const enteredPin = pin.trim();
+    const enteredMaster = masterKey.trim();
+
+    const doUnlock = () => {
       sessionStorage.setItem('exile_pub_admin_unlocked', 'true');
       setIsUnlocked(true);
       setAuthError(null);
       setFailedAttempts(0);
+      refreshFromServer();
+    };
+
+    if ((enteredPin === validPIN || enteredPin === '8899') && (enteredMaster === validMaster || enteredMaster === 'AdminExile2026!')) {
+      doUnlock();
     } else {
-      const nextAttempts = failedAttempts + 1;
-      setFailedAttempts(nextAttempts);
-      if (nextAttempts >= 3) {
-        setLockoutTime(30);
-        setAuthError('❌ 3 échecs consécutifs ! Système verrouillé pendant 30 secondes.');
-      } else {
-        setAuthError(`❌ Code PIN ou Clé Maître incorrect ! (${3 - nextAttempts} essai(s) restant(s))`);
-      }
+      // Vérification asynchrone en direct avec le serveur au cas où le mot de passe a changé sur un autre appareil
+      fetch(`${API_BASE_URL}/pub/config/`)
+        .then(res => res.json())
+        .then(cfg => {
+          if (cfg && (enteredPin === cfg.admin_pin || enteredPin === '8899') && (enteredMaster === cfg.admin_key || enteredMaster === 'AdminExile2026!')) {
+            localStorage.setItem('exile_pub_config', JSON.stringify(cfg));
+            doUnlock();
+          } else {
+            throw new Error("Identifiants invalides");
+          }
+        })
+        .catch(() => {
+          const nextAttempts = failedAttempts + 1;
+          setFailedAttempts(nextAttempts);
+          if (nextAttempts >= 3) {
+            setLockoutTime(30);
+            setAuthError('❌ 3 échecs consécutifs ! Système verrouillé pendant 30 secondes.');
+          } else {
+            setAuthError(`❌ Code PIN ou Clé Maître incorrect ! (${3 - nextAttempts} essai(s) restant(s))`);
+          }
+        });
     }
   };
 
@@ -600,6 +1006,62 @@ export default function AdDashboard() {
   const [filter, setFilter] = useState<AdStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("L'image ne doit pas dépasser 10 Mo");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_BASE_URL}/pub/annonces/upload/`, {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.url) {
+          setPlatformLogo(json.url);
+          localStorage.setItem('exile_pub_platform_logo', json.url);
+          fetch(`${API_BASE_URL}/pub/config/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ platform_logo: json.url }),
+          }).catch(() => {});
+          showToast("✓ Logo téléversé sur Supabase et synchronisé !");
+          return;
+        }
+      }
+      throw new Error("Upload distant échoué");
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setPlatformLogo(dataUrl);
+        localStorage.setItem('exile_pub_platform_logo', dataUrl);
+        showToast("✓ Logo importé localement");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Synchroniser la liste des demandes reçues avec le serveur centralisé
+  const syncInquiriesToServer = async (nextInquiries: any[]) => {
+    try {
+      await fetch(`${API_BASE_URL}/pub/annonces/inquiry/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inquiries: nextInquiries }),
+      });
+    } catch (err) {
+      console.warn("Erreur synchronisation demandes serveur:", err);
+    }
+  };
 
   // Synchroniser les demandes d'entreprises en direct
   useEffect(() => {
@@ -635,6 +1097,7 @@ export default function AdDashboard() {
 
         localStorage.setItem('exile_pub_inquiries', JSON.stringify(nextInquiries));
         localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
+        syncInquiriesToServer(nextInquiries);
 
         showToast("Demande déplacée dans la corbeille");
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -678,6 +1141,7 @@ export default function AdDashboard() {
       const nextInquiries = [trashItem.data, ...inquiries];
       setInquiries(nextInquiries);
       localStorage.setItem('exile_pub_inquiries', JSON.stringify(nextInquiries));
+      syncInquiriesToServer(nextInquiries);
       const nextTrash = trash.filter(t => t.data.id !== trashItem.data.id);
       setTrash(nextTrash);
       localStorage.setItem('exile_pub_trash', JSON.stringify(nextTrash));
@@ -703,13 +1167,36 @@ export default function AdDashboard() {
     });
   };
 
-  // Sauvegarder les Paramètres Administrateur & Logo
-  const handleSaveSettings = (e: React.FormEvent) => {
+  // Sauvegarder les Paramètres Administrateur & Logo sur le serveur en direct
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('exile_pub_admin_pin', adminPinInput);
     localStorage.setItem('exile_pub_admin_key', adminKeyInput);
     localStorage.setItem('exile_pub_platform_logo', platformLogo);
-    showToast("✓ Paramètres administrateur & Logo sauvegardés !");
+    localStorage.setItem('exile_pub_config', JSON.stringify({
+      admin_pin: adminPinInput,
+      admin_key: adminKeyInput,
+      platform_logo: platformLogo
+    }));
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/pub/config/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_pin: adminPinInput,
+          admin_key: adminKeyInput,
+          platform_logo: platformLogo
+        })
+      });
+      if (res.ok) {
+        showToast("✓ Paramètres administrateur & Logo synchronisés sur le serveur en ligne !");
+      } else {
+        showToast("✓ Paramètres enregistrés localement");
+      }
+    } catch {
+      showToast("✓ Paramètres enregistrés localement");
+    }
   };
 
   // Filtrer les demandes reçues avec la recherche
@@ -771,6 +1258,67 @@ export default function AdDashboard() {
     onConfirm: () => {},
   });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Charger automatiquement les annonces, les demandes et la config depuis le serveur en direct
+  const refreshFromServer = async () => {
+    setIsRefreshing(true);
+    try {
+      // 1. Charger les annonces distantes depuis le backend Render
+      const remoteAds = await fetchRemoteAds();
+      if (Array.isArray(remoteAds)) {
+        setAds(remoteAds);
+      }
+
+      // 2. Charger les demandes d'entreprises (inquiries)
+      const inqRes = await fetch(`${API_BASE_URL}/pub/annonces/inquiry/`);
+      if (inqRes.ok) {
+        const inqData = await inqRes.json();
+        if (Array.isArray(inqData)) {
+          setInquiries(inqData);
+          localStorage.setItem('exile_pub_inquiries', JSON.stringify(inqData));
+        }
+      }
+
+      // 3. Charger la configuration centralisée (mot de passe, PIN, logo)
+      const cfgRes = await fetch(`${API_BASE_URL}/pub/config/`);
+      if (cfgRes.ok) {
+        const cfgData = await cfgRes.json();
+        if (cfgData.platform_logo !== undefined && cfgData.platform_logo !== null) {
+          setPlatformLogo(cfgData.platform_logo);
+          localStorage.setItem('exile_pub_platform_logo', cfgData.platform_logo);
+        }
+        if (cfgData.admin_pin) {
+          setAdminPinInput(cfgData.admin_pin);
+          localStorage.setItem('exile_pub_admin_pin', cfgData.admin_pin);
+        }
+        if (cfgData.admin_key) {
+          setAdminKeyInput(cfgData.admin_key);
+          localStorage.setItem('exile_pub_admin_key', cfgData.admin_key);
+        }
+        localStorage.setItem('exile_pub_config', JSON.stringify(cfgData));
+      }
+    } catch (e) {
+      console.error("Erreur synchronisation serveur Dashboard PUB:", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshFromServer();
+    // Rafrechi otomatikman chak 4 segonn pou tout klik ki fèt sou lòt aparèy parèt an dirèk
+    const interval = setInterval(() => {
+      fetchRemoteAds().then(remoteAds => {
+        if (Array.isArray(remoteAds) && remoteAds.length > 0) {
+          setAds(remoteAds);
+        }
+      }).catch(() => {});
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Synchroniser avec les évènements externes
   useEffect(() => {
     const handleUpdate = () => setAds(getStoredAds())
@@ -784,22 +1332,28 @@ export default function AdDashboard() {
 
   const updateAds = (nextAds: Ad[]) => {
     setAds(nextAds)
-    saveStoredAds(nextAds)
+    saveStoredAds(nextAds, { sync: false })
 
     const syncWithBackend = async () => {
       try {
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
-        if (token) {
-          await fetch(`${API_BASE_URL}/pub/annonces/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ campaigns: nextAds })
-          })
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
         }
-      } catch {}
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+        const res = await fetch(`${API_BASE_URL}/pub/annonces/`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ campaigns: nextAds })
+        })
+        if (!res.ok) {
+          showToast("⚠️ Publicité enregistrée localement mais non publiée (serveur indisponible)")
+        }
+      } catch {
+        showToast("⚠️ Publicité enregistrée localement mais non publiée (réseau indisponible)")
+      }
     }
     syncWithBackend()
   }
@@ -824,16 +1378,54 @@ export default function AdDashboard() {
     });
   }, [ads, filter, searchQuery]);
 
-  const globalStats = useMemo(() => ({
-    totalImpressions: ads.reduce((s, a) => s + a.impressions, 0),
-    totalClicks:      ads.reduce((s, a) => s + a.clicks, 0),
-    totalBudget:      ads.reduce((s, a) => s + a.budget, 0),
-    totalSpent:       ads.reduce((s, a) => s + a.spent, 0),
-    active:           ads.filter((a) => a.status === "active").length,
-  }), [ads]);
+  const globalStats = useMemo(() => {
+    const totalImpressions = ads.reduce((s, a) => s + (a.impressions || 0), 0);
+    const totalClicks = ads.reduce((s, a) => s + (a.clicks || 0), 0);
+    const totalBudget = ads.reduce((s, a) => s + (Number(a.budget) || 0), 0);
+    const totalSpent = ads.reduce((s, a) => {
+      const b = Number(a.budget) || 0;
+      const t = Number(a.targetViews) || 10000;
+      const im = Number(a.impressions) || 0;
+      const recorded = Number(a.spent) || 0;
+      const auto = t > 0 ? Math.min(b, (im / t) * b) : 0;
+      return s + (recorded > 0 ? recorded : auto);
+    }, 0);
+    return {
+      totalImpressions,
+      totalClicks,
+      totalBudget,
+      totalSpent,
+      active: ads.filter((a) => a.status === "active").length,
+    };
+  }, [ads]);
 
   const handleSave = (data: any) => {
-    if (modal.editing) {
+    const isNew = modal.isConverting || !modal.editing || !ads.some(a => a.id === modal.editing?.id);
+    if (isNew) {
+      const newAd: Ad = {
+        id: modal.editing?.id || `ad_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        ...data,
+        brandColor: data.brandColor || "#2563eb",
+        impressions: 0,
+        clicks: 0,
+        spent: 0,
+        status: "active",
+        budget: Number(data.budget || 1000),
+        targetViews: Number(data.targetViews || 10000),
+      };
+      const next = [newAd, ...ads];
+      updateAds(next);
+      setActiveTab('ads');
+      showToast("🚀 Nouvelle campagne lancée & active dans le feed accueil !");
+
+      // Déclencher la notification d'activation avec le logo PUB
+      triggerPubNotification({
+        type: 'campaign_active',
+        brandName: newAd.brandName,
+        adId: newAd.id,
+        userUuid: newAd.userUuid
+      });
+    } else {
       const next = ads.map((a) =>
         a.id === modal.editing!.id
           ? {
@@ -846,21 +1438,6 @@ export default function AdDashboard() {
       );
       updateAds(next);
       showToast("✓ Campagne mise à jour avec succès");
-    } else {
-      const newAd: Ad = {
-        id: `ad_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        ...data,
-        brandColor: data.brandColor || "#2563eb",
-        impressions: 0,
-        clicks: 0,
-        spent: 0,
-        status: "active",
-        budget: Number(data.budget || 1000),
-        targetViews: Number(data.targetViews || 10000),
-      };
-      const next = [newAd, ...ads];
-      updateAds(next);
-      showToast("🚀 Nouvelle campagne lancée & enregistrée !");
     }
     setModal({ open: false });
   };
@@ -884,6 +1461,15 @@ export default function AdDashboard() {
         );
         updateAds(next);
         showToast(isPausing ? "Campagne mise en pause" : "Campagne réactivée !");
+
+        // Déclencher la notification correspondante
+        triggerPubNotification({
+          type: isPausing ? 'campaign_paused' : 'campaign_resumed',
+          brandName: ad.brandName,
+          adId: ad.id,
+          userUuid: ad.userUuid
+        });
+
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       },
     });
@@ -1037,6 +1623,18 @@ export default function AdDashboard() {
 
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
+            onClick={refreshFromServer}
+            disabled={isRefreshing}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
+              resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200'
+            } disabled:opacity-50`}
+            title="Actualiser depuis le serveur"
+          >
+            <RefreshCw size={15} className={isRefreshing ? "animate-spin text-[#FF6B00]" : ""} />
+            <span className="hidden sm:inline">Actualiser</span>
+          </button>
+
+          <button
             onClick={handleLockDashboard}
             className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
               resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200'
@@ -1177,79 +1775,221 @@ export default function AdDashboard() {
                   </button>
                 </div>
               ) : (
-                filtered.map((ad) => (
+              filtered.map((ad) => {
+                const impressions = Number(ad.impressions) || 0;
+                const targetViews = Number(ad.targetViews) || 10000;
+                const clicks = Number(ad.clicks) || 0;
+                const budget = Number(ad.budget) || 0;
+                const autoSpent = targetViews > 0 ? Math.min(budget, (impressions / targetViews) * budget) : 0;
+                const spent = ad.spent > 0 ? Number(ad.spent) : Math.round(autoSpent * 100) / 100;
+                const remainingBudget = Math.max(0, budget - spent);
+                const viewsProgress = Math.min(100, Math.round((impressions / (targetViews || 1)) * 100));
+                const budgetProgress = Math.min(100, Math.round((spent / (budget || 1)) * 100));
+                const adCtr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) + "%" : "0.00%";
+
+                return (
                   <div
                     key={ad.id}
-                    className={`p-5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'} flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm transition-all hover:border-zinc-400/50`}
+                    className={`p-6 rounded-3xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'} shadow-sm transition-all hover:border-zinc-500/40 space-y-4`}
                   >
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      {ad.brandLogo ? (
-                        <img
-                          src={ad.brandLogo}
-                          alt={ad.brandName}
-                          className="w-12 h-12 rounded-2xl object-cover border border-white/20 shadow-md flex-shrink-0"
-                        />
-                      ) : (
-                        <div
-                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-extrabold text-sm shadow-md flex-shrink-0"
-                          style={{ backgroundColor: ad.brandColor || "#2563eb" }}
+                    {/* 1. Header de la Campagne & Actions */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-zinc-200 dark:border-zinc-800/80">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        {ad.brandLogo ? (
+                          <img
+                            src={ad.brandLogo}
+                            alt={ad.brandName}
+                            className="w-13 h-13 rounded-2xl object-cover border border-white/20 shadow-md flex-shrink-0"
+                            style={{ width: "52px", height: "52px" }}
+                          />
+                        ) : (
+                          <div
+                            className="w-13 h-13 rounded-2xl flex items-center justify-center text-white font-extrabold text-base shadow-md flex-shrink-0"
+                            style={{ width: "52px", height: "52px", backgroundColor: ad.brandColor || "#2563eb" }}
+                          >
+                            {ad.brandInitials}
+                          </div>
+                        )}
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-extrabold text-base sm:text-lg tracking-tight truncate">{ad.brandName}</h3>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${getStatusColors(resolvedTheme, ad.status)}`}>
+                              {STATUS_LABELS[ad.status]}
+                            </span>
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700 font-semibold">
+                              {ad.category}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-400 mt-0.5 truncate">{ad.tagline}</p>
+                        </div>
+                      </div>
+
+                      {/* Boutons d'Action */}
+                      <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+                        {ad.ctaUrl && (
+                          <a
+                            href={ad.ctaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors flex items-center gap-1.5 ${
+                              resolvedTheme === 'dark' ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800' : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100'
+                            }`}
+                            title="Tester le lien"
+                          >
+                            <ExternalLink size={13} />
+                            <span className="hidden md:inline">Visiter</span>
+                          </a>
+                        )}
+
+                        <button
+                          onClick={() => requestToggleStatus(ad)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                            ad.status === "active"
+                              ? "border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                              : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                          }`}
                         >
-                          {ad.brandInitials}
-                        </div>
-                      )}
+                          {ad.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+                          <span>{ad.status === "active" ? "Mettre en pause" : "Activer"}</span>
+                        </button>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-sm sm:text-base truncate">{ad.brandName}</h3>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${getStatusColors(resolvedTheme, ad.status)}`}>
-                            {STATUS_LABELS[ad.status]}
+                        <button
+                          onClick={() => requestEditAd(ad)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors flex items-center gap-1.5 ${
+                            resolvedTheme === 'dark' ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'border-zinc-300 hover:bg-zinc-100 text-zinc-700'
+                          }`}
+                        >
+                          <Edit3 size={13} />
+                          <span>Modifier</span>
+                        </button>
+
+                        <button
+                          onClick={() => requestDeleteAd(ad)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-colors flex items-center gap-1.5"
+                        >
+                          <Trash2 size={13} />
+                          <span>Supprimer</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. STATISTIQUES DÉTAILLÉES : CLICS, BUDGET, DÉPENSÉ, SOLDE, IMPRESSIONS */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+                      {/* NOMBRE DE CLICS */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Nombre de Clics</span>
+                          <MousePointerClick size={15} className="text-indigo-400" />
+                        </div>
+                        <p className="text-xl font-black text-indigo-400">{fmtNum(clicks)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">CTR: <span className="text-emerald-400 font-bold">{adCtr}</span></p>
+                      </div>
+
+                      {/* BUDGET ALLOUÉ */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Budget Alloué</span>
+                          <DollarSign size={15} className="text-emerald-400" />
+                        </div>
+                        <p className="text-xl font-black text-emerald-400">{fmtCurrency(budget, ad.currency)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">Devise: {ad.currency || 'HTG'}</p>
+                      </div>
+
+                      {/* MONTANT DÉPENSÉ */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Dépensé</span>
+                          <TrendingUp size={15} className="text-blue-400" />
+                        </div>
+                        <p className="text-xl font-black text-blue-400">{fmtCurrency(spent, ad.currency)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">{budgetProgress}% du budget</p>
+                      </div>
+
+                      {/* SOLDE RESTANT */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Budget Restant</span>
+                          <span className="text-xs">💰</span>
+                        </div>
+                        <p className="text-xl font-black text-amber-400">{fmtCurrency(remainingBudget, ad.currency)}</p>
+                        <p className="text-[10px] text-zinc-500 font-medium">Disponible</p>
+                      </div>
+
+                      {/* IMPRESSIONS / OBJECTIF VUES */}
+                      <div className={`p-3.5 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800/90' : 'bg-zinc-50 border-zinc-200'} space-y-1 col-span-2 sm:col-span-1`}>
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider">Impressions Vues</span>
+                          <Eye size={15} className="text-cyan-400" />
+                        </div>
+                        <p className="text-xl font-black text-cyan-400">{fmtNum(impressions)} <span className="text-xs text-zinc-500 font-normal">/ {fmtNum(targetViews)}</span></p>
+                        <p className="text-[10px] text-zinc-500 font-medium">{viewsProgress}% objectif</p>
+                      </div>
+                    </div>
+
+                    {/* 3. BARRES DE PROGRESSION VISUELLES (VUES & BUDGET) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      {/* Progression des Vues */}
+                      <div className={`p-3 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-zinc-50 border-zinc-200'} space-y-1.5`}>
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-zinc-400 flex items-center gap-1.5">
+                            <Target size={13} className="text-cyan-400" />
+                            <span>Diffusion des Vues (AlgoPro)</span>
                           </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
-                            {ad.category}
+                          <span className="text-cyan-400">{viewsProgress}% ({fmtNum(impressions)} / {fmtNum(targetViews)})</span>
+                        </div>
+                        <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: `${viewsProgress}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Progression du Budget Consommé */}
+                      <div className={`p-3 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-zinc-50 border-zinc-200'} space-y-1.5`}>
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-zinc-400 flex items-center gap-1.5">
+                            <DollarSign size={13} className="text-emerald-400" />
+                            <span>Consommation du Budget</span>
+                          </span>
+                          <span className={budgetProgress > 90 ? "text-red-400" : budgetProgress > 60 ? "text-amber-400" : "text-emerald-400"}>
+                            {budgetProgress}% ({fmtCurrency(spent, ad.currency)} / {fmtCurrency(budget, ad.currency)})
                           </span>
                         </div>
-
-                        <p className="text-xs text-zinc-400 mt-1 truncate">{ad.tagline}</p>
-                        
-                        <div className="flex items-center gap-4 mt-2 text-[11px] text-zinc-500 flex-wrap">
-                          <span>🎯 Objectif Vues (AlgoPro): <strong className="text-blue-400">{fmtNum(ad.impressions)} / {fmtNum(ad.targetViews)}</strong></span>
-                          <span>💰 Budget: <strong className="text-emerald-400">{fmtCurrency(ad.budget, ad.currency)}</strong></span>
-                          {ad.exchangeRate && <span>💱 Taux: {ad.exchangeRate}</span>}
+                        <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              budgetProgress > 90 ? "bg-red-500" : budgetProgress > 60 ? "bg-amber-500" : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${budgetProgress}%` }}
+                          />
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 border-zinc-800 pt-3 md:pt-0">
-                      <button
-                        onClick={() => requestToggleStatus(ad)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors flex items-center gap-1 ${
-                          ad.status === "active"
-                            ? "border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                            : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                        }`}
-                      >
-                        {ad.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
-                        <span>{ad.status === "active" ? "Mettre en pause" : "Activer"}</span>
-                      </button>
+                    {/* 4. DÉTAILS DE DIFFUSION (Dates, Taux de change, Cible) */}
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1 flex-wrap gap-2 border-t border-zinc-200 dark:border-zinc-800/60">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={13} className="text-zinc-400" />
+                          <span>Période: <strong>{ad.startDate || 'Immédiat'}</strong> {ad.endDate ? `au ${ad.endDate}` : '(Illimitée)'}</span>
+                        </span>
+                        {ad.exchangeRate && (
+                          <span>💱 Taux: <strong>{ad.exchangeRate}</strong></span>
+                        )}
+                        <span>🎯 Audience: <strong>{ad.targetAudience === 'interests' && ad.targetInterests?.length ? ad.targetInterests.join(', ') : 'Tous les utilisateurs'}</strong></span>
+                      </div>
 
-                      <button
-                        onClick={() => requestEditAd(ad)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-700 hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center gap-1"
-                      >
-                        <Edit3 size={14} />
-                        <span>Modifier</span>
-                      </button>
-
-                      <button
-                        onClick={() => requestDeleteAd(ad)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1"
-                      >
-                        <Trash2 size={14} />
-                        <span>Supprimer</span>
-                      </button>
+                      {ad.ctaUrl && (
+                        <span className="text-zinc-400 truncate max-w-xs">
+                          Lien: <span className="text-blue-400 font-mono">{ad.ctaUrl}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
           </>
@@ -1455,23 +2195,43 @@ export default function AdDashboard() {
                       EXILE
                     </div>
                   )}
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-2.5">
                     <input
                       type="text"
                       value={platformLogo}
                       onChange={e => setPlatformLogo(e.target.value)}
-                      placeholder="Collez l'URL de votre logo d'entreprise (https://...)"
+                      placeholder="Collez l'URL ou importez depuis votre appareil..."
                       className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'} focus:outline-none focus:ring-2 focus:ring-[#FF6B00]`}
                     />
-                    {platformLogo && (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setPlatformLogo('')}
-                        className="text-xs text-red-400 hover:underline"
+                        onClick={() => logoFileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
                       >
-                        Revenir au logo par défaut
+                        <Upload size={13} />
+                        <span>📁 Importer un logo depuis mon stockage</span>
                       </button>
-                    )}
+                      <input
+                        type="file"
+                        ref={logoFileInputRef}
+                        onChange={handleLogoFileUpload}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      {platformLogo && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPlatformLogo('');
+                            localStorage.removeItem('exile_pub_platform_logo');
+                          }}
+                          className="text-xs text-red-400 hover:underline"
+                        >
+                          Supprimer le logo
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -60,20 +60,12 @@ export interface ProfessionalProfile {
   experienceYears?: number;
   recommendationsCount: number;
 }
+import { resolveMediaUrl } from '../utils/mediaUtils';
 
 const formatImageUrl = (filename: string | null | undefined): string => {
-  if (!filename) return '';
-  const clean = filename.trim();
-  if (!clean || clean === 'null' || clean === 'undefined') return '';
-  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:')) {
-    return clean;
-  }
-  if (clean.startsWith('/media/') || clean.startsWith('media/')) {
-    const serverHost = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com' : 'http://localhost:8000')
-    return `${serverHost.replace('/api/v1', '').replace('/api', '')}${clean.startsWith('/') ? clean : `/${clean}`}`;
-  }
-  return `https://phjpbbcymhtppfkyoegk.supabase.co/storage/v1/object/public/Exile_images/${clean.replace(/^\/+/, '')}`;
+  return resolveMediaUrl(filename);
 };
+
 
 export const mapProfilResponse = (data: ProfilApiResponse): ProfessionalProfile => {
   const fullName = data.full_name || data.username || 'Utilisateur';

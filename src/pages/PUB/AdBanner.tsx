@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
+import { API_BASE_URL } from "../../config/api";
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -26,8 +27,17 @@ export interface Ad {
   description: string;          // détail (max 120 chars)
   ctaLabel: string;             // texte bouton ex: "Découvrir", "En savoir plus"
   ctaUrl: string;
+  ctaTextColor?: string;        // Couleur du texte du bouton ex: "#ffffff"
+  ctaBgColor?: string;          // Couleur de fond du bouton ex: "#FF6B00"
+  bgType?: 'color' | 'gradient' | 'media'; // Type de fond choisi
+  bgColor?: string;             // Couleur de fond réelle hex ex: "#2563eb"
+  bgMediaUrl?: string;          // Média de fond : image, GIF, ou vidéo
+  bgVideoUrl?: string;          // Vidéo d'arrière-plan
+  userUuid?: string;            // UUID du propriétaire
   gradient: string;             // Tailwind gradient ex: "from-amber-500 to-orange-600"
   category: string;             // "Mode", "Tech", "Santé", etc.
+  targetAudience?: 'all' | 'interests'; // Diffusion ciblée
+  targetInterests?: string[];   // Liste des centres d'intérêt ciblés
   impressions: number;
   clicks: number;
   budget: number;               // budget total
@@ -67,15 +77,145 @@ export const getStoredAds = (): Ad[] => {
   return []
 }
 
-export const saveStoredAds = (ads: Ad[]): void => {
+export const fetchRemoteAds = async (): Promise<Ad[]> => {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('exile_ads', JSON.stringify(ads))
+      localStorage.removeItem('exile_custom_ads')
+    }
+    const res = await fetch(`${API_BASE_URL}/pub/annonces/`)
+    if (res.ok) {
+      const remoteAds = await res.json()
+      if (Array.isArray(remoteAds)) {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('exile_ads', JSON.stringify(remoteAds))
+          window.dispatchEvent(new CustomEvent('exile_ads_updated', { detail: remoteAds }))
+        }
+        checkAndNotifyExpiredAds(remoteAds)
+        return remoteAds
+      }
+    }
+  } catch {}
+  const local = getStoredAds()
+  checkAndNotifyExpiredAds(local)
+  return local
+}
+
+export const saveStoredAds = async (ads: Ad[], options: { sync?: boolean } = {}): Promise<void> => {
+  const { sync = true } = options
+  try {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('exile_ads', JSON.stringify(ads))
+      } catch {
+        // En cas de quota dépassé (vidéo / GIF volumineux en Base64), sauvegarder version allégée en local
+        try {
+          const lightweight = ads.map(a => ({
+            ...a,
+            bgMediaUrl: a.bgMediaUrl && a.bgMediaUrl.length > 500000 ? '' : a.bgMediaUrl,
+            bgVideoUrl: a.bgVideoUrl && a.bgVideoUrl.length > 500000 ? '' : a.bgVideoUrl
+          }))
+          localStorage.setItem('exile_ads', JSON.stringify(lightweight))
+        } catch {}
+      }
       window.dispatchEvent(new CustomEvent('exile_ads_updated', { detail: ads }))
     }
+    // Synchronisation serveur partagée intégrale dans la table PostgreSQL/SQLite
+    if (!sync) return
+    await fetch(`${API_BASE_URL}/pub/annonces/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaigns: ads })
+    }).catch(() => {})
   } catch (e) {
     console.error('Erreur lors de la sauvegarde des publicités:', e)
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// IDENTIFICATION UUID & CLIC UNIQUE EN TEMPS RÉEL SANS DOUBLONS
+// ─────────────────────────────────────────────────────────────
+
+export const getUserUUID = (): string => {
+  try {
+    const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+    if (profile?.id) return String(profile.id)
+    if (profile?.uuid) return String(profile.uuid)
+  } catch {}
+  let guestUuid = typeof localStorage !== 'undefined' ? localStorage.getItem('exile_client_uuid') : null
+  if (!guestUuid && typeof localStorage !== 'undefined') {
+    guestUuid = 'guest_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now()
+    localStorage.setItem('exile_client_uuid', guestUuid)
+  }
+  return guestUuid || 'guest_user'
+}
+
+export const trackAdClick = (adId: string, targetUrl?: string): void => {
+  const userUuid = getUserUUID()
+  const clickKey = `exile_ad_click_${adId}_${userUuid}`
+  const alreadyClicked = typeof localStorage !== 'undefined' && localStorage.getItem(clickKey) === '1'
+
+  if (!alreadyClicked) {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(clickKey, '1')
+    }
+
+    // 1. Incrémenter en local et notifier
+    const ads = getStoredAds()
+    const updated = ads.map(a => {
+      if (a.id === adId) {
+        return { ...a, clicks: (a.clicks || 0) + 1 }
+      }
+      return a
+    })
+    saveStoredAds(updated)
+
+    // 2. Transmettre au backend pour synchronisation en temps réel avec le dashboard
+    fetch(`${API_BASE_URL}/pub/annonces/click/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ad_id: adId, user_uuid: userUuid })
+    }).catch(() => {})
+  }
+
+  // 3. Ouvrir l'URL cible
+  if (targetUrl && targetUrl !== '#' && targetUrl !== 'https://') {
+    window.open(targetUrl, '_blank', 'noopener,noreferrer')
+  }
+}
+
+export const trackAdImpression = (adId: string): void => {
+  fetch(`${API_BASE_URL}/pub/annonces/impression/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad_id: adId })
+  }).catch(() => {})
+}
+
+export const checkAndNotifyExpiredAds = (ads: Ad[]): void => {
+  if (typeof localStorage === 'undefined') return
+  const now = new Date()
+  const myUuid = getUserUUID()
+
+  ads.forEach(ad => {
+    // Vérifier si la date de fin est dépassée ou statut terminé
+    const isPastEnd = ad.endDate ? new Date(ad.endDate) < now : false
+    if (ad.status === 'ended' || isPastEnd) {
+      const notifiedKey = `exile_ad_expired_notified_${ad.id}_${myUuid}`
+      if (localStorage.getItem(notifiedKey) !== '1') {
+        localStorage.setItem(notifiedKey, '1')
+
+        import('../../services/pubNotificationService').then(({ triggerPubNotification }) => {
+          triggerPubNotification({
+            type: 'campaign_ended',
+            brandName: ad.brandName,
+            adId: ad.id,
+            endDate: ad.endDate,
+            userUuid: ad.userUuid || myUuid
+          })
+        }).catch(() => {})
+      }
+    }
+  })
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -159,6 +299,7 @@ export function AdBanner({
       ([entry]) => {
         if (entry.isIntersecting && !impressionFired.current) {
           impressionFired.current = true;
+          trackAdImpression(ad.id);
           onImpression?.(ad.id);
         }
       },
@@ -393,158 +534,3 @@ export function AdInjector({
 }
 
 // ─────────────────────────────────────────────────────────────
-// COMPOSANT : SectionPub (retrocompatible avec VideoFeed)
-// ─────────────────────────────────────────────────────────────
-
-interface SectionPubProps {
-  className?: string;
-}
-
-export default function SectionPub({ className = '' }: SectionPubProps) {
-  const { resolvedTheme } = useTheme();
-  const [adIdx, setAdIdx] = useState(0);
-  const [animatingAds, setAnimatingAds] = useState<number[]>([]);
-  const activeAds = DEMO_ADS.filter((a) => a.status === "active");
-
-  // Montrer jiska 12 piblikite (4x3)
-  const getAdAt = (index: number) => activeAds[index % Math.max(activeAds.length, 1)];
-
-  // Desktop: 12 piblikite (3x3)
-  const desktopAds = [0, 1, 2, 3, 4, 5, 6, 7, 8,9,10,11].map(i => getAdAt(adIdx + i));
-  
-  // Mobile: 12 piblikite nan yon liy
-  const mobileBaseAds = [0, 1, 2, 3, 4, 5, 6, 7, 8,9,10,11].map(i => getAdAt(adIdx + i));
-
-  // Efè wotasyon chak 5 segond pou tout ekran
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Chwazi yon piblikite aleyatwa pou ranplase
-      const randomIndex = Math.floor(Math.random() * 6);
-      setAnimatingAds([randomIndex]);
-      
-      // Apre 500ms animasyon, chanje li
-      setTimeout(() => {
-        setAdIdx(prev => prev + 1);
-        setAnimatingAds([]);
-      }, 500);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Vèsyon mobil - Montre 6 piblikite nan yon liy horizontal (menm jan pou tout ekran piti)
-  const isHomePage = typeof window !== 'undefined' && window.location.pathname === '/pro';
-
-  // Pa montre piblikite si se pa nan paj d'accueil (/pro)
-  if (location.pathname !== '/pro' && location.pathname !== '/pro/') return null;
-
-  const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 1024;
-  
-  if (isSmallScreen) {
-    return (
-      <div className={`fixed top-[110px] sm:top-[128px] left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm ${className}`}>
-        {/* Header ekstrèmman konpakt */}
-        <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-2 py-0 flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <div className="pt-6 w-1 h-1  rounded-full animate-pulse" />
-            <span className="text-[9px] font-bold text-white tracking-wide">Publicite</span>
-          </div>
-        </div>
-        
-        {/* Liy horizontal 6 piblikite - ekstrèmman konpakt */}
-        <div className="flex overflow-x-auto gap-1 px-1 py-0 scrollbar-hide" style={{ scrollSnapType: 'x mandatory' }}>
-          {mobileBaseAds.slice(0, 6).map((ad, i) => (
-            <div 
-              key={`mobile-ad-${ad.id}-${i}`}
-              className={`flex-shrink-0 transition-all duration-500 ${
-                animatingAds.includes(i) 
-                  ? 'scale-95 opacity-70' 
-                  : 'scale-100 opacity-100'
-              }`}
-              style={{ 
-                width: 'calc(25% - 4px)', 
-                minWidth: '80px',
-                scrollSnapAlign: 'start'
-              }}
-            >
-              <button
-                onClick={() => window.open(ad.ctaUrl, '_blank')}
-                className="w-full text-left group bg-white rounded overflow-hidden shadow-sm hover:shadow transition-all duration-200 border border-gray-100 active:scale-95"
-              >
-                {/* Image container - pi piti 3:1 ratio */}
-                <div className={`relative aspect-[4/2] overflow-hidden bg-gradient-to-br ${ad.gradient}`}>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-white font-bold text-[9px] tracking-wider drop-shadow">
-                      {ad.brandInitials}
-                    </span>
-                  </div>
-                  {/* Shine efè kan l ap wotete */}
-                  {animatingAds.includes(i) && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" />
-                  )}
-                </div>
-                
-                {/* Text content - sèlman non, pi piti */}
-                <div className="px-1 py-0.5">
-                  <p className="text-[6px] font-bold text-gray-900 leading-none line-clamp-1">
-                    {ad.brandName}
-                  </p>
-                </div>
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Vèsyon desktop - Grid 3x3 (jiska 9 piblikite) ak menm animasyon
-  return (
-    <div className={`space-y-3 mt-16 ${className}`}>
-      <div className={`${resolvedTheme === 'dark' ? 'bg-[#0f0f0f]' : 'bg-white'} rounded-xl shadow-lg border ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-100'} overflow-hidden`}>
-        {/* Header 
-        <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-2 flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white mb-0">Publicite</span>
-          </div>
-          <div className="flex gap-1 mt-10">
-            <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" />
-            <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
-            <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
-          </div>
-        </div>
-        */}
-
-        {/* Grid 3x3 ak menm animasyon an tankou mobil */}
-        <div className="p-3 grid grid-cols-3 gap-3">
-          {desktopAds.map((ad, i) => (
-            <button
-              key={`desktop-ad-${i}`}
-              onClick={() => window.open(ad.ctaUrl, '_blank')}
-              className={`text-left group transition-all duration-500 ${
-                animatingAds.includes(i)
-                  ? 'scale-95 opacity-70'
-                  : 'scale-100 opacity-100'
-              }`}
-            >
-              <div className={`relative aspect-[4/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-shadow bg-gradient-to-br ${ad.gradient}`}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-white font-black text-2xl">{ad.brandInitials}</span>
-                </div>
-                {/* Shine efè kan l ap wotete */}
-                {animatingAds.includes(i) && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" />
-                )}
-              </div>
-              <div className="mt-2 space-y-0.5">
-                <p className={`text-xs font-bold line-clamp-1 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{ad.brandName}</p>
-                <p className={`text-[10px] line-clamp-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{ad.tagline}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-
-      </div>
-    </div>
-  );
-}

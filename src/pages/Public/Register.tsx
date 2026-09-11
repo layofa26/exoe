@@ -237,7 +237,7 @@ export const Register = (): JSX.Element => {
   }
 
   return (
-    <div className={`min-h-screen py-4 sm:py-8 md:py-12 px-3 sm:px-6 relative overflow-hidden flex flex-col justify-center items-center ${
+    <div className={`min-h-screen pt-2 sm:pt-4 pb-8 px-3 sm:px-6 relative overflow-hidden flex flex-col justify-start items-center ${
       resolvedTheme === 'dark' 
         ? 'bg-slate-900' 
         : 'bg-gray-50'
@@ -259,7 +259,7 @@ export const Register = (): JSX.Element => {
         <div className="absolute top-40 right-10 sm:right-20 w-16 sm:w-24 h-16 sm:h-24 bg-white/10 rounded-lg animate-spin" style={{ animationDuration: '10s' }} />
       </div>
 
-      <div className="w-full max-w-lg mx-auto relative z-10 my-auto pt-16 sm:pt-20 pb-8">
+      <div className="w-full max-w-lg mx-auto relative z-10 my-0 pt-1 sm:pt-2 pb-6">
         <div className={`rounded-2xl shadow-2xl p-5 sm:p-8 backdrop-blur-md transition-all ${
           resolvedTheme === 'dark' 
             ? 'bg-slate-800/90 border border-slate-700/80 shadow-black/40' 

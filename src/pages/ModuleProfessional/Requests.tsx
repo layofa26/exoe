@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Users, Inbox, Search, Clock, XCircle,
   ArrowLeft, Loader2, X, Shield, MessageSquare,
@@ -200,24 +201,13 @@ function getAvatarGradient(name: string): string {
   return AVATAR_GRADIENTS[index]
 }
 
+import { resolveMediaUrl } from '../../utils/mediaUtils'
+
 function formatAvatarUrl(url: string | null | undefined): string | null {
-  if (!url || typeof url !== 'string') return null
-  const trimmed = url.trim()
-  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null
-
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
-    return trimmed
-  }
-
-  if (trimmed.startsWith('/media/') || trimmed.startsWith('media/')) {
-    const clean = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
-    const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace('/api/v1', '')
-    return `${base}${clean}`
-  }
-
-  const supabaseBase = import.meta.env.VITE_SUPABASE_URL || 'https://phjpbbcymhtppfkyoegk.supabase.co'
-  return `${supabaseBase}/storage/v1/object/public/Exile_images/${trimmed.replace(/^\/+/, '')}`
+  const res = resolveMediaUrl(url)
+  return res || null
 }
+
 
 function Avatar({ src, name, size = 44 }: { src: string | null; name: string; size?: number }) {
   const [imgError, setImgError] = useState(false)
@@ -247,26 +237,28 @@ function Avatar({ src, name, size = 44 }: { src: string | null; name: string; si
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<DemandeStatus, { icon: any; label: string; cls: string }> = {
-  pending: { icon: Clock, label: 'En attente', cls: 'text-amber-400 bg-amber-400/10 border border-amber-400/20' },
-  accepted: { icon: MessageCircle, label: 'Discussion', cls: 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' },
-  rejected: { icon: XCircle, label: 'Refusée', cls: 'text-red-400 bg-red-400/10 border border-red-400/20' },
-  cancelled: { icon: X, label: 'Annulée', cls: 'text-slate-400 bg-slate-400/10 border border-slate-400/20' },
-  blocked: { icon: Shield, label: 'Bloquée', cls: 'text-orange-400 bg-orange-400/10 border border-orange-400/20' },
+const STATUS_CONFIG: Record<DemandeStatus, { icon: any; labelKey: string; defaultLabel: string; cls: string }> = {
+  pending: { icon: Clock, labelKey: 'pro.requests.pending', defaultLabel: 'En attente', cls: 'text-amber-400 bg-amber-400/10 border border-amber-400/20' },
+  accepted: { icon: MessageCircle, labelKey: 'pro.requests.accepted', defaultLabel: 'Discussion', cls: 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' },
+  rejected: { icon: XCircle, labelKey: 'pro.requests.rejected', defaultLabel: 'Refusée', cls: 'text-red-400 bg-red-400/10 border border-red-400/20' },
+  cancelled: { icon: X, labelKey: 'pro.requests.cancelled', defaultLabel: 'Annulée', cls: 'text-slate-400 bg-slate-400/10 border border-slate-400/20' },
+  blocked: { icon: Shield, labelKey: 'pro.requests.blocked', defaultLabel: 'Bloquée', cls: 'text-orange-400 bg-orange-400/10 border border-orange-400/20' },
 }
 
 function StatusBadge({ status }: { status: DemandeStatus }) {
+  const { t } = useTranslation()
   const cfg = STATUS_CONFIG[status]
   const Icon = cfg.icon
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium ${cfg.cls}`}>
-      <Icon size={12} /> {cfg.label}
+      <Icon size={12} /> {t(cfg.labelKey, cfg.defaultLabel)}
     </span>
   )
 }
 
 // ─── Main Unified Requests & WhatsApp Split Component ──────────────────────────
 export const Requests = (): JSX.Element => {
+  const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   const navigate = useNavigate()
@@ -486,7 +478,7 @@ export const Requests = (): JSX.Element => {
       window.dispatchEvent(new CustomEvent('exile_demande_updated', { detail: { id: d.id, status: 'accepted', convId } }))
       window.dispatchEvent(new Event('storage'))
 
-      showToast('🎉 Demande acceptée ! Discussion confirmée.')
+      showToast(t('pro.requests.acceptedToast', '🎉 Demande acceptée ! Ouverture de la discussion...'))
 
       const updatedD: Demande = { ...d, status: 'accepted' as DemandeStatus, conversationId: convId || d.conversationId }
       setSelectedDemande(updatedD)
@@ -496,11 +488,11 @@ export const Requests = (): JSX.Element => {
         handleOpenConversation(updatedD)
       }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erreur lors de l\'acceptation', 'error')
+      showToast(err instanceof Error ? err.message : t('pro.requests.acceptError', 'Erreur lors de l\'acceptation'), 'error')
     } finally {
       setLoadingAction(null)
     }
-  }, [handleOpenConversation, showToast, updateStatus])
+  }, [handleOpenConversation, showToast, updateStatus, t])
 
   // Reject Demande
   const handleReject = useCallback(async (d: Demande) => {
@@ -510,13 +502,13 @@ export const Requests = (): JSX.Element => {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Erreur')
       updateStatus(d.id, 'rejected')
       setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'rejected' } : prev)
-      showToast('Demande refusée')
+      showToast(t('pro.requests.rejectedToast', 'Demande refusée'))
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur', 'error')
     } finally {
       setLoadingAction(null)
     }
-  }, [showToast, updateStatus])
+  }, [showToast, updateStatus, t])
 
   // Cancel Demande
   const handleCancel = useCallback(async (d: Demande) => {
@@ -526,13 +518,13 @@ export const Requests = (): JSX.Element => {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Erreur')
       updateStatus(d.id, 'cancelled')
       setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'cancelled' } : prev)
-      showToast('Demande annulée')
+      showToast(t('pro.requests.cancelledToast', 'Demande annulée'))
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur', 'error')
     } finally {
       setLoadingAction(null)
     }
-  }, [showToast, updateStatus])
+  }, [showToast, updateStatus, t])
 
   // Block User
   const handleBlock = useCallback(async (d: Demande) => {
@@ -543,16 +535,16 @@ export const Requests = (): JSX.Element => {
         method: 'POST',
         body: JSON.stringify({ blocked_user: targetUser }),
       })
-      if (!res.ok) throw new Error('Erreur lors du blocage')
+      if (!res.ok) throw new Error(t('pro.requests.blockError', 'Erreur lors du blocage'))
       updateStatus(d.id, 'blocked')
       setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'blocked' } : prev)
-      showToast('🚫 Utilisateur bloqué')
+      showToast(t('pro.requests.blockedToast', '🚫 Utilisateur bloqué'))
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur', 'error')
     } finally {
       setLoadingAction(null)
     }
-  }, [currentUserId, showToast, updateStatus])
+  }, [currentUserId, showToast, updateStatus, t])
 
   // Load Blocked Users
   const loadBlockedUsers = useCallback(async () => {
@@ -658,10 +650,10 @@ export const Requests = (): JSX.Element => {
   }, [deduplicatedDemandes, allItems, currentUserId])
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: 'all', label: 'Tous', icon: Users },
-    { id: 'accepted', label: 'Discussions', icon: MessageCircle },
-    { id: 'received', label: 'Reçues', icon: Inbox },
-    { id: 'sent', label: 'Envoyées', icon: Send },
+    { id: 'all', label: t('pro.requests.all', 'Tous'), icon: Users },
+    { id: 'accepted', label: t('pro.requests.discussions', 'Discussions'), icon: MessageCircle },
+    { id: 'received', label: t('pro.requests.received', 'Reçues'), icon: Inbox },
+    { id: 'sent', label: t('pro.requests.sent', 'Envoyées'), icon: Send },
   ]
 
   const base = isDark ? 'bg-[#0b0e14] text-white' : 'bg-slate-50 text-slate-900'
@@ -701,7 +693,7 @@ export const Requests = (): JSX.Element => {
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm">
                 <Inbox size={18} />
               </div>
-              <h1 className="font-bold text-base">Demandes & Discussions</h1>
+              <h1 className="font-bold text-base">{t('pro.requests.hubTitle', 'Demandes & Discussions')}</h1>
             </div>
 
             <button
@@ -709,7 +701,7 @@ export const Requests = (): JSX.Element => {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors
                 ${isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
             >
-              <Shield size={13} /> Bloqués
+              <Shield size={13} /> {t('pro.requests.blocked', 'Bloqués')}
             </button>
           </div>
 
@@ -719,7 +711,7 @@ export const Requests = (): JSX.Element => {
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Rechercher par @username..."
+              placeholder={t('pro.requests.searchByUsername', 'Rechercher par @username...')}
               className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
             />
             {searchQuery && (
@@ -766,13 +758,13 @@ export const Requests = (): JSX.Element => {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 size={28} className="animate-spin text-emerald-500" />
-              <p className={`text-xs ${subtle}`}>Chargement des échanges...</p>
+              <p className={`text-xs ${subtle}`}>{t('pro.requests.loading', 'Chargement des échanges...')}</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-60">
               <MessageCircle size={40} className={subtle} />
               <p className={`text-xs text-center ${subtle}`}>
-                {searchQuery ? 'Aucun résultat trouvé' : 'Aucune demande pour le moment'}
+                {searchQuery ? t('pro.requests.noResults', 'Aucun résultat trouvé') : t('pro.requests.noRequests', 'Aucune demande pour le moment')}
               </p>
             </div>
           ) : filtered.map(d => {
@@ -787,7 +779,7 @@ export const Requests = (): JSX.Element => {
 
             // ─── 1. WhatsApp Discussion Card (Accepted in Discussions or All) ──
             if (showAsDiscussionCard) {
-              const previewMsg = d.lastMessage?.content || d.message || 'Discussion active'
+              const previewMsg = d.lastMessage?.content || d.message || t('pro.requests.activeDiscussion', 'Discussion active')
               const msgTime = timeAgo(d.lastMessage?.created_at || d.createdAt)
 
               return (
@@ -821,7 +813,7 @@ export const Requests = (): JSX.Element => {
                         </div>
 
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 flex-shrink-0">
-                          <MessageSquare size={10} /> Ouvrir
+                          <MessageSquare size={10} /> {t('pro.requests.open', 'Ouvrir')}
                         </span>
                       </div>
                     </div>
@@ -851,7 +843,7 @@ export const Requests = (): JSX.Element => {
                     </div>
 
                     <p className={`text-xs mt-0.5 ${subtle}`}>
-                      {isSender ? '→ Demande envoyée' : '← Demande reçue'}
+                      {isSender ? `→ ${t('pro.requests.requestSent', 'Demande envoyée')}` : `← ${t('pro.requests.requestReceived', 'Demande reçue')}`}
                     </p>
 
                     {d.message && (
@@ -872,21 +864,21 @@ export const Requests = (): JSX.Element => {
                               disabled={!!loadingAction}
                               className="px-2.5 py-1 rounded-xl text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                             >
-                              Refuser
+                              {t('pro.requests.reject', 'Refuser')}
                             </button>
                             <button
                               onClick={() => handleBlock(d)}
                               disabled={!!loadingAction}
                               className="px-2.5 py-1 rounded-xl text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
                             >
-                              Bloquer
+                              {t('pro.requests.block', 'Bloquer')}
                             </button>
                             <button
                               onClick={() => handleAccept(d)}
                               disabled={!!loadingAction}
                               className="px-3 py-1 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm hover:scale-105 transition-all flex items-center gap-1"
                             >
-                              <Check size={12} /> Accepter
+                              <Check size={12} /> {t('pro.requests.accept', 'Accepter')}
                             </button>
                           </>
                         )}
@@ -897,7 +889,7 @@ export const Requests = (): JSX.Element => {
                             disabled={!!loadingAction}
                             className="px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 transition-colors"
                           >
-                            Annuler
+                            {t('pro.requests.cancel', 'Annuler')}
                           </button>
                         )}
 
@@ -953,9 +945,9 @@ export const Requests = (): JSX.Element => {
             <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-600/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-4 shadow-xl">
               <MessageCircle size={38} />
             </div>
-            <h2 className={`text-lg font-bold mb-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>Messagerie Professionnelle Instantanée</h2>
+            <h2 className={`text-lg font-bold mb-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('pro.requests.emptyTitle', 'Messagerie Professionnelle Instantanée')}</h2>
             <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
-              Sélectionnez une discussion ou cliquez sur une demande à gauche pour ouvrir et commencer la conversation instantanément ici à droite.
+              {t('pro.requests.emptyDesc', 'Sélectionnez une discussion ou cliquez sur une demande à gauche pour ouvrir et commencer la conversation instantanément ici à droite.')}
             </p>
           </div>
         )}
@@ -967,7 +959,7 @@ export const Requests = (): JSX.Element => {
           <div className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
               <h2 className="font-bold flex items-center gap-2 text-sm">
-                <Shield size={18} className="text-orange-400" /> Utilisateurs bloqués
+                <Shield size={18} className="text-orange-400" /> {t('pro.modals.blockedUsers', 'Utilisateurs bloqués')}
               </h2>
               <button onClick={() => setShowBlockedPanel(false)}>
                 <X size={18} className={subtle} />
@@ -982,7 +974,7 @@ export const Requests = (): JSX.Element => {
               ) : blockedUsers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2 opacity-50">
                   <UserX size={32} className={subtle} />
-                  <p className={`text-sm ${subtle}`}>Aucun utilisateur bloqué</p>
+                  <p className={`text-sm ${subtle}`}>{t('pro.modals.noBlockedUsers', 'Aucun utilisateur bloqué')}</p>
                 </div>
               ) : blockedUsers.map(b => (
                 <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -995,7 +987,7 @@ export const Requests = (): JSX.Element => {
                     onClick={() => handleUnblock(b.blocked.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${isDark ? 'bg-orange-900/30 text-orange-400 hover:bg-orange-900/50' : 'bg-orange-50 text-orange-500 hover:bg-orange-100'}`}
                   >
-                    Débloquer
+                    {t('pro.modals.unblock', 'Débloquer')}
                   </button>
                 </div>
               ))}

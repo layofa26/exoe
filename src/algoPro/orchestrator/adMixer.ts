@@ -2,7 +2,7 @@
 // Injecte intelligemment les publicités selon l'objectif de vues (targetViews)
 // et les signaux de préférences utilisateur
 
-import { getStoredAds, saveStoredAds, type Ad } from '../../pages/PUB/AdBanner'
+import { getStoredAds, saveStoredAds, trackAdImpression, type Ad } from '../../pages/PUB/AdBanner'
 
 export interface AdTargetingResult {
   selectedAd: Ad | null
@@ -76,6 +76,7 @@ export function registerAlgoProAdImpression(adId: string): void {
   })
 
   saveStoredAds(updatedAds)
+  trackAdImpression(adId)
 
   if (goalReached) {
     window.dispatchEvent(new CustomEvent('exile_toast', { detail: '🎯 Objectif de vues atteint pour une campagne PUB !' }))

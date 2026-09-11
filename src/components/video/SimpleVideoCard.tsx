@@ -32,8 +32,24 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
   const [showContactModal, setShowContactModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Autoplay logic
+  // Autoplay logic avec respect de l'Économiseur de données et du mode réseau Wi-Fi
   useEffect(() => {
+    let dataSaver = false
+    let networkMode = 'all'
+    try {
+      dataSaver = localStorage.getItem('exile_video_data_saver') === 'true'
+      networkMode = JSON.parse(localStorage.getItem('exile_video_network_mode') || '"all"')
+    } catch {}
+
+    const nav = typeof navigator !== 'undefined' ? (navigator as any) : null
+    const connection = nav?.connection || nav?.mozConnection || nav?.webkitConnection
+    const isCellular = connection && (connection.type === 'cellular' || connection.effectiveType === '2g' || connection.effectiveType === '3g' || connection.saveData)
+    const isRestrictedByNetwork = networkMode === 'wifi_only' && isCellular
+
+    if (dataSaver || isRestrictedByNetwork) {
+      return
+    }
+
     if (autoplay && video.videoUrl && videoRef.current) {
       const videoElement = videoRef.current;
       videoElement.muted = true;

@@ -2,12 +2,17 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import {
   Lock,
   Eye,
   EyeOff,
   AlertCircle,
-  User
+  User,
+  Shield,
+  ArrowLeft,
+  Loader2,
+  KeyRound
 } from 'lucide-react'
 
 type LoginMode = 'email' | 'forgot-password' | 'reset-sent' | 'recover-email'
@@ -67,7 +72,8 @@ const getRemainingTime = (): number => {
 }
 
 export const Login = (): JSX.Element => {
-  const { login } = useAuth()
+  const { t } = useTranslation()
+  const { login, verify2FA, resend2FAOtp } = useAuth()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
@@ -77,6 +83,18 @@ export const Login = (): JSX.Element => {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Double Authentification (2FA) Complète
+  const [is2FAStep, setIs2FAStep] = useState(false)
+  const [twoFactorData, setTwoFactorData] = useState<{
+    sessionTemp: string
+    method: 'totp' | 'email'
+    emailMasked?: string
+  } | null>(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [verifying2FA, setVerifying2FA] = useState(false)
+  const [resendingOtp, setResendingOtp] = useState(false)
+  const [resendSuccessMsg, setResendSuccessMsg] = useState<string | null>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.name === 'username' ? e.target.value.trim() : e.target.value
@@ -106,7 +124,17 @@ export const Login = (): JSX.Element => {
     
     const result = await login(formData.username, formData.password)
     
-    if (!result.success) {
+    if (result.requires2FA && result.sessionTemp) {
+      setTwoFactorData({
+        sessionTemp: result.sessionTemp,
+        method: result.twoFactorMethod || 'totp',
+        emailMasked: result.emailMasked
+      })
+      setIs2FAStep(true)
+      setError('')
+      setOtpCode('')
+      resetAttempts()
+    } else if (!result.success) {
       setError(result.error || 'Identifiants incorrects. Vérifiez votre nom d\'utilisateur ou mot de passe.')
     } else {
       resetAttempts()
@@ -114,6 +142,142 @@ export const Login = (): JSX.Element => {
     
     setLoading(false)
   }
+
+  const handleVerify2FA = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!twoFactorData?.sessionTemp) return
+    if (otpCode.length < 6) {
+      setError('Veuillez renseigner le code à 6 chiffres.')
+      return
+    }
+
+    setVerifying2FA(true)
+    setError('')
+    const res = await verify2FA(twoFactorData.sessionTemp, otpCode)
+    if (!res.success) {
+      setError(res.error || 'Code incorrect ou expiré.')
+    }
+    setVerifying2FA(false)
+  }
+
+  const handleResendOtp = async () => {
+    if (!twoFactorData?.sessionTemp) return
+    setResendingOtp(true)
+    setError('')
+    setResendSuccessMsg(null)
+    const res = await resend2FAOtp(twoFactorData.sessionTemp)
+    if (res.success) {
+      setResendSuccessMsg(res.message || 'Nouveau code envoyé par email !')
+      setTimeout(() => setResendSuccessMsg(null), 4000)
+    } else {
+      setError(res.error || "Erreur lors de l'envoi du code.")
+    }
+    setResendingOtp(false)
+  }
+
+  const render2FAStep = () => (
+    <>
+      <div className="text-center mb-6 sm:mb-8">
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/10">
+          <Shield className="w-7 h-7" />
+        </div>
+        <h1 className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>
+          {t('auth.twoFactorTitle', 'Double Authentification')}
+        </h1>
+        <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
+          {twoFactorData?.method === 'email'
+            ? `Entrez le code à 6 chiffres envoyé à ${twoFactorData.emailMasked || 'votre adresse email'}.`
+            : "Entrez le code à 6 chiffres généré par votre application d'authentification (Google Authenticator / Authy)."}
+        </p>
+      </div>
+
+      {error && (
+        <div className={`mb-4 sm:mb-6 p-3 sm:p-4 ${resolvedTheme === 'dark' ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'} border rounded-lg flex items-center space-x-2`}>
+          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
+          <span className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>{error}</span>
+        </div>
+      )}
+
+      {resendSuccessMsg && (
+        <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center gap-2">
+          <span>{resendSuccessMsg}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleVerify2FA} className="space-y-4 sm:space-y-6">
+        <div>
+          <label className={`block text-xs sm:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-2 text-center`}>
+            {t('auth.twoFactorPlaceholder', 'Code à 6 chiffres')}
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              autoFocus
+              value={otpCode}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '')
+                setOtpCode(val)
+                setError('')
+              }}
+              placeholder="••••••"
+              className={`w-full py-3.5 px-4 text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                resolvedTheme === 'dark'
+                  ? 'bg-zinc-900 border-zinc-700 text-white placeholder-zinc-600'
+                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-300'
+              }`}
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={verifying2FA || otpCode.length !== 6}
+          className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-md shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {verifying2FA ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Vérification...</span>
+            </>
+          ) : (
+            <span>{t('auth.twoFactorVerify', 'Valider la connexion')}</span>
+          )}
+        </button>
+
+        {twoFactorData?.method === 'email' && (
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={resendingOtp}
+              className="text-xs text-blue-500 hover:underline font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {resendingOtp && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Renvoyer un nouveau code</span>
+            </button>
+          </div>
+        )}
+
+        <div className="pt-2 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              setIs2FAStep(false)
+              setTwoFactorData(null)
+              setOtpCode('')
+              setError('')
+            }}
+            className="text-xs text-zinc-400 hover:text-zinc-200 inline-flex items-center gap-1.5"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 rtl-flip" />
+            <span>{t('auth.twoFactorBackToLogin', 'Retour à la connexion')}</span>
+          </button>
+        </div>
+      </form>
+    </>
+  )
 
   const renderLoginForm = () => (
     <>
@@ -253,7 +417,7 @@ export const Login = (): JSX.Element => {
             ? 'bg-slate-800/80 border border-slate-700' 
             : 'bg-white/80 border border-gray-200'
         }`}>
-          {renderLoginForm()}
+          {is2FAStep ? render2FAStep() : renderLoginForm()}
         </div>
       </div>
 

@@ -1,6 +1,9 @@
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Play, Edit, Trash2, Clock, AlertCircle, CheckCircle } from 'lucide-react'
 import { useQuery } from '../../hooks/useQuery'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
@@ -17,6 +20,7 @@ interface Draft {
 }
 
 export const MyDrafts = () => {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
 
   const {
@@ -35,13 +39,26 @@ export const MyDrafts = () => {
       })
 
       if (response.ok) {
+
         const data = await response.json()
-        return data.results || data || []
+        const rawDrafts = data.results || data || []
+        return rawDrafts.map((d: any) => ({
+          ...d,
+          thumbnailUrl: resolveMediaUrl(d.thumbnailUrl || d.cover_url || d.cover || null)
+        }))
       }
+
       return []
     },
     {
-      cacheKey: 'pro:videos:drafts',
+      cacheKey: (() => {
+        try {
+          const profile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}');
+          return `pro:videos:drafts:${profile?.id || localStorage.getItem('exile_client_uuid') || 'guest'}`;
+        } catch {
+          return 'pro:videos:drafts:guest';
+        }
+      })(),
       cacheTime: 3 * 60 * 1000,
       initialData: []
     }
@@ -51,12 +68,12 @@ export const MyDrafts = () => {
   const error = queryError ? queryError.message : null
 
   const handleDelete = async (draftId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce brouillon ?')) return
+    if (!confirm(t('pro.myVideos.deleteConfirmDraft', 'Êtes-vous sûr de vouloir supprimer ce brouillon ?'))) return
 
     try {
       const token = localStorage.getItem('accessToken')
       if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
+        alert(t('common.tokenNotFound', 'Token non trouvé. Veuillez vous reconnecter.'))
         return
       }
 
@@ -66,14 +83,14 @@ export const MyDrafts = () => {
       })
 
       if (response.ok) {
-        alert('Brouillon supprimé avec succès')
+        alert(t('pro.myVideos.draftDeleted', 'Brouillon supprimé avec succès'))
         loadDrafts()
       } else {
         throw new Error('Erreur lors de la suppression')
       }
     } catch (err) {
       console.error('Error deleting draft:', err)
-      alert('Erreur lors de la suppression')
+      alert(t('common.errorDeleting', 'Erreur lors de la suppression'))
     }
   }
 
@@ -105,15 +122,15 @@ export const MyDrafts = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'DRAFT':
-        return 'Brouillon'
+        return t('pro.myVideos.draft', 'Brouillon')
       case 'UPLOADING':
-        return 'Upload en cours'
+        return t('pro.myVideos.uploading', 'Upload en cours')
       case 'FAILED':
-        return 'Échec'
+        return t('pro.myVideos.failed', 'Échec')
       case 'READY':
-        return 'Prêt à publier'
+        return t('pro.myVideos.readyToPublish', 'Prêt à publier')
       default:
-        return 'Inconnu'
+        return t('common.unknown', 'Inconnu')
     }
   }
 
@@ -144,9 +161,11 @@ export const MyDrafts = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Mes Brouillons</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {t('pro.myVideos.myDrafts', 'Mes Brouillons')}
+          </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Gérez vos vidéos en cours de création
+            {t('pro.myVideos.myDraftsSubtitle', 'Gérez vos vidéos en cours de création')}
           </p>
         </div>
 
@@ -162,16 +181,16 @@ export const MyDrafts = () => {
               <Clock className="w-8 h-8 text-gray-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Aucun brouillon
+              {t('pro.myVideos.noDrafts', 'Aucun brouillon')}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Commencez à créer une vidéo pour voir vos brouillons ici
+              {t('pro.myVideos.noDraftsDesc', 'Commencez à créer une vidéo pour voir vos brouillons ici')}
             </p>
             <button
               onClick={() => navigate('/pro/upload')}
               className="px-6 py-3 bg-pro text-white rounded-lg hover:bg-pro/90"
             >
-              Créer une vidéo
+              {t('pro.myVideos.createVideo', 'Créer une vidéo')}
             </button>
           </div>
         ) : (
@@ -215,7 +234,7 @@ export const MyDrafts = () => {
                 {/* Content */}
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-2 truncate">
-                    {draft.title || 'Sans titre'}
+                    {draft.title || t('pro.myVideos.untitled', 'Sans titre')}
                   </h3>
                   {draft.description && (
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
@@ -251,7 +270,7 @@ export const MyDrafts = () => {
 
                   {/* Date */}
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                    {new Date(draft.createdAt).toLocaleDateString('fr-FR', {
+                    {new Date(draft.createdAt).toLocaleDateString(i18n.language || 'fr-FR', {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric'
@@ -266,7 +285,7 @@ export const MyDrafts = () => {
                         className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <Play className="w-4 h-4" />
-                        Continuer
+                        {t('common.continue', 'Continuer')}
                       </button>
                     ) : draft.status === 'READY' ? (
                       <button
@@ -274,7 +293,7 @@ export const MyDrafts = () => {
                         className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <CheckCircle className="w-4 h-4" />
-                        Publier
+                        {t('common.publish', 'Publier')}
                       </button>
                     ) : (
                       <button
@@ -282,11 +301,12 @@ export const MyDrafts = () => {
                         className="flex-1 px-3 py-2 bg-pro text-white rounded-lg hover:bg-pro/90 text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <Edit className="w-4 h-4" />
-                        Modifier
+                        {t('common.edit', 'Modifier')}
                       </button>
                     )}
                     <button
                       onClick={() => handleDelete(draft.id)}
+                      title={t('common.delete', 'Supprimer')}
                       className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
                     >
                       <Trash2 className="w-4 h-4" />

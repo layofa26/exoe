@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Calendar, Clock, MapPin, Video, Users, ArrowLeft,
   CheckCircle, Play, Share2, Heart, Bookmark
@@ -26,6 +27,7 @@ interface EventData {
 }
 
 export default function EventPreview() {
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
@@ -94,7 +96,7 @@ export default function EventPreview() {
     )
   }
 
-  const formatDate = (date: string) => new Date(date).toLocaleDateString('fr-FR', {
+  const formatDate = (date: string) => new Date(date).toLocaleDateString(i18n.language || 'fr-FR', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -114,16 +116,19 @@ export default function EventPreview() {
             <ArrowLeft className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400 group-hover:text-white' : 'text-gray-600 group-hover:text-gray-900'} transition-colors`} />
           </button>
           <div className="flex-1">
-            <h1 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Prévisualisation</h1>
-            <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Vérifiez avant de publier</p>
+            <h1 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              {t('pro.events.preview', 'Prévisualisation')}
+            </h1>
+            <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+              {t('pro.events.checkBeforePublish', 'Vérifiez avant de publier')}
+            </p>
           </div>
           <button
             onClick={handlePublish}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 sm:gap-2"
           >
             <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">{event.status === 'draft' ? 'Publier' : 'Publié'}</span>
-            <span className="sm:hidden">{event.status === 'draft' ? 'Publier' : 'Publié'}</span>
+            <span>{event.status === 'draft' ? t('common.publish', 'Publier') : t('pro.events.published', 'Publié')}</span>
           </button>
         </div>
       </div>
@@ -151,7 +156,7 @@ export default function EventPreview() {
             <div className="absolute top-3 sm:top-4 left-3 sm:left-4 flex gap-1.5 sm:gap-2">
               {event.isLive && (
                 <span className="bg-red-600 text-white text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full uppercase animate-pulse">
-                  Live
+                  {t('common.live', 'Live')}
                 </span>
               )}
               <span className={`${resolvedTheme === 'dark' ? 'bg-zinc-700/90 text-zinc-300' : 'bg-gray-800/90 text-gray-200'} backdrop-blur text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full uppercase`}>
@@ -167,7 +172,7 @@ export default function EventPreview() {
                 </div>
               ) : (
                 <div className="bg-emerald-600/80 backdrop-blur text-white text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 sm:py-2 rounded-full uppercase">
-                  Gratuit
+                  {t('common.free', 'Gratuit')}
                 </div>
               )}
             </div>
@@ -186,14 +191,14 @@ export default function EventPreview() {
               </span>
               <span className="flex items-center gap-1.5 sm:gap-2">
                 {event.format === 'virtual' ? (
-                  <><Video className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'}`} /> En ligne</>
+                  <><Video className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'}`} /> {t('pro.events.online', 'En ligne')}</>
                 ) : (
                   <><MapPin className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'}`} /> {event.location?.city}</>
                 )}
               </span>
               <span className="flex items-center gap-1.5 sm:gap-2">
                 <Users className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'}`} />
-                {event.capacity} places
+                {event.capacity} {t('pro.events.spots', 'places')}
               </span>
             </div>
 
@@ -208,33 +213,34 @@ export default function EventPreview() {
               </div>
               <div>
                 <p className={`font-medium text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{event.organizerName}</p>
-                <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Organisateur</p>
+                <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                  {t('pro.events.organizer', 'Organisateur')}
+                </p>
               </div>
             </div>
 
             {/* ACTIONS */}
             <div className="flex flex-wrap gap-2 sm:gap-3">
-              <button
-                onClick={handleGoLive}
-                className="flex-1 min-w-[120px] bg-red-600 text-white py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95"
-              >
-                <Video className="w-4 h-4 animate-pulse" />
-                <span>{event.isLive ? '🔴 Rejoindre le direct' : '🔴 Démarrer le direct'}</span>
-              </button>
+              {event.isLive && (
+                <button
+                  onClick={handleGoLive}
+                  className="flex-1 min-w-[100px] sm:min-w-[120px] bg-red-600 text-white py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 animate-pulse"
+                >
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Rejoindre
+                </button>
+              )}
               <button className={`flex-1 min-w-[100px] sm:min-w-[120px] ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2`}>
                 <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Partager</span>
-                <span className="sm:hidden">Partager</span>
+                <span>{t('common.share', 'Partager')}</span>
               </button>
               <button className={`flex-1 min-w-[100px] sm:min-w-[120px] ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2`}>
                 <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">J'aime</span>
-                <span className="sm:hidden">J'aime</span>
+                <span>{t('common.like', "J'aime")}</span>
               </button>
               <button className={`flex-1 min-w-[100px] sm:min-w-[120px] ${resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2`}>
                 <Bookmark className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Sauvegarder</span>
-                <span className="sm:hidden">Sauver</span>
+                <span>{t('common.save', 'Sauvegarder')}</span>
               </button>
             </div>
           </div>
@@ -242,23 +248,33 @@ export default function EventPreview() {
 
         {/* STATISTIQUES */}
         <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-2xl border p-4 sm:p-6`}>
-          <h3 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>Statistiques estimées</h3>
+          <h3 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>
+            {t('pro.events.estimatedStats', 'Statistiques estimées')}
+          </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="text-center">
               <p className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'}`}>0</p>
-              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Vues</p>
+              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                {t('pro.events.views', 'Vues')}
+              </p>
             </div>
             <div className="text-center">
               <p className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-emerald-300' : 'text-emerald-400'}`}>0</p>
-              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Inscriptions</p>
+              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                {t('pro.events.registrations', 'Inscriptions')}
+              </p>
             </div>
             <div className="text-center">
               <p className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-purple-300' : 'text-purple-400'}`}>0</p>
-              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Partages</p>
+              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                {t('pro.events.shares', 'Partages')}
+              </p>
             </div>
             <div className="text-center">
               <p className={`text-xl sm:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-orange-300' : 'text-orange-400'}`}>0€</p>
-              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Revenus</p>
+              <p className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                {t('pro.events.revenue', 'Revenus')}
+              </p>
             </div>
           </div>
         </div>
@@ -267,24 +283,24 @@ export default function EventPreview() {
         <div className={`${resolvedTheme === 'dark' ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-950/30 border-blue-800/40'} rounded-2xl border p-4 sm:p-6`}>
           <h3 className="text-base sm:text-lg font-bold text-white mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2">
             <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 ${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'}`} />
-            Conseils avant publication
+            {t('pro.events.tipsBeforePublish', 'Conseils avant publication')}
           </h3>
           <ul className={`space-y-1.5 sm:space-y-2 text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
             <li className="flex items-start gap-2">
               <span className={`${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'} mt-0.5 sm:mt-1`}>•</span>
-              Vérifiez que l'image de couverture est de bonne qualité
+              {t('pro.events.tipCoverQuality', "Vérifiez que l'image de couverture est de bonne qualité")}
             </li>
             <li className="flex items-start gap-2">
               <span className={`${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'} mt-0.5 sm:mt-1`}>•</span>
-              Assurez-vous que la description est claire et attrayante
+              {t('pro.events.tipDescClear', "Assurez-vous que la description est claire et attrayante")}
             </li>
             <li className="flex items-start gap-2">
               <span className={`${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'} mt-0.5 sm:mt-1`}>•</span>
-              Testez le lien virtuel si l'événement est en ligne
+              {t('pro.events.tipVirtualLink', "Testez le lien virtuel si l'événement est en ligne")}
             </li>
             <li className="flex items-start gap-2">
               <span className={`${resolvedTheme === 'dark' ? 'text-blue-300' : 'text-blue-400'} mt-0.5 sm:mt-1`}>•</span>
-              Partagez l'événement sur vos réseaux sociaux
+              {t('pro.events.tipShareSocial', "Partagez l'événement sur vos réseaux sociaux")}
             </li>
           </ul>
         </div>
