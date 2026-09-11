@@ -2304,9 +2304,9 @@ const Settings = () => {
                   <div className={`p-6 rounded-2xl border ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} shadow-sm flex flex-col justify-between space-y-6`}>
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Pour démarrer</span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">{t('settings.premium.forStarting', 'Pou kòmanse')}</span>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
-                          Plan Actif
+                          {t('settings.premium.activePlan', 'Plan Aktyèl')}
                         </span>
                       </div>
 
@@ -2316,138 +2316,139 @@ const Settings = () => {
                         </h3>
                         <div className="flex items-baseline gap-1 mt-1">
                           <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$0</span>
-                          <span className="text-xs text-zinc-400">/ mois</span>
+                          <span className="text-xs text-zinc-400">/ {t('common.month', 'mwa')}</span>
                         </div>
                         <p className={`text-xs mt-2 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                          Pou tout moun kòmanse sou EXILE.
+                          {t('settings.premium.freeDesc', 'Pou tout moun kòmanse sou EXILE.')}
                         </p>
                       </div>
 
                       <div className="pt-3 border-t border-zinc-800/60 space-y-2.5">
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Profil professionnel</span>
+                          <span>{t('settings.premium.featProfile', 'Pwofil pwofesyonèl')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Publier des vidéos</span>
+                          <span>{t('settings.premium.featPublish', 'Pibliye videyo')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Suivre des professionnels</span>
+                          <span>{t('settings.premium.featFollow', 'Swiv pwofesyonèl yo')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Likes, commentaires, partages</span>
+                          <span>{t('settings.premium.featInteract', 'Jèm, kòmantè, pataj')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Messagerie</span>
+                          <span>{t('settings.premium.featMessaging', 'Mesajri')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Accès aux cours et lives</span>
+                          <span>{t('settings.premium.featCourses', 'Aksè ak kou ak live')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Piblisite EXILE</span>
+                          <span>{t('settings.premium.featAds', 'Piblisite EXILE')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Statistiques de base</span>
+                          <span>{t('settings.premium.featStats', 'Estatistik de baz')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>Visibilité normale</span>
+                          <span>{t('settings.premium.featVisibility', 'Vizibilite nòmal')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-500 opacity-60">
                           <X className="w-4 h-4 text-red-400 flex-shrink-0" />
-                          <span className="line-through">Badge vérifié</span>
+                          <span className="line-through">{t('settings.premium.featBadge', 'Badj verifye')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-500 opacity-60">
                           <X className="w-4 h-4 text-red-400 flex-shrink-0" />
-                          <span className="line-through">Promotion payante incluse</span>
+                          <span className="line-through">{t('settings.premium.featPromo', 'Pwomosyon peye')}</span>
                         </div>
                       </div>
                     </div>
 
-                    <button
-                      disabled
-                      className="w-full py-2.5 rounded-xl border border-zinc-700/60 text-zinc-400 text-xs sm:text-sm font-semibold text-center cursor-default bg-zinc-800/20"
-                    >
-                      Plan Actuel
-                    </button>
+                    <div className="pt-2">
+                      <span className="w-full py-2.5 rounded-xl bg-zinc-800/80 text-zinc-400 font-bold text-xs flex items-center justify-center cursor-default">
+                        {t('settings.premium.activePlan', 'Plan Aktyèl')}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* CARTE 2 : PRO — $25/mois */}
+                  {/* CARTE 2 : PRO — $20/mois (Featured) */}
                   <div
                     id="pro-plan-card"
-                    className={`p-6 rounded-2xl border-2 border-[#FF6B00] relative ${resolvedTheme === 'dark' ? 'bg-zinc-900/90' : 'bg-white'} shadow-xl flex flex-col justify-between space-y-6`}
+                    className={`p-6 rounded-2xl border-2 border-[#FF6B00] ${
+                      resolvedTheme === 'dark' ? 'bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-2xl shadow-[#FF6B00]/10' : 'bg-gradient-to-b from-white to-orange-50/30 shadow-xl'
+                    } flex flex-col justify-between space-y-6 relative overflow-hidden`}
                   >
-                    <div className="absolute -top-3 right-6 px-3 py-0.5 rounded-full bg-[#FF6B00] text-white font-bold text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1">
-                      <Crown className="w-3 h-3" />
-                      <span>Recommandé</span>
-                    </div>
-
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-[#FF6B00]">Pleine puissance</span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#FF6B00]">
+                          {t('settings.premium.fullPower', 'Tout Pouvwa')}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FF6B00] text-white">
+                          {t('settings.premium.recommended', 'Rekòmande')}
+                        </span>
                       </div>
 
                       <div>
-                        <h3 className={`text-2xl font-black ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} flex items-center gap-2`}>
+                        <h3 className={`text-2xl font-black flex items-center gap-2 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                           <span>PRO</span>
                           <span className="text-amber-400 text-xl">⭐</span>
                         </h3>
                         <div className="flex items-baseline gap-1 mt-1">
                           <span className={`text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>$20</span>
-                          <span className="text-xs text-zinc-400">/ mois</span>
+                          <span className="text-xs text-zinc-400">/ {t('common.month', 'mwa')}</span>
                         </div>
                         <p className={`text-xs mt-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
-                          Pou professionnels ki vle plis crédibilité ak visibilité.
+                          {t('settings.premium.proDesc', 'Pou pwofesyonèl ki vle plis kredibilite ak vizibilite.')}
                         </p>
                       </div>
 
                       <div className="pt-3 border-t border-zinc-800/60 space-y-2.5">
                         <div className="flex items-center gap-2 text-xs font-bold text-[#FF6B00]">
                           <Check className="w-4 h-4 text-[#FF6B00] flex-shrink-0" />
-                          <span>Tout sa ki nan Free</span>
+                          <span>{t('settings.premium.allInFree', 'Tout sa ki nan Free')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-white">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span className="font-semibold">Badge Pro vérifié</span>
+                          <span className="font-semibold">{t('settings.premium.verifiedBadge', 'Badj Pro verifye')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-white">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span className="font-semibold">Sans publicité</span>
+                          <span className="font-semibold">{t('settings.premium.noAds', 'San piblisite')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-200">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>2 promotions / semaine</span>
+                          <span>{t('settings.premium.twoPromos', '2 pwomosyon / semèn')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-200">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>Statistiques avancées</span>
+                          <span>{t('settings.premium.advancedStats', 'Estatistik avanse')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-200">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>Priorité dans les recherches</span>
+                          <span>{t('settings.premium.searchPriority', 'Priyorite nan rechèch')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-200">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>Mise en avant du contenu</span>
+                          <span>{t('settings.premium.contentHighlight', 'Mete kontni an valè')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-200">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>Lien professionnel personnalisé</span>
+                          <span>{t('settings.premium.customLink', 'Lyen pwofesyonèl pèsonalize')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-200">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>Support prioritaire</span>
+                          <span>{t('settings.premium.prioritySupport', 'Sipò priyoritè')}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-200">
                           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>1 bonus de visibilité / mois</span>
+                          <span>{t('settings.premium.monthlyBonus', '1 bonis vizibilite / mwa')}</span>
                         </div>
                       </div>
                     </div>

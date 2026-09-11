@@ -56,13 +56,20 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
         body: JSON.stringify({ montant: montant })
       });
 
-      const data = await response.json();
+      let data: any = null;
+      const textResponse = await response.text();
+      try {
+        data = JSON.parse(textResponse);
+      } catch (jsonErr) {
+        data = { error: textResponse.slice(0, 300) };
+      }
 
       if (response.ok && data && data.payment_url) {
         window.location.href = data.payment_url;
       } else {
-        const errDetail = data?.detail || data?.message || data?.error || (response.status === 401 ? 'Sesyon ou ekspire oswa ou pa konekte. Tanpri rekonekte.' : 'URL peman an pa disponib.');
-        setErrorMessage(errDetail);
+        const detailStr = typeof data?.details === 'object' ? JSON.stringify(data?.details) : (data?.details || '');
+        const errDetail = data?.error || data?.message || data?.detail || (response.status === 401 ? 'Sesyon ou ekspire oswa ou pa konekte. Tanpri rekonekte.' : 'URL peman an pa disponib.');
+        setErrorMessage(detailStr ? `${errDetail} (${detailStr})` : errDetail);
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Erè pandan inisyasyon peman an sou PGecom.');

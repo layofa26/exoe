@@ -1307,6 +1307,16 @@ export default function AdDashboard() {
 
   useEffect(() => {
     refreshFromServer();
+    // Rafrechi otomatikman chak 4 segonn pou tout klik ki fèt sou lòt aparèy parèt an dirèk
+    const interval = setInterval(() => {
+      fetchRemoteAds().then(remoteAds => {
+        if (Array.isArray(remoteAds) && remoteAds.length > 0) {
+          setAds(remoteAds);
+        }
+      }).catch(() => {});
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Synchroniser avec les évènements externes

@@ -776,5 +776,51 @@
     "twoFactorPlaceholder": "Kòd 6 chif",
     "twoFactorVerify": "Valide koneksyon an",
     "twoFactorBackToLogin": "Retounen nan koneksyon"
+  },
+  "settings": {
+    "sections": {
+      "main": "Paramèt Jeneral",
+      "security": "Kont & Sekirite"
+    },
+    "categories": {
+      "account": "Kont & Pwofil",
+      "accountDesc": "Enfòmasyon pèsonèl, imèl, sekirite",
+      "privacy": "Konfidansyalite",
+      "privacyDesc": "Kiyès ki ka kontakte w, vizibilite",
+      "security": "Sekirite & 2FA",
+      "securityDesc": "Double otantifikasyon, sesyon aktif",
+      "notifications": "Notifikasyon",
+      "notificationsDesc": "Alèt, imèl, notifikasyon push",
+      "app": "Aparans & Lang",
+      "appDesc": "Tèm nwa/klè, lang, zòn tan",
+      "video": "Lekti Videyo",
+      "videoDesc": "Lekti otomatik, kalite, done mobil",
+      "support": "Sipò & Èd",
+      "supportDesc": "Asistans, rapòte yon pwoblèm, enfòmasyon",
+      "premium": "Pase nan Premium",
+      "premiumDesc": "Debloke plis fonksyonalite ak vizibilite"
+    },
+    "account": {
+      "personalInfoTitle": "Enfòmasyon Pèsonèl",
+      "personalInfoDesc": "Jere enfòmasyon pèsonèl ak detay pwofil ou",
+      "editProfileBtn": "Modifye pwofil la",
+      "securityTitle": "Sekirite Kont lan",
+      "passwordDescClean": "Modpas sekirize ak aktif",
+      "modifyPassword": "Chanje modpas",
+      "emailTitle": "Adrès Imèl",
+      "emailDesc": "Imèl prensipal ki konekte ak kont ou",
+      "modifyEmail": "Chanje adrès imèl",
+      "dangerZoneClean": "Zòn Danje",
+      "deleteAccountTitle": "Efase Kont la",
+      "dangerZoneDescClean": "Aksyon sa a ap efase pwofil ou, videyo ou, ak tout done ou yo nèt.",
+      "deleteAccount": "Efase kont la nèt"
+    },
+    "premium": {
+      "currentPlanTitle": "Plan Aktyèl",
+      "upgradeBtn": "Pase nan PRO ($20/mwa)",
+      "cancelSubscription": "Anile abònman an",
+      "title": "Abònman Premium",
+      "subtitle": "Chwazi plan ki pi bon pou ou"
+    }
   }
 }
