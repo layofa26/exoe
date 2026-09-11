@@ -15,13 +15,36 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const getAuthToken = (): string | null => {
+    // 1. Check accessToken (standard Exile auth key)
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) return accessToken;
+
+    // 2. Check access_token / token fallbacks
+    const fallback = localStorage.getItem('access_token') || localStorage.getItem('token');
+    if (fallback) return fallback;
+
+    // 3. Check document.cookie
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.match(/(?:^|;\s*)access_token=([^;]*)/);
+      if (match) return decodeURIComponent(match[1]);
+    }
+    return null;
+  };
+
   const handlePayment = async () => {
     setLoading(true);
     setErrorMessage(null);
 
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-      const apiBase = API_BASE_URL || 'https://exile-backend.onrender.com';
+      const token = getAuthToken();
+      if (!token) {
+        setErrorMessage('Ou dwe konekte pou w ka abòne. Tanpri rekonekte.');
+        setLoading(false);
+        return;
+      }
+
+      const apiBase = API_BASE_URL || 'https://exile-backend-9q6o.onrender.com/api/v1';
 
       const response = await fetch(`${apiBase}/abonnement/abonnements/initier_paiement/`, {
         method: 'POST',
@@ -29,6 +52,7 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ montant: montant })
       });
 
@@ -37,7 +61,8 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
       if (response.ok && data && data.payment_url) {
         window.location.href = data.payment_url;
       } else {
-        setErrorMessage(data?.message || data?.error || 'URL peman an pa disponib. Tanpri reeseye.');
+        const errDetail = data?.detail || data?.message || data?.error || (response.status === 401 ? 'Sesyon ou ekspire oswa ou pa konekte. Tanpri rekonekte.' : 'URL peman an pa disponib.');
+        setErrorMessage(errDetail);
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Erè pandan inisyasyon peman an sou PGecom.');
