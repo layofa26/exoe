@@ -6,7 +6,8 @@ import {
   Clock, MapPin, Video, BarChart3, Trash2, CheckCircle,
   Radio, Ticket, X, ArrowLeft, Share2, CalendarPlus, Check, Sparkles,
   Play, Download, Upload, RotateCcw, Laptop, Briefcase, Palette, HeartPulse,
-  Scale, Megaphone, GraduationCap, Layers, PlayCircle, User, AlertCircle, Eye, Shield, DollarSign
+  Scale, Megaphone, GraduationCap, Layers, PlayCircle, User, AlertCircle, Eye, Shield, DollarSign,
+  ChevronLeft, ChevronRight, Info
 } from 'lucide-react'
 import TicketModal from '../../components/modals/TicketModal'
 import EventStatsModal from '../../components/modals/EventStatsModal'
@@ -135,26 +136,23 @@ export default function EventsPro() {
     async () => {
       try {
         const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
-        if (!token) {
-          return DEMO_EVENTS
-        }
 
         const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
-          headers: {
+          headers: token ? {
             'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } : {
             'Content-Type': 'application/json'
           }
         })
 
         if (!response.ok) {
-          return DEMO_EVENTS
+          return []
         }
 
         const data = await response.json()
         const rawEvents = Array.isArray(data) ? data : (data.results || [])
         
-        if (rawEvents.length === 0) return DEMO_EVENTS
-
         return rawEvents.map((item: any) => ({
           id: String(item.id),
           title: item.title || item.name,
@@ -194,17 +192,17 @@ export default function EventsPro() {
         }))
       } catch (error) {
         console.error('Error loading events:', error)
-        return DEMO_EVENTS
+        return []
       }
     },
     {
       cacheKey: 'pro:events:list',
       cacheTime: 5 * 60 * 1000,
-      initialData: DEMO_EVENTS
+      initialData: []
     }
   )
 
-  const events = cachedEvents || DEMO_EVENTS
+  const events = cachedEvents || []
 
   // Fonction de navigation conditionnelle
   const handleBack = () => {
@@ -214,8 +212,11 @@ export default function EventsPro() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'live' | 'past' | 'replays' | 'mine'>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const categoryScrollRef = useRef<HTMLDivElement>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null)
+  const [selectedDetailEvent, setSelectedDetailEvent] = useState<EventItem | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [showStatsModal, setShowStatsModal] = useState(false)
   const [selectedReplayEvent, setSelectedReplayEvent] = useState<EventItem | null>(null)
@@ -359,7 +360,37 @@ export default function EventsPro() {
     showToastMsg('Fichier calendrier (.ics) téléchargé !')
   }, [showToastMsg])
 
-    // Helper pour vérifier si l'utilisateur actuel est le créateur / propriétaire de l'événement
+  // Helper pour vérifier et demander les permissions Caméra & Micro une seule fois
+  const ensureMediaPermissions = useCallback(async (): Promise<boolean> => {
+    const granted = localStorage.getItem('exile_media_permissions_granted')
+    if (granted === 'true') {
+      return true
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return true
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      stream.getTracks().forEach(t => t.stop())
+      localStorage.setItem('exile_media_permissions_granted', 'true')
+      return true
+    } catch (err: any) {
+      console.warn('Media permissions warning:', err)
+      // Si l'utilisateur n'a pas de caméra ou refuse, on le laisse continuer avec avertissement
+      showToastMsg("Accès caméra/micro non accordé ou indisponible. Vous pourrez toujours écouter le live.")
+      return true
+    }
+  }, [showToastMsg])
+
+  // Défilement horizontal des catégories
+  const scrollCategories = useCallback((direction: 'left' | 'right') => {
+    if (categoryScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220
+      categoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+    }
+  }, [])
+
+  // Helper pour vérifier si l'utilisateur actuel est le créateur / propriétaire de l'événement
   const isEventOwner = useCallback((event: EventItem) => {
     if (!isAuthenticated || !user) return false
     if (event.ownerId !== undefined && event.ownerId !== null && String(event.ownerId) === String(user.id)) {
@@ -371,9 +402,9 @@ export default function EventsPro() {
     return false
   }, [isAuthenticated, user])
 
-  // Notification de rappel quand l'heure arrive (uniquement pour l'organisateur)
+  // Notification de rappel quand l'heure arrive + Polling léger pour détecter les lives en temps réel
   useEffect(() => {
-    const checkSchedule = () => {
+    const checkScheduleAndLive = async () => {
       const now = Date.now()
       events.forEach(e => {
         const start = new Date(e.startDate).getTime()
@@ -387,12 +418,33 @@ export default function EventsPro() {
           }
         }
       })
+
+      // Polling léger en tâche de fond pour mettre à jour les statuts en direct sans recharger toute la page
+      try {
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+        const headers: HeadersInit = { 'Content-Type': 'application/json' }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const res = await fetch(`${API_BASE_URL}/evenement/evenements/?status=live`, { headers })
+        if (res.ok) {
+          const liveData = await res.json()
+          const liveList = Array.isArray(liveData) ? liveData : (liveData.results || [])
+          const liveIds = new Set(liveList.map((item: any) => String(item.id)))
+
+          setEvents(prev => prev.map(evt => {
+            const isLiveNow = liveIds.has(String(evt.id))
+            if (evt.isLive !== isLiveNow) {
+              return { ...evt, isLive: isLiveNow, status: isLiveNow ? 'live' : evt.status }
+            }
+            return evt
+          }))
+        }
+      } catch {}
     }
 
-    checkSchedule()
-    const interval = setInterval(checkSchedule, 10000)
+    checkScheduleAndLive()
+    const interval = setInterval(checkScheduleAndLive, 12000)
     return () => clearInterval(interval)
-  }, [events, isEventOwner, showToastMsg])
+  }, [events, isEventOwner, showToastMsg, setEvents])
 
   const createEvent = useCallback(async (data: any) => {
     if (!isAuthenticated) {
@@ -522,6 +574,8 @@ export default function EventsPro() {
       return
     }
 
+    await ensureMediaPermissions()
+
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
     const cleanId = String(event.id).replace('exile-', '').replace('evt_', '')
     const roomName = event.liveRoomName || `exile-${event.id}`
@@ -543,7 +597,7 @@ export default function EventsPro() {
 
     setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isLive: true, status: 'published', liveRoomName: roomName } : e))
     navigate(`/pro/events/${event.id}/live?room=${roomName}`)
-  }, [isAuthenticated, isEventOwner, navigate, showToastMsg, setEvents])
+  }, [isAuthenticated, isEventOwner, ensureMediaPermissions, navigate, showToastMsg, setEvents])
 
   const handleUploadRecording = useCallback(async (eventId: string, file?: File, replayUrl?: string) => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
@@ -575,6 +629,11 @@ export default function EventsPro() {
       return
     }
 
+    // Demander/vérifier les permissions média si organisateur
+    if (isOwner) {
+      await ensureMediaPermissions()
+    }
+
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
     const cleanId = String(event.id).replace('exile-', '').replace('evt_', '')
     const roomName = event.liveRoomName || `exile-${event.id}`
@@ -595,7 +654,7 @@ export default function EventsPro() {
       setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isLive: true, liveRoomName: roomName } : e))
     }
     navigate(`/pro/events/${event.id}/live?room=${roomName}`)
-  }, [isEventOwner, navigate, showToastMsg, setEvents])
+  }, [isEventOwner, ensureMediaPermissions, navigate, showToastMsg, setEvents])
 
   const deleteEvent = useCallback(async (id: string) => {
     if (!isAuthenticated) {
@@ -648,6 +707,7 @@ export default function EventsPro() {
       return
     }
     const title = instantLiveTitle.trim() || `Session Live de @${user?.username || 'mon_compte'}`
+    await ensureMediaPermissions()
     setIsLaunchingLive(true)
     try {
       const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
@@ -852,28 +912,54 @@ export default function EventsPro() {
           })}
         </div>
 
-                {/* 2. CATEGORIES HORIZONTAL SCROLL CHIPS */}
-        <div className="flex gap-1.5 overflow-x-auto pt-2 pb-0.5" style={{ scrollbarWidth: 'none' }}>
-          {CATEGORIES.map(cat => {
-            const isSelected = selectedCategory === cat.id
-            const CatIcon = cat.icon
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
-                  isSelected
-                    ? 'bg-zinc-800 text-[#FF6B00] border border-[#FF6B00]/50 font-bold'
-                    : resolvedTheme === 'dark'
-                    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-800/20 border border-zinc-800'
-                    : 'text-slate-600 hover:text-slate-900 bg-slate-100/80 border border-slate-200'
-                }`}
-              >
-                <CatIcon className="w-3 h-3" />
-                <span>{cat.label}</span>
-              </button>
-            )
-          })}
+        {/* 2. CATEGORIES HORIZONTAL SCROLL CHIPS AVEC BOUTONS FLECHES */}
+        <div className="relative flex items-center pt-2 pb-0.5 group">
+          <button
+            onClick={() => scrollCategories('left')}
+            className={`hidden md:flex items-center justify-center w-7 h-7 rounded-full border shadow-sm flex-shrink-0 mr-1.5 transition-all z-10 ${
+              resolvedTheme === 'dark' ? 'bg-zinc-850 hover:bg-zinc-700 text-zinc-300 border-zinc-700' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }`}
+            title="Précédent"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div
+            ref={categoryScrollRef}
+            className="flex-1 flex gap-1.5 overflow-x-auto scroll-smooth py-0.5"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {CATEGORIES.map(cat => {
+              const isSelected = selectedCategory === cat.id
+              const CatIcon = cat.icon
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
+                    isSelected
+                      ? 'bg-zinc-800 text-[#FF6B00] border border-[#FF6B00]/50 font-bold shadow-sm'
+                      : resolvedTheme === 'dark'
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-800/20 border border-zinc-800'
+                      : 'text-slate-600 hover:text-slate-900 bg-slate-100/80 border border-slate-200'
+                  }`}
+                >
+                  <CatIcon className="w-3 h-3" />
+                  <span>{cat.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <button
+            onClick={() => scrollCategories('right')}
+            className={`hidden md:flex items-center justify-center w-7 h-7 rounded-full border shadow-sm flex-shrink-0 ml-1.5 transition-all z-10 ${
+              resolvedTheme === 'dark' ? 'bg-zinc-850 hover:bg-zinc-700 text-zinc-300 border-zinc-700' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }`}
+            title="Suivant"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -960,7 +1046,7 @@ export default function EventsPro() {
                       </span>
                       <span className="text-[11px] font-semibold text-red-400 flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" />
-                        {liveEvt.participantsCount || liveEvt.stats.attendees || 42} {t('pro.events.participants', 'participants')}
+                        {liveEvt.participantsCount || liveEvt.stats.attendees || 1} {t('pro.events.participants', 'participants')}
                       </span>
                     </div>
                   </div>
@@ -1012,16 +1098,34 @@ export default function EventsPro() {
             {filtered.map(event => (
               <div key={event.id} className={`group ${resolvedTheme === 'dark' ? 'bg-zinc-900/70 border-zinc-800/80 hover:bg-zinc-900 hover:border-zinc-700' : 'bg-white border-slate-200 hover:shadow-md'} rounded-3xl border overflow-hidden transition-all flex flex-col justify-between`}>
                 <div>
-                  {/* KOUVRI */}
-                  <div className={`relative h-40 sm:h-44 ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-slate-100'} overflow-hidden w-full`}>
-                    {event.coverImage ? (
-                      <img src={event.coverImage} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-br ${resolvedTheme === 'dark' ? 'from-zinc-800 to-zinc-950' : 'from-slate-100 to-slate-300'} flex items-center justify-center`}>
-                        <Calendar className={`w-10 h-10 ${resolvedTheme === 'dark' ? 'text-zinc-600' : 'text-slate-400'}`} />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    {/* KOUVRI */}
+                    <div 
+                      onClick={() => { setSelectedDetailEvent(event); setShowDetailModal(true) }}
+                      className={`relative h-40 sm:h-44 ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-slate-100'} overflow-hidden w-full cursor-pointer`}
+                    >
+                      {event.coverImage ? (
+                        <img src={event.coverImage} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      ) : (
+                        <div className={`w-full h-full flex flex-col items-center justify-center p-4 text-center select-none ${
+                          (event.category || '').toLowerCase().includes('tech') 
+                            ? 'bg-gradient-to-br from-indigo-900/60 via-blue-900/40 to-zinc-950 text-indigo-200'
+                            : (event.category || '').toLowerCase().includes('bus')
+                            ? 'bg-gradient-to-br from-amber-900/60 via-orange-900/40 to-zinc-950 text-amber-200'
+                            : (event.category || '').toLowerCase().includes('des')
+                            ? 'bg-gradient-to-br from-purple-900/60 via-pink-900/40 to-zinc-950 text-purple-200'
+                            : (event.category || '').toLowerCase().includes('sant') || (event.category || '').toLowerCase().includes('heal')
+                            ? 'bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-zinc-950 text-emerald-200'
+                            : 'bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-zinc-300'
+                        }`}>
+                          <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur border border-white/10 flex items-center justify-center mb-2 shadow-inner group-hover:scale-110 transition-transform">
+                            <Calendar className="w-6 h-6 opacity-80" />
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+                            {event.category || 'EXILE LIVE'}
+                          </span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
                     {/* BADGES */}
                     <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
@@ -1068,8 +1172,11 @@ export default function EventsPro() {
                   </div>
 
                   {/* TITRE & DESCRIPTION */}
-                  <div className="p-3.5 space-y-2">
-                    <h3 className={`text-xs sm:text-sm font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100' : 'text-slate-900'} leading-snug line-clamp-2`}>
+                  <div 
+                    onClick={() => { setSelectedDetailEvent(event); setShowDetailModal(true) }}
+                    className="p-3.5 space-y-2 cursor-pointer"
+                  >
+                    <h3 className={`text-xs sm:text-sm font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100 hover:text-[#FF6B00]' : 'text-slate-900 hover:text-[#FF6B00]'} leading-snug line-clamp-2 transition-colors`}>
                       {event.title}
                     </h3>
                     <p className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'} line-clamp-2`}>
@@ -1191,72 +1298,109 @@ export default function EventsPro() {
                     }
                   })()}
 
-                  {/* Bouton d'inscription / participation principale */}
-                  <div className="flex items-center gap-1.5">
-                    {!isEventOwner(event) ? (
+                  {/* Boutons d'actions principaux et inscription */}
+                  {!isFinished ? (
+                    <div className="flex items-center gap-1.5">
+                      {!isOwner ? (
+                        <button
+                          onClick={() => handleToggleRegister(event)}
+                          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                            event.isRegistered
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-[#FF6B00]/25'
+                          }`}
+                        >
+                          {event.isRegistered ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>{t('pro.events.registered', 'Inscrit')} ✓</span>
+                            </>
+                          ) : (
+                            <>
+                              <Ticket className="w-3.5 h-3.5" />
+                              <span>{t('pro.events.register', "S'inscrire")} ({event.price === 0 ? t('pro.events.free', 'Gratuit') : `${event.price}$`})</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <div className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border ${
+                          resolvedTheme === 'dark' ? 'bg-indigo-950/40 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                          <Shield className="w-3.5 h-3.5" />
+                          <span>{t('pro.events.organizer', 'Organisateur')}</span>
+                        </div>
+                      )}
+
+                      {/* Partager */}
                       <button
-                        onClick={() => handleToggleRegister(event)}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
-                          event.isRegistered
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                            : 'bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-[#FF6B00]/25'
+                        onClick={() => handleShareEvent(event)}
+                        className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
+                        }`}
+                        title={t('common.share', "Partager l'événement")}
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Google Calendar */}
+                      <button
+                        onClick={() => addToGoogleCalendar(event)}
+                        className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
+                        }`}
+                        title={t('pro.events.addToGoogleCalendar', 'Ajouter au calendrier Google')}
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleShareEvent(event)}
+                        className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                         }`}
                       >
-                        {event.isRegistered ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                            <span>{t('pro.events.registered', 'Inscrit')} ✓</span>
-                          </>
-                        ) : (
-                          <>
-                            <Ticket className="w-3.5 h-3.5" />
-                            <span>{t('pro.events.register', "S'inscrire")} ({event.price === 0 ? t('pro.events.free', 'Gratuit') : `${event.price}$`})</span>
-                          </>
-                        )}
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>{t('common.share', 'Partager')}</span>
                       </button>
-                    ) : (
-                      <div className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border ${
-                        resolvedTheme === 'dark' ? 'bg-indigo-950/40 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                      }`}>
-                        <Shield className="w-3.5 h-3.5" />
-                        <span>{t('pro.events.organizer', 'Organisateur')}</span>
-                      </div>
-                    )}
+                      <button
+                        onClick={() => { setSelectedDetailEvent(event); setShowDetailModal(true) }}
+                        className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                        <span>Détails</span>
+                      </button>
+                    </div>
+                  )}
 
-                    {/* Partager */}
-                    <button
-                      onClick={() => handleShareEvent(event)}
-                      className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
-                        resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
-                      }`}
-                      title={t('common.share', "Partager l'événement")}
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Google Calendar */}
-                    <button
-                      onClick={() => addToGoogleCalendar(event)}
-                      className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
-                        resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
-                      }`}
-                      title={t('pro.events.addToGoogleCalendar', 'Ajouter au calendrier Google')}
-                    >
-                      <CalendarPlus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Boutons secondaires (Stats / Supprimer si organisateur) */}
+                  {/* Boutons secondaires (Billetterie / Stats / Supprimer si organisateur) */}
                   <div className="flex items-center justify-between text-[11px] pt-1">
-                    <button
-                      onClick={() => { setSelectedEvent(event); setShowStatsModal(true) }}
-                      className={`font-semibold transition-colors flex items-center gap-1 ${
-                        resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      <BarChart3 className="w-3 h-3" />
-                      <span>{t('pro.events.stats', 'Statistiques')}</span>
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => { setSelectedEvent(event); setShowStatsModal(true) }}
+                        className={`font-semibold transition-colors flex items-center gap-1 ${
+                          resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        <BarChart3 className="w-3 h-3" />
+                        <span>{t('pro.events.stats', 'Statistiques')}</span>
+                      </button>
+
+                      {isEventOwner(event) && (
+                        <button
+                          onClick={() => { setSelectedEvent(event); setShowTicketModal(true) }}
+                          className={`font-semibold transition-colors flex items-center gap-1 ${
+                            resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-blue-400' : 'text-slate-500 hover:text-blue-600'
+                          }`}
+                        >
+                          <Ticket className="w-3 h-3" />
+                          <span>Billetterie</span>
+                        </button>
+                      )}
+                    </div>
 
                     {isEventOwner(event) && (
                       <button
@@ -1335,6 +1479,116 @@ export default function EventsPro() {
           eventId={selectedEvent.id}
           eventTitle={selectedEvent.title}
         />
+      )}
+
+      {/* MODAL: DÉTAILS RAPIDES DE L'ÉVÉNEMENT */}
+      {showDetailModal && selectedDetailEvent && (
+        <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className={`w-full max-w-lg rounded-3xl overflow-hidden border shadow-2xl flex flex-col max-h-[90vh] ${
+            resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            {/* Header / Cover */}
+            <div className="relative h-44 sm:h-52 bg-zinc-950 overflow-hidden flex-shrink-0">
+              {selectedDetailEvent.coverImage ? (
+                <img src={selectedDetailEvent.coverImage} alt={selectedDetailEvent.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-indigo-900/50 via-zinc-900 to-black flex items-center justify-center">
+                  <Calendar className="w-12 h-12 text-zinc-600" />
+                </div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              <button
+                onClick={() => { setShowDetailModal(false); setSelectedDetailEvent(null) }}
+                className="absolute top-3 right-3 p-1.5 rounded-full bg-black/60 backdrop-blur text-white hover:bg-black/80 transition-colors z-10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="absolute bottom-3 left-3 right-3">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#FF6B00] text-white text-[10px] font-bold uppercase tracking-wider">
+                  {selectedDetailEvent.category}
+                </span>
+                <h3 className="text-base sm:text-lg font-bold text-white mt-1 leading-snug line-clamp-2">
+                  {selectedDetailEvent.title}
+                </h3>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs sm:text-sm">
+              <p className={resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-600'}>
+                {selectedDetailEvent.description || "Aucune description fournie pour cet événement."}
+              </p>
+
+              <div className={`p-3.5 rounded-2xl border space-y-2.5 ${resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[#FF6B00]" />
+                  <span><strong>Date :</strong> {formatDate(selectedDetailEvent.startDate)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-400" />
+                  <span><strong>Format :</strong> {selectedDetailEvent.format === 'virtual' ? 'En ligne (Salon Live)' : (selectedDetailEvent.location?.city || 'Sur place')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <span><strong>Participants inscrits :</strong> {selectedDetailEvent.stats.registrations} / {selectedDetailEvent.capacity}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <span><strong>Tarif :</strong> {selectedDetailEvent.price === 0 ? 'Gratuit' : `${selectedDetailEvent.price}$`}</span>
+                </div>
+              </div>
+
+              {/* Organisateur */}
+              <div className="flex items-center gap-3 pt-2">
+                <div className="w-8 h-8 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-xs font-bold">
+                  {selectedDetailEvent.organizerAvatar ? <img src={selectedDetailEvent.organizerAvatar} className="w-full h-full rounded-full object-cover" /> : selectedDetailEvent.organizerName.charAt(0)}
+                </div>
+                <div>
+                  <p className="font-bold text-xs">{selectedDetailEvent.organizerName}</p>
+                  <p className="text-[10px] text-zinc-400">Organisateur certifié</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={`p-3.5 border-t flex items-center justify-between gap-2.5 ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+              <button
+                onClick={() => {
+                  const evt = selectedDetailEvent
+                  setShowDetailModal(false)
+                  navigate(`/pro/events/${evt.id}/preview`)
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold border border-zinc-700 hover:bg-zinc-800 transition-colors flex items-center gap-1.5"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Page Complète</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                {selectedDetailEvent.isLive ? (
+                  <button
+                    onClick={() => {
+                      const evt = selectedDetailEvent
+                      setShowDetailModal(false)
+                      startLive(evt)
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white animate-pulse flex items-center gap-1.5 shadow-md"
+                  >
+                    <Radio className="w-3.5 h-3.5" />
+                    <span>Rejoindre le Live</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setShowDetailModal(false); setSelectedDetailEvent(null) }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+                  >
+                    Fermer
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* MODAL: LANCER UN LIVE EN 1-CLIC */}
@@ -1966,9 +2220,11 @@ function ReplayModal({ isOpen, onClose, event, onRestartLive, onUploadRecording 
                   <Play className="w-6 h-6 fill-current opacity-60" />
                 </div>
                 <div>
-                  <p className="font-bold text-sm text-zinc-200">Enregistrement en attente</p>
-                  <p className="text-xs text-zinc-500 max-w-xs mx-auto mt-1">
-                    Ce direct s'est achevé. Vous pouvez ajouter une vidéo MP4/WebM ou relancer une nouvelle session en direct.
+                  <p className="font-bold text-sm text-zinc-200">Rediffusion non disponible pour le moment</p>
+                  <p className="text-xs text-zinc-400 max-w-sm mx-auto mt-1 leading-relaxed">
+                    {isOwner
+                      ? "L'enregistrement vidéo n'a pas encore été importé. Vous pouvez téléverser un fichier MP4/WebM ou fournir un lien YouTube/Vimeo ci-dessous."
+                      : "L'organisateur n'a pas encore mis en ligne l'enregistrement de cette session. Revenez plus tard pour visionner la rediffusion."}
                   </p>
                 </div>
               </div>

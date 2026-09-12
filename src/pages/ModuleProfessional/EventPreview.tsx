@@ -41,24 +41,71 @@ export default function EventPreview() {
   const eventsAlgo = useEventsAlgo(userId)
 
   useEffect(() => {
-    // Simuler chargement de l'événement depuis localStorage
-    const savedEvents = localStorage.getItem('exile_events')
-    if (savedEvents) {
-      const events = JSON.parse(savedEvents)
-      const foundEvent = events.find((e: EventData) => e.id === eventId)
-      if (foundEvent) {
-        setEvent(foundEvent)
-        
-        // Démarrer le tracking de l'événement
-        eventsAlgo.startTracking(foundEvent as any)
+    let isMounted = true
+    const cleanId = String(eventId).replace('exile-', '').replace('evt_', '')
+
+    const fetchEventData = async () => {
+      // 1. Try Backend API first if valid ID
+      if (cleanId && !isNaN(Number(cleanId))) {
+        try {
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+          const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+          const headers: HeadersInit = { 'Content-Type': 'application/json' }
+          if (token) headers['Authorization'] = `Bearer ${token}`
+
+          const res = await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/`, { headers })
+          if (res.ok) {
+            const item = await res.json()
+            if (isMounted && item) {
+              const mapped: EventData = {
+                id: String(item.id),
+                title: item.title || item.name || '',
+                description: item.description || '',
+                startDate: item.date_debut || item.start_date,
+                endDate: item.date_fin || item.end_date,
+                format: item.format || 'virtual',
+                status: item.status || 'published',
+                location: item.location ? { city: item.location, venue: '' } : undefined,
+                coverImage: item.cover || item.cover_image,
+                category: item.categorie || item.category || 'Tech',
+                capacity: item.capacite || item.capacity || 100,
+                price: item.price || 0,
+                isLive: item.is_live || item.status === 'live',
+                organizerName: item.owner_name || item.organizer_name || 'Organisateur',
+                organizerAvatar: item.owner_avatar || item.organizer_avatar
+              }
+              setEvent(mapped)
+              eventsAlgo.startTracking(mapped as any)
+              setTimeout(() => setIsAnimating(false), 300)
+              return
+            }
+          }
+        } catch (err) {
+          console.warn('Could not fetch event from API, checking local storage:', err)
+        }
+      }
+
+      // 2. Fallback to localStorage
+      const savedEvents = localStorage.getItem('exile_events')
+      if (savedEvents) {
+        try {
+          const events = JSON.parse(savedEvents)
+          const foundEvent = events.find((e: EventData) => e.id === eventId)
+          if (foundEvent && isMounted) {
+            setEvent(foundEvent)
+            eventsAlgo.startTracking(foundEvent as any)
+          }
+        } catch {}
+      }
+      if (isMounted) {
+        setTimeout(() => setIsAnimating(false), 500)
       }
     }
-    
-    // Animation d'entrée
-    setTimeout(() => setIsAnimating(false), 500)
 
-    // Arrêter le tracking quand on quitte la page
+    fetchEventData()
+
     return () => {
+      isMounted = false
       eventsAlgo.stopTracking()
     }
   }, [eventId, eventsAlgo])
