@@ -1095,7 +1095,12 @@ export default function EventsPro() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {filtered.map(event => (
+            {filtered.map(event => {
+              const isOwner = isEventOwner(event)
+              const isFinished = isPast(event.endDate || event.startDate) || event.status === 'completed' || event.status === 'termine'
+              const isDueNow = !event.isLive && new Date(event.startDate).getTime() <= Date.now() && new Date(event.endDate).getTime() >= Date.now() && !isFinished
+
+              return (
               <div key={event.id} className={`group ${resolvedTheme === 'dark' ? 'bg-zinc-900/70 border-zinc-800/80 hover:bg-zinc-900 hover:border-zinc-700' : 'bg-white border-slate-200 hover:shadow-md'} rounded-3xl border overflow-hidden transition-all flex flex-col justify-between`}>
                 <div>
                     {/* KOUVRI */}
@@ -1414,7 +1419,8 @@ export default function EventsPro() {
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
