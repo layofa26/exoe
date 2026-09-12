@@ -7,7 +7,8 @@ import {
   Radio, Ticket, X, ArrowLeft, Share2, CalendarPlus, Check, Sparkles,
   Play, Download, Upload, RotateCcw, Laptop, Briefcase, Palette, HeartPulse,
   Scale, Megaphone, GraduationCap, Layers, PlayCircle, User, AlertCircle, Eye, Shield, DollarSign,
-  ChevronLeft, ChevronRight, Info
+  ChevronLeft, ChevronRight, Info, Mic, MicOff, VideoOff, Settings2, Globe, Lock, MessageSquare, Bell,
+  Image as ImageIcon, ChevronDown, ChevronUp
 } from 'lucide-react'
 import TicketModal from '../../components/modals/TicketModal'
 import EventStatsModal from '../../components/modals/EventStatsModal'
@@ -228,7 +229,24 @@ export default function EventsPro() {
   const [showInstantLiveModal, setShowInstantLiveModal] = useState(false)
   const [instantLiveTitle, setInstantLiveTitle] = useState('')
   const [instantLiveCategory, setInstantLiveCategory] = useState('TECHNOLOGY')
+  const [instantLiveAccessType, setInstantLiveAccessType] = useState<'free' | 'paid'>('free')
+  const [instantLivePrice, setInstantLivePrice] = useState('5')
+  const [instantLiveShowInDirect, setInstantLiveShowInDirect] = useState(true)
+  const [instantLiveShowAdvanced, setInstantLiveShowAdvanced] = useState(false)
+  const [instantLiveDescription, setInstantLiveDescription] = useState('')
+  const [instantLiveCapacity, setInstantLiveCapacity] = useState('500')
+  const [instantLiveAllowComments, setInstantLiveAllowComments] = useState(true)
+  const [instantLiveSendNotifications, setInstantLiveSendNotifications] = useState(true)
+  const [instantLiveCoverFile, setInstantLiveCoverFile] = useState<File | null>(null)
+  const [instantLiveCoverPreview, setInstantLiveCoverPreview] = useState<string | null>(null)
   const [isLaunchingLive, setIsLaunchingLive] = useState(false)
+
+  // Écran Pré-Live (Test Caméra & Micro avant d'entrer)
+  const [preLiveEvent, setPreLiveEvent] = useState<{ id: string; title: string; category: string; roomName: string } | null>(null)
+  const [preLiveCamActive, setPreLiveCamActive] = useState(true)
+  const [preLiveMicActive, setPreLiveMicActive] = useState(true)
+  const preLiveVideoRef = useRef<HTMLVideoElement | null>(null)
+  const preLiveStreamRef = useRef<MediaStream | null>(null)
 
   // Open create modal if create=true query param is present
   useEffect(() => {
@@ -701,6 +719,69 @@ export default function EventsPro() {
     showToastMsg('Événement publié')
   }, [showToastMsg, isAuthenticated, navigate])
 
+  // Fermer et nettoyer le flux pré-live
+  const closePreLive = useCallback(() => {
+    if (preLiveStreamRef.current) {
+      preLiveStreamRef.current.getTracks().forEach(track => track.stop())
+      preLiveStreamRef.current = null
+    }
+    setPreLiveEvent(null)
+  }, [])
+
+  // Démarrer la caméra/micro pour le pré-live
+  const startPreLiveMedia = useCallback(async () => {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        preLiveStreamRef.current = stream
+        if (preLiveVideoRef.current) {
+          preLiveVideoRef.current.srcObject = stream
+        }
+      }
+    } catch (err) {
+      console.warn('Pre-live media access error:', err)
+    }
+  }, [])
+
+  // Toggle Camera in Pre-Live
+  const togglePreLiveCam = useCallback(() => {
+    if (preLiveStreamRef.current) {
+      const videoTrack = preLiveStreamRef.current.getVideoTracks()[0]
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled
+        setPreLiveCamActive(videoTrack.enabled)
+      }
+    } else {
+      setPreLiveCamActive(prev => !prev)
+    }
+  }, [])
+
+  // Toggle Mic in Pre-Live
+  const togglePreLiveMic = useCallback(() => {
+    if (preLiveStreamRef.current) {
+      const audioTrack = preLiveStreamRef.current.getAudioTracks()[0]
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled
+        setPreLiveMicActive(audioTrack.enabled)
+      }
+    } else {
+      setPreLiveMicActive(prev => !prev)
+    }
+  }, [])
+
+  // Entrer définitivement dans le salon Live
+  const handleEnterLiveRoom = useCallback(() => {
+    if (!preLiveEvent) return
+    const { id, roomName } = preLiveEvent
+    // Arrêter le preview local pour libérer la caméra pour Jitsi
+    if (preLiveStreamRef.current) {
+      preLiveStreamRef.current.getTracks().forEach(track => track.stop())
+      preLiveStreamRef.current = null
+    }
+    setPreLiveEvent(null)
+    navigate(`/pro/events/${id}/live?room=${roomName}`)
+  }, [preLiveEvent, navigate])
+
   const handleLaunchInstantLive = useCallback(async () => {
     if (!isAuthenticated) {
       navigate('/login')
@@ -715,19 +796,26 @@ export default function EventsPro() {
       const endDate = new Date(now.getTime() + 2 * 60 * 60 * 1000)
 
       let createdId = `evt_${Date.now()}`
+      const numCapacity = parseInt(instantLiveCapacity) || 500
+      const parsedPrice = instantLiveAccessType === 'paid' ? Math.max(1, parseFloat(instantLivePrice) || 5) : 0
+      const desc = instantLiveDescription.trim() || 'Diffusion en direct interactive sur EXILE.'
 
       if (token) {
         const formData = new FormData()
         formData.append('title', title)
         formData.append('name', title)
-        formData.append('description', 'Diffusion en direct interactive sur EXILE.')
+        formData.append('description', desc)
         formData.append('format', 'online')
         formData.append('categorie', instantLiveCategory.toLowerCase())
-        formData.append('capacite', '500')
+        formData.append('capacite', String(numCapacity))
         formData.append('status', 'live')
         formData.append('is_live', 'true')
+        formData.append('price', String(parsedPrice))
         formData.append('date_debut', now.toISOString())
         formData.append('date_fin', endDate.toISOString())
+        if (instantLiveCoverFile) {
+          formData.append('cover', instantLiveCoverFile)
+        }
 
         const res = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
           method: 'POST',
@@ -743,16 +831,72 @@ export default function EventsPro() {
       }
 
       const roomName = `exile-${createdId}`
+      
+      // Ajouter immédiatement à la liste d'événements pour feedback instantané
+      const newLiveItem: EventItem = {
+        id: createdId,
+        title,
+        description: desc,
+        startDate: now.toISOString(),
+        endDate: endDate.toISOString(),
+        format: 'virtual',
+        status: 'published',
+        category: instantLiveCategory,
+        capacity: numCapacity,
+        stats: { views: 1, registrations: 1, attendees: 1, revenue: 0 },
+        organizerName: user?.fullName || user?.username || 'Moi',
+        organizerAvatar: user?.avatar,
+        ownerId: user?.id ? Number(user.id) : undefined,
+        createdAt: now.toISOString(),
+        publishedAt: now.toISOString(),
+        price: parsedPrice,
+        isLive: true,
+        liveRoomName: roomName,
+        isRegistered: true
+      }
+      setEvents(prev => [newLiveItem, ...prev.filter(e => e.id !== createdId)])
+
       setShowInstantLiveModal(false)
-      navigate(`/pro/events/${createdId}/live?room=${roomName}`)
+      // Ouvrir l'écran Pré-Live pour tester caméra et micro
+      setPreLiveEvent({
+        id: createdId,
+        title,
+        category: instantLiveCategory,
+        roomName
+      })
+      setTimeout(() => {
+        startPreLiveMedia()
+      }, 200)
     } catch {
       const fallbackId = `evt_${Date.now()}`
       setShowInstantLiveModal(false)
-      navigate(`/pro/events/${fallbackId}/live?room=exile-${fallbackId}`)
+      setPreLiveEvent({
+        id: fallbackId,
+        title,
+        category: instantLiveCategory,
+        roomName: `exile-${fallbackId}`
+      })
+      setTimeout(() => {
+        startPreLiveMedia()
+      }, 200)
     } finally {
       setIsLaunchingLive(false)
     }
-  }, [isAuthenticated, instantLiveTitle, instantLiveCategory, user, navigate])
+  }, [
+    isAuthenticated,
+    instantLiveTitle,
+    instantLiveCategory,
+    instantLiveAccessType,
+    instantLivePrice,
+    instantLiveDescription,
+    instantLiveCapacity,
+    instantLiveCoverFile,
+    user,
+    navigate,
+    ensureMediaPermissions,
+    setEvents,
+    startPreLiveMedia
+  ])
 
   const isUpcoming = (date: string) => new Date(date) > new Date()
   const isPast = (date: string) => new Date(date) < new Date()
@@ -841,22 +985,33 @@ export default function EventsPro() {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Bouton 1 : Lancer un Live (Direct 1-clic) */}
             <button
               onClick={() => isAuthenticated ? setShowInstantLiveModal(true) : navigate('/login')}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl shadow-md shadow-red-600/30 text-xs font-bold transition-all active:scale-95 flex-shrink-0 animate-pulse"
-              title="Démarrer un live vidéo immédiatement"
+              className="group relative flex items-center gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl shadow-md shadow-red-600/30 text-xs font-bold transition-all active:scale-95 flex-shrink-0 border border-red-400/30"
+              title="Démarrer un direct vidéo immédiatement en 1 clic"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>{t('pro.events.startLive', 'Lancer un Live')}</span>
+              <div className="relative flex items-center justify-center">
+                <Radio className="w-3.5 h-3.5 animate-pulse text-white" />
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+              </div>
+              <div className="text-left leading-none">
+                <span className="block font-bold">{t('pro.events.startLive', 'Lancer un Live')}</span>
+                <span className="text-[9px] font-medium opacity-80 hidden sm:block">1-Clic direct</span>
+              </div>
             </button>
 
+            {/* Bouton 2 : Créer un événement (Programmer) */}
             <button
               onClick={() => isAuthenticated ? setShowCreateModal(true) : navigate('/login')}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl shadow-md text-xs font-bold transition-all active:scale-95 flex-shrink-0"
+              className="flex items-center gap-2 px-3.5 sm:px-4 py-2 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-2xl shadow-md shadow-orange-500/20 text-xs font-bold transition-all active:scale-95 flex-shrink-0 border border-orange-400/30"
+              title="Programmer un événement ou un Live futur"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span className="hidden sm:inline">{t('pro.events.createEvent', 'Créer un événement')}</span>
-              <span className="sm:hidden">{t('common.create', 'Créer')}</span>
+              <div className="text-left leading-none">
+                <span className="block font-bold">{t('pro.events.createEvent', 'Créer un événement')}</span>
+                <span className="text-[9px] font-medium opacity-80 hidden sm:block">Programmer</span>
+              </div>
             </button>
           </div>
         </div>
@@ -1423,6 +1578,15 @@ export default function EventsPro() {
             })}
           </div>
         )}
+
+        {/* COMPTEUR EN BAS DE PAGE (Design propre) */}
+        {filtered.length > 0 && (
+          <div className="pt-8 pb-4 text-center">
+            <p className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
+              Affichage de <span className="font-bold text-[#FF6B00]">{filtered.length}</span> événement{filtered.length > 1 ? 's' : ''}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* MODAL: KREYE EVENMAN */}
@@ -1597,72 +1761,284 @@ export default function EventsPro() {
         </div>
       )}
 
-      {/* MODAL: LANCER UN LIVE EN 1-CLIC */}
+      {/* MODAL: LANCER UN LIVE EN 1-CLIC (PROFESSIONNEL) */}
       {showInstantLiveModal && (
-        <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl space-y-5 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-red-600/20 text-red-500 flex items-center justify-center">
+        <div className="fixed inset-0 z-[100000] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+          <div className={`w-full max-w-lg rounded-3xl p-5 sm:p-6 border shadow-2xl space-y-4 my-auto ${resolvedTheme === 'dark' ? 'bg-[#12161f] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+            
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b pb-3 border-zinc-800/60">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shadow-lg shadow-red-500/30">
                   <Radio className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base">Lancer un Direct Live</h3>
-                  <p className="text-xs text-zinc-400">Diffusion vidéo & chat en temps réel</p>
+                  <h3 className="font-extrabold text-base tracking-tight flex items-center gap-2">
+                    <span>LANCER UN LIVE</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-600/20 text-red-500 uppercase tracking-wider border border-red-500/30">
+                      1-Clic Direct
+                    </span>
+                  </h3>
+                  <p className="text-xs text-zinc-400">Diffusion haute définition & interaction en direct</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowInstantLiveModal(false)}
-                className="p-1.5 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                className={`p-2 rounded-xl transition-colors ${resolvedTheme === 'dark' ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500'}`}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4">
+            {/* Formulaire Principal */}
+            <div className="space-y-3.5 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+              
+              {/* Titre du Live */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-zinc-400">
-                  Titre de votre session Live *
+                <label className="block text-xs font-bold mb-1.5 text-zinc-300">
+                  Titre du Live <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={instantLiveTitle}
                   onChange={e => setInstantLiveTitle(e.target.value)}
-                  placeholder="Ex: Q&A Tech, Démo projet, Masterclass..."
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-red-500 ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white placeholder-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'}`}
+                  placeholder="Ex. Q&A Tech avec la communauté, Masterclass..."
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 transition-all ${
+                    resolvedTheme === 'dark'
+                      ? 'bg-zinc-950/80 border-zinc-800 text-white placeholder-zinc-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                  }`}
                   autoFocus
                 />
               </div>
 
+              {/* Catégorie */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-zinc-400">
+                <label className="block text-xs font-bold mb-1.5 text-zinc-300">
                   Catégorie
                 </label>
                 <select
                   value={instantLiveCategory}
                   onChange={e => setInstantLiveCategory(e.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-red-500 ${resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 transition-all ${
+                    resolvedTheme === 'dark' ? 'bg-zinc-950/80 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
                 >
-                  <option value="TECHNOLOGY">Technologie</option>
-                  <option value="BUSINESS">Business & Finance</option>
-                  <option value="DESIGN">Design & UI/UX</option>
-                  <option value="HEALTH">Santé & Bien-être</option>
-                  <option value="EDUCATION">Masterclass</option>
-                  <option value="OTHER">Autre</option>
+                  <option value="TECHNOLOGY">💻 Technologie</option>
+                  <option value="BUSINESS">💼 Business & Finance</option>
+                  <option value="DESIGN">🎨 Design & UI/UX</option>
+                  <option value="HEALTH">❤️ Santé & Bien-être</option>
+                  <option value="LAW">⚖️ Droit & Fiscalité</option>
+                  <option value="MARKETING">📢 Marketing & Vente</option>
+                  <option value="EDUCATION">🎓 Masterclass & Éducation</option>
+                  <option value="OTHER">✨ Autre</option>
                 </select>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 space-y-1">
-                <p className="font-semibold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" /> WebRTC & Chat en direct activés
-                </p>
-                <p className="text-[11px] opacity-80">
-                  Votre caméra et micro seront prêts dès l'ouverture du salon. Vous pourrez partager votre écran et interagir avec vos spectateurs.
-                </p>
+              {/* Qui peut regarder ? */}
+              <div>
+                <label className="block text-xs font-bold mb-1.5 text-zinc-300">
+                  Qui peut regarder ?
+                </label>
+                <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-medium ${
+                  resolvedTheme === 'dark' ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <Globe className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span className="font-semibold text-white">🌍 Tout le monde (Public sur EXILE)</span>
+                </div>
+              </div>
+
+              {/* Type d'accès (Gratuit / Payant) */}
+              <div>
+                <label className="block text-xs font-bold mb-1.5 text-zinc-300">
+                  Type d'accès
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInstantLiveAccessType('free')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      instantLiveAccessType === 'free'
+                        ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400 shadow-sm'
+                        : resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <span>🆓 Gratuit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInstantLiveAccessType('paid')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      instantLiveAccessType === 'paid'
+                        ? 'bg-[#FF6B00]/20 border-[#FF6B00] text-[#FF6B00] shadow-sm'
+                        : resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>Payant</span>
+                  </button>
+                </div>
+
+                {instantLiveAccessType === 'paid' && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-zinc-400">Prix d'accès :</span>
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={instantLivePrice}
+                        onChange={e => setInstantLivePrice(e.target.value)}
+                        placeholder="5"
+                        className={`w-full px-3 py-1.5 rounded-lg border text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#FF6B00] ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      />
+                      <span className="absolute right-3 top-1.5 text-xs text-zinc-400 font-bold">$ USD</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Visibilité dans En direct */}
+              <div className="pt-1">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={instantLiveShowInDirect}
+                    onChange={e => setInstantLiveShowInDirect(e.target.checked)}
+                    className="w-4 h-4 rounded text-red-600 accent-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-zinc-300">
+                    ☑ Afficher immédiatement dans l'onglet « En direct »
+                  </span>
+                </label>
+              </div>
+
+              {/* ACCORDÉON: PARAMÈTRES AVANCÉS */}
+              <div className="pt-1 border-t border-zinc-800/80">
+                <button
+                  type="button"
+                  onClick={() => setInstantLiveShowAdvanced(prev => !prev)}
+                  className={`w-full flex items-center justify-between py-2 text-xs font-bold transition-colors ${
+                    resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Settings2 className="w-3.5 h-3.5 text-[#FF6B00]" />
+                    <span>Paramètres avancés</span>
+                  </div>
+                  {instantLiveShowAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {instantLiveShowAdvanced && (
+                  <div className="space-y-3 pt-2 pb-1 pl-1">
+                    {/* Description */}
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1 text-zinc-400">
+                        Description brève
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={instantLiveDescription}
+                        onChange={e => setInstantLiveDescription(e.target.value)}
+                        placeholder="Présentez les thèmes abordés lors de ce live..."
+                        className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white placeholder-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Image de couverture optionnelle */}
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1 text-zinc-400 flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3" />
+                        <span>Image de couverture (optionnel)</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className={`cursor-pointer px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800' : 'bg-slate-100 border-slate-200 text-slate-700'
+                        }`}>
+                          <Upload className="w-3 h-3" />
+                          <span>Choisir un fichier</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                setInstantLiveCoverFile(file)
+                                setInstantLiveCoverPreview(URL.createObjectURL(file))
+                              }
+                            }}
+                          />
+                        </label>
+                        {instantLiveCoverFile && (
+                          <span className="text-[11px] text-emerald-400 truncate max-w-[200px]">
+                            {instantLiveCoverFile.name}
+                          </span>
+                        )}
+                      </div>
+                      {instantLiveCoverPreview && (
+                        <div className="mt-2 w-full h-20 rounded-xl overflow-hidden border border-zinc-800">
+                          <img src={instantLiveCoverPreview} alt="Aperçu" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Limite de participants */}
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1 text-zinc-400">
+                        Limite de participants
+                      </label>
+                      <select
+                        value={instantLiveCapacity}
+                        onChange={e => setInstantLiveCapacity(e.target.value)}
+                        className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      >
+                        <option value="100">100 participants</option>
+                        <option value="250">250 participants</option>
+                        <option value="500">500 participants (Recommandé)</option>
+                        <option value="1000">1 000 participants (Grande Masterclass)</option>
+                      </select>
+                    </div>
+
+                    {/* Options secondaires */}
+                    <div className="space-y-1.5 pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={instantLiveAllowComments}
+                          onChange={e => setInstantLiveAllowComments(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded text-red-600 accent-red-600"
+                        />
+                        <span className="text-[11px] text-zinc-300 flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3 text-blue-400" /> Autoriser le chat et les commentaires en direct
+                        </span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={instantLiveSendNotifications}
+                          onChange={e => setInstantLiveSendNotifications(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded text-red-600 accent-red-600"
+                        />
+                        <span className="text-[11px] text-zinc-300 flex items-center gap-1">
+                          <Bell className="w-3 h-3 text-amber-400" /> Notifier mes abonnés du début de ce live
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            {/* Footer Modal Actions */}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-zinc-800/60">
               <button
                 type="button"
                 onClick={() => setShowInstantLiveModal(false)}
@@ -1671,14 +2047,123 @@ export default function EventsPro() {
               >
                 Annuler
               </button>
+
               <button
                 type="button"
                 onClick={handleLaunchInstantLive}
                 disabled={isLaunchingLive}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs shadow-lg shadow-red-600/30 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-xl shadow-red-600/30 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{isLaunchingLive ? 'Initialisation...' : 'Démarrer maintenant'}</span>
+                <Radio className="w-4 h-4 animate-pulse" />
+                <span>{isLaunchingLive ? 'Création en cours...' : '🔴 Démarrer maintenant'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ÉCRAN PRÉ-LIVE : TEST CAMÉRA & MICROPHONE ─── */}
+      {preLiveEvent && (
+        <div className="fixed inset-0 z-[100001] bg-black/90 backdrop-blur-lg flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className={`w-full max-w-lg rounded-3xl p-5 sm:p-6 border shadow-2xl space-y-4 ${
+            resolvedTheme === 'dark' ? 'bg-[#0f131a] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            
+            {/* Header Pré-Live */}
+            <div className="flex items-center justify-between border-b pb-3 border-zinc-800">
+              <div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                  Écran Pré-Live · Configuration
+                </span>
+                <h3 className="font-extrabold text-base mt-1 line-clamp-1">{preLiveEvent.title}</h3>
+              </div>
+              <button
+                onClick={closePreLive}
+                className="p-1.5 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                title="Annuler"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Zone Preview Vidéo */}
+            <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black border border-zinc-800 flex items-center justify-center">
+              <video
+                ref={preLiveVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${!preLiveCamActive ? 'hidden' : ''}`}
+              />
+              {!preLiveCamActive && (
+                <div className="flex flex-col items-center justify-center text-zinc-500 space-y-2">
+                  <div className="w-14 h-14 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800">
+                    <VideoOff className="w-7 h-7 text-zinc-600" />
+                  </div>
+                  <span className="text-xs font-semibold text-zinc-400">Caméra désactivée</span>
+                </div>
+              )}
+
+              {/* Commandes Overlay Caméra / Micro */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={togglePreLiveMic}
+                  className={`p-2.5 rounded-xl text-white transition-colors ${
+                    preLiveMicActive ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                  title={preLiveMicActive ? 'Couper le microphone' : 'Activer le microphone'}
+                >
+                  {preLiveMicActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={togglePreLiveCam}
+                  className={`p-2.5 rounded-xl text-white transition-colors ${
+                    preLiveCamActive ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                  title={preLiveCamActive ? 'Couper la caméra' : 'Activer la caméra'}
+                >
+                  {preLiveCamActive ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Statuts des périphériques */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${
+                preLiveCamActive ? 'bg-emerald-950/20 border-emerald-800/40 text-emerald-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${preLiveCamActive ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`} />
+                <span>Caméra : <strong>{preLiveCamActive ? 'Activée' : 'Désactivée'}</strong></span>
+              </div>
+
+              <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${
+                preLiveMicActive ? 'bg-emerald-950/20 border-emerald-800/40 text-emerald-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${preLiveMicActive ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`} />
+                <span>Microphone : <strong>{preLiveMicActive ? 'Activé' : 'Désactivé'}</strong></span>
+              </div>
+            </div>
+
+            {/* Boutons d'action finale */}
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={closePreLive}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                onClick={handleEnterLiveRoom}
+                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs sm:text-sm shadow-xl shadow-red-600/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
+              >
+                <Radio className="w-4 h-4 animate-pulse" />
+                <span>Entrer dans le Live</span>
               </button>
             </div>
           </div>
