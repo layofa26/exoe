@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 import { SUPPORTED_LANGUAGES } from '../../i18n'
 import { API_BASE_URL } from '../../config/api'
 import PayerPremiumButton from '../../components/PayerPremiumButton'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 type SettingsCategory = 
   | 'account' 
@@ -55,10 +56,13 @@ const Settings = () => {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('account')
   const [mobileShowContent, setMobileShowContent] = useState<boolean>(false)
 
+  // Custom Confirm/Alert Modal States
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [revokeConfirmSession, setRevokeConfirmSession] = useState<{ id: number; name: string } | null>(null)
+  const [settingsAlert, setSettingsAlert] = useState<{ title?: string; message: string; type?: 'info' | 'warning' | 'danger' | 'success'; onConfirm?: () => void } | null>(null)
+
   const handleLogout = () => {
-    if (window.confirm(t('common.confirmLogout', 'Voulez-vous vraiment vous déconnecter ?'))) {
-      logout()
-    }
+    setShowLogoutConfirm(true)
   }
 
   const handleBack = () => {
@@ -331,25 +335,30 @@ const Settings = () => {
     }
   }, [])
 
-  const handleRevokeSession = async (sessionId: number, deviceName: string) => {
-    if (window.confirm(`Voulez-vous vraiment déconnecter l'appareil "${deviceName}" à distance ?`)) {
-      setRevokingSessionId(sessionId)
-      setSessionFeedback(null)
-      try {
-        const res = await authApi.revokeSession(sessionId)
-        if (res.success) {
-          setSessionFeedback({ type: 'success', message: res.message || "Appareil déconnecté avec succès." })
-          setActiveSessions(prev => prev.filter(s => s.id !== sessionId))
-          setTimeout(() => setSessionFeedback(null), 3500)
-        } else {
-          setSessionFeedback({ type: 'error', message: res.error || "Impossible de déconnecter l'appareil." })
-          setTimeout(() => setSessionFeedback(null), 4000)
-        }
-      } catch (err) {
-        setSessionFeedback({ type: 'error', message: "Erreur de connexion lors de la déconnexion." })
-      } finally {
-        setRevokingSessionId(null)
+  const handleRevokeSession = (sessionId: number, deviceName: string) => {
+    setRevokeConfirmSession({ id: sessionId, name: deviceName })
+  }
+
+  const executeRevokeSession = async () => {
+    if (!revokeConfirmSession) return
+    const sessionId = revokeConfirmSession.id
+    setRevokeConfirmSession(null)
+    setRevokingSessionId(sessionId)
+    setSessionFeedback(null)
+    try {
+      const res = await authApi.revokeSession(sessionId)
+      if (res.success) {
+        setSessionFeedback({ type: 'success', message: res.message || "Appareil déconnecté avec succès." })
+        setActiveSessions(prev => prev.filter(s => s.id !== sessionId))
+        setTimeout(() => setSessionFeedback(null), 3500)
+      } else {
+        setSessionFeedback({ type: 'error', message: res.error || "Impossible de déconnecter l'appareil." })
+        setTimeout(() => setSessionFeedback(null), 4000)
       }
+    } catch (err) {
+      setSessionFeedback({ type: 'error', message: "Erreur de connexion lors de la déconnexion." })
+    } finally {
+      setRevokingSessionId(null)
     }
   }
 
@@ -684,9 +693,15 @@ const Settings = () => {
       if (!res.ok) {
         setDeleteError(data.error || 'Erreur lors de la suppression du compte.')
       } else {
-        alert('Votre compte et vos données ont été définitivement supprimés.')
-        logout()
-        navigate('/')
+        setSettingsAlert({
+          title: 'Compte supprimé',
+          message: 'Votre compte et vos données ont été définitivement supprimés.',
+          type: 'success',
+          onConfirm: () => {
+            logout()
+            navigate('/')
+          }
+        })
       }
     } catch (err) {
       setDeleteError('Erreur de connexion avec le serveur.')
@@ -728,11 +743,11 @@ const Settings = () => {
         setShowProfileEditModal(false)
         loadProfile()
       } else {
-        alert('Erreur lors de la sauvegarde du profil.')
+        setSettingsAlert({ title: 'Erreur de mise à jour', message: 'Erreur lors de la sauvegarde du profil.', type: 'danger' })
       }
     } catch (error) {
       console.error('Error updating profile:', error)
-      alert('Erreur réseau lors de la mise à jour.')
+      setSettingsAlert({ title: 'Erreur réseau', message: 'Erreur réseau lors de la mise à jour.', type: 'danger' })
     }
   }
 
@@ -741,11 +756,11 @@ const Settings = () => {
     if (!file) return
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     if (!validTypes.includes(file.type)) {
-      alert('Format non supporté. Utilisez JPG, PNG ou WEBP.')
+      setSettingsAlert({ title: 'Format non supporté', message: 'Format non supporté. Utilisez JPG, PNG ou WEBP.', type: 'warning' })
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('L\'image ne doit pas dépasser 5 Mo.')
+      setSettingsAlert({ title: 'Fichier volumineux', message: "L'image ne doit pas dépasser 5 Mo.", type: 'warning' })
       return
     }
     const reader = new FileReader()
@@ -780,7 +795,7 @@ const Settings = () => {
         setUploadedPhoto('')
         loadProfile()
       } else {
-        alert("Erreur lors de l'enregistrement de la photo.")
+        setSettingsAlert({ title: 'Erreur photo', message: "Erreur lors de l'enregistrement de la photo.", type: 'danger' })
       }
     } catch (error) {
       console.error('Error saving photo:', error)
@@ -2287,7 +2302,11 @@ const Settings = () => {
                       </div>
                       <button
                         onClick={() => {
-                          alert('Vous êtes actuellement sur le plan gratuit. Aucun abonnement payant n\'est en cours.')
+                          setSettingsAlert({
+                            title: 'Plan Gratuit',
+                            message: "Vous êtes actuellement sur le plan gratuit. Aucun abonnement payant n'est en cours à résilier.",
+                            type: 'info'
+                          })
                         }}
                         className="text-[11px] text-red-500 hover:text-red-400 font-semibold text-left mt-2"
                       >
@@ -3352,6 +3371,49 @@ const Settings = () => {
           </div>
         </div>
       )}
+
+      {/* CONFIRM MODAL: DÉCONNEXION */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        title={t('common.confirmLogoutTitle', 'Déconnexion')}
+        message={t('common.confirmLogout', 'Voulez-vous vraiment vous déconnecter de votre compte EXILE ?')}
+        confirmText={t('common.logout', 'Se déconnecter')}
+        cancelText={t('common.cancel', 'Annuler')}
+        type="warning"
+        onConfirm={() => {
+          setShowLogoutConfirm(false)
+          logout()
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      {/* CONFIRM MODAL: RÉVOQUER SESSION */}
+      <ConfirmModal
+        isOpen={Boolean(revokeConfirmSession)}
+        title="Déconnexion de l'appareil"
+        message={`Voulez-vous vraiment déconnecter l'appareil "${revokeConfirmSession?.name || 'Inconnu'}" à distance ?`}
+        confirmText="Déconnecter"
+        cancelText="Annuler"
+        type="warning"
+        onConfirm={executeRevokeSession}
+        onCancel={() => setRevokeConfirmSession(null)}
+      />
+
+      {/* MODAL ALERTE / INFORMATION */}
+      <ConfirmModal
+        isOpen={Boolean(settingsAlert)}
+        title={settingsAlert?.title || 'Information'}
+        message={settingsAlert?.message || ''}
+        confirmText="D'accord"
+        isAlert={true}
+        type={settingsAlert?.type || 'info'}
+        onConfirm={() => {
+          if (settingsAlert?.onConfirm) {
+            settingsAlert.onConfirm()
+          }
+          setSettingsAlert(null)
+        }}
+      />
 
     </div>
   )

@@ -10,6 +10,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLiveWebRTC } from '../../hooks/useLiveWebRTC'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
@@ -43,6 +44,8 @@ export default function LiveRoom() {
   const [rating, setRating] = useState(5)
   const [feedback, setFeedback] = useState('')
   const [isSubmittingRating, setIsSubmittingRating] = useState(false)
+  const [showEndLiveConfirm, setShowEndLiveConfirm] = useState(false)
+  const [showKickedModal, setShowKickedModal] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const chatBottomRef = useRef<HTMLDivElement>(null)
@@ -57,9 +60,8 @@ export default function LiveRoom() {
   }, [])
 
   const handleKicked = useCallback(() => {
-    alert("Vous avez été retiré(e) du direct par l'organisateur.")
-    navigate('/pro/events')
-  }, [navigate])
+    setShowKickedModal(true)
+  }, [])
 
   // Fetch Event Details to check ownership
   useEffect(() => {
@@ -259,29 +261,32 @@ export default function LiveRoom() {
     clearInterval(recordingTimerRef.current)
   }, [])
 
-  const handleLeaveLive = async () => {
+  const handleLeaveLive = () => {
     if (isRecording) {
       stopRecording()
     }
     if (isHost) {
-      if (window.confirm('Voulez-vous terminer le direct pour tous les participants ?')) {
-        endLive()
-        try {
-          const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
-          const cleanId = String(eventId).replace('exile-', '').replace('evt_', '')
-          await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/end_live/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-          })
-        } catch {}
-        setShowRatingModal(true)
-      }
+      setShowEndLiveConfirm(true)
     } else {
       setShowRatingModal(true)
     }
+  }
+
+  const executeEndLive = async () => {
+    setShowEndLiveConfirm(false)
+    endLive()
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+      const cleanId = String(eventId).replace('exile-', '').replace('evt_', '')
+      await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/end_live/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+    } catch {}
+    setShowRatingModal(true)
   }
 
   const handleRatingSubmit = async () => {
@@ -957,6 +962,32 @@ export default function LiveRoom() {
           </div>
         </div>
       )}
+
+      {/* CONFIRM MODAL: TERMINER LE DIRECT POUR TOUS */}
+      <ConfirmModal
+        isOpen={showEndLiveConfirm}
+        title="Terminer la session en direct"
+        message="Voulez-vous vraiment terminer le direct pour tous les participants ? Cette action coupera la diffusion et générera les statistiques."
+        confirmText="Terminer le direct"
+        cancelText="Continuer le direct"
+        type="danger"
+        onConfirm={executeEndLive}
+        onCancel={() => setShowEndLiveConfirm(false)}
+      />
+
+      {/* ALERT MODAL: KICKED DU DIRECT */}
+      <ConfirmModal
+        isOpen={showKickedModal}
+        title="Session interrompue"
+        message="Vous avez été retiré(e) du direct par l'organisateur."
+        confirmText="Retour aux événements"
+        isAlert={true}
+        type="warning"
+        onConfirm={() => {
+          setShowKickedModal(false)
+          navigate('/pro/events')
+        }}
+      />
     </div>
   )
 }

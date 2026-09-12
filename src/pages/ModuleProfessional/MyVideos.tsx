@@ -25,6 +25,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useQuery } from '../../hooks/useQuery'
 import { cacheService } from '../../services/cacheService'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
@@ -140,28 +141,37 @@ export const MyVideos = (): JSX.Element => {
     totalLikes: videos.reduce((acc, v) => acc + (v.likesCount || 0), 0)
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette vidéo ?')) {
-      try {
-        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
-        const response = await fetch(`${API_BASE_URL}/accueil/videos/${id}/`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (response.ok) {
-          setVideos(prev => prev ? prev.filter(v => v.id !== id) : [])
-          cacheService.invalidate('pro:videos:feed')
-        } else {
-          alert('Erreur lors de la suppression de la vidéo')
+  const [deleteVideoId, setDeleteVideoId] = useState<string | null>(null)
+  const [videoFeedbackAlert, setVideoFeedbackAlert] = useState<{ title?: string; message: string; type?: 'info' | 'warning' | 'danger' | 'success' } | null>(null)
+
+  const handleDelete = (id: string) => {
+    setDeleteVideoId(id)
+  }
+
+  const executeDeleteVideo = async () => {
+    if (!deleteVideoId) return
+    const id = deleteVideoId
+    setDeleteVideoId(null)
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+      const response = await fetch(`${API_BASE_URL}/accueil/videos/${id}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      } catch (error) {
-        console.error('Error deleting video:', error)
-        alert('Erreur lors de la suppression de la vidéo')
+      })
+      
+      if (response.ok) {
+        setVideos(prev => prev ? prev.filter(v => v.id !== id) : [])
+        cacheService.invalidate('pro:videos:feed')
+        setVideoFeedbackAlert({ title: 'Vidéo supprimée', message: 'La vidéo a été supprimée avec succès.', type: 'success' })
+      } else {
+        setVideoFeedbackAlert({ title: 'Erreur', message: 'Erreur lors de la suppression de la vidéo.', type: 'danger' })
       }
+    } catch (error) {
+      console.error('Error deleting video:', error)
+      setVideoFeedbackAlert({ title: 'Erreur', message: 'Erreur réseau lors de la suppression de la vidéo.', type: 'danger' })
     }
   }
 
@@ -555,6 +565,29 @@ export const MyVideos = (): JSX.Element => {
           </div>
         )}
       </div>
+
+      {/* CONFIRM MODAL: SUPPRIMER VIDÉO */}
+      <ConfirmModal
+        isOpen={Boolean(deleteVideoId)}
+        title="Supprimer la vidéo"
+        message="Êtes-vous sûr de vouloir supprimer définitivement cette vidéo ? Cette action est irréversible."
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+        onConfirm={executeDeleteVideo}
+        onCancel={() => setDeleteVideoId(null)}
+      />
+
+      {/* ALERT FEEDBACK MODAL */}
+      <ConfirmModal
+        isOpen={Boolean(videoFeedbackAlert)}
+        title={videoFeedbackAlert?.title || 'Information'}
+        message={videoFeedbackAlert?.message || ''}
+        confirmText="D'accord"
+        isAlert={true}
+        type={videoFeedbackAlert?.type || 'info'}
+        onConfirm={() => setVideoFeedbackAlert(null)}
+      />
     </div>
   )
 }

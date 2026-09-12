@@ -33,6 +33,7 @@ import {
   Send
 } from 'lucide-react';
 import { ContactModal } from '../../components/modals/ContactModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
 
@@ -94,6 +95,8 @@ export const PublicProfile = () => {
     checkSubscription();
   }, [isAuthenticated, id]);
 
+  const [publicProfileAlert, setPublicProfileAlert] = useState<{ title?: string; message: string; type?: 'info' | 'warning' | 'danger' | 'success' } | null>(null);
+
   const handleSubscribe = async () => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -107,7 +110,7 @@ export const PublicProfile = () => {
         setIsSubscribed(res.data.is_subscribed);
         setSubscribersCount(res.data.subscribers_count);
       } else if (res.error) {
-        alert(res.error);
+        setPublicProfileAlert({ title: 'Abonnement', message: res.error, type: 'warning' });
       }
     } catch (error) {
       console.error('Error toggling subscription:', error);
@@ -125,7 +128,7 @@ export const PublicProfile = () => {
       } catch {}
     } else {
       navigator.clipboard.writeText(url);
-      alert('Lien du profil copié dans le presse-papier !');
+      setPublicProfileAlert({ title: 'Lien copié', message: 'Le lien du profil a été copié dans le presse-papier !', type: 'success' });
     }
   };
 
@@ -575,6 +578,17 @@ export const PublicProfile = () => {
           targetAvatar={profile.avatarUrl}
         />
       )}
+
+      {/* Alert Modal */}
+      <ConfirmModal
+        isOpen={Boolean(publicProfileAlert)}
+        title={publicProfileAlert?.title || 'Information'}
+        message={publicProfileAlert?.message || ''}
+        confirmText="D'accord"
+        isAlert={true}
+        type={publicProfileAlert?.type || 'info'}
+        onConfirm={() => setPublicProfileAlert(null)}
+      />
     </div>
   );
 };

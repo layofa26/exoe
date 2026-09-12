@@ -15,6 +15,7 @@ import EventStatsModal from '../../components/modals/EventStatsModal'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useQuery } from '../../hooks/useQuery'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
 
@@ -2202,6 +2203,8 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
   const [isDragging, setIsDragging] = useState(false)
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
+  const [createModalAlert, setCreateModalAlert] = useState<{ title?: string; message: string; type?: 'info' | 'warning' | 'danger' | 'success' } | null>(null)
+
   // Filtrage mot cle inappropriate
   const inappropriateWords = ['porn', 'sex', 'xxx', 'adult', 'nude', 'erotic', 'sexy', 'fuck', 'shit', 'ass']
 
@@ -2247,7 +2250,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
 
     // Lieu: requis si format présentiel ou hybride
     if (form.format !== 'virtual' && !form.location.city.trim()) {
-      newErrors.city = t('pro.events.errCityRequired', 'La ville est obligatoire pour les événements présentiel/hybride')
+      newErrors.location = t('pro.events.errLocationRequired', 'La ville est obligatoire pour un événement physique')
     }
 
     setErrors(newErrors)
@@ -2264,14 +2267,14 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
     
     // Validation taille
     if (file.size > 5 * 1024 * 1024) {
-      alert('L\'image ne doit pas dépasser 5MB')
+      setCreateModalAlert({ title: 'Fichier trop volumineux', message: "L'image ne doit pas dépasser 5MB", type: 'warning' })
       return
     }
     
     // Validation format
     const validFormats = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (!validFormats.includes(file.type)) {
-      alert('Format non supporté. Utilisez JPEG, PNG, WebP ou GIF')
+      setCreateModalAlert({ title: 'Format non supporté', message: 'Format non supporté. Utilisez JPEG, PNG, WebP ou GIF', type: 'warning' })
       return
     }
     
@@ -2301,7 +2304,7 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
     
     // Validation mot cle inappropriate
     if (containsInappropriateContent(form.title) || containsInappropriateContent(form.description)) {
-      alert('Votre événement contient des mots inappropriés. Veuillez modifier le titre ou la description.')
+      setCreateModalAlert({ title: 'Contenu inapproprié', message: 'Votre événement contient des mots inappropriés. Veuillez modifier le titre ou la description.', type: 'danger' })
       return
     }
     
@@ -2634,6 +2637,17 @@ function CreateEventModal({ onClose, onCreate }: { onClose: () => void; onCreate
           </div>
         </div>
       )}
+
+      {/* ALERT MODAL */}
+      <ConfirmModal
+        isOpen={Boolean(createModalAlert)}
+        title={createModalAlert?.title || 'Information'}
+        message={createModalAlert?.message || ''}
+        confirmText="D'accord"
+        isAlert={true}
+        type={createModalAlert?.type || 'info'}
+        onConfirm={() => setCreateModalAlert(null)}
+      />
     </div>
   )
 }

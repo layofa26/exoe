@@ -83,7 +83,8 @@ export const BlockedUsers = (): JSX.Element => {
     try {
       const token = localStorage.getItem('accessToken')
       if (!token) {
-        alert('Token non trouvé. Veuillez vous reconnecter.')
+        setToast('Token non trouvé. Veuillez vous reconnecter.')
+        setTimeout(() => setToast(''), 3500)
         return
       }
 

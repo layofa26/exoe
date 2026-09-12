@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Play, Edit, Trash2, Clock, AlertCircle, CheckCircle } from 'lucide-react'
 import { useQuery } from '../../hooks/useQuery'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
@@ -67,13 +68,22 @@ export const MyDrafts = () => {
   const drafts = cachedDrafts || []
   const error = queryError ? queryError.message : null
 
-  const handleDelete = async (draftId: string) => {
-    if (!confirm(t('pro.myVideos.deleteConfirmDraft', 'Êtes-vous sûr de vouloir supprimer ce brouillon ?'))) return
+  const [deleteDraftId, setDeleteDraftId] = useState<string | null>(null)
+  const [draftAlert, setDraftAlert] = useState<{ title?: string; message: string; type?: 'info' | 'warning' | 'danger' | 'success' } | null>(null)
+
+  const handleDelete = (draftId: string) => {
+    setDeleteDraftId(draftId)
+  }
+
+  const executeDeleteDraft = async () => {
+    if (!deleteDraftId) return
+    const draftId = deleteDraftId
+    setDeleteDraftId(null)
 
     try {
       const token = localStorage.getItem('accessToken')
       if (!token) {
-        alert(t('common.tokenNotFound', 'Token non trouvé. Veuillez vous reconnecter.'))
+        setDraftAlert({ title: 'Non authentifié', message: t('common.tokenNotFound', 'Token non trouvé. Veuillez vous reconnecter.'), type: 'warning' })
         return
       }
 
@@ -83,14 +93,14 @@ export const MyDrafts = () => {
       })
 
       if (response.ok) {
-        alert(t('pro.myVideos.draftDeleted', 'Brouillon supprimé avec succès'))
+        setDraftAlert({ title: 'Brouillon supprimé', message: t('pro.myVideos.draftDeleted', 'Brouillon supprimé avec succès'), type: 'success' })
         loadDrafts()
       } else {
         throw new Error('Erreur lors de la suppression')
       }
     } catch (err) {
       console.error('Error deleting draft:', err)
-      alert(t('common.errorDeleting', 'Erreur lors de la suppression'))
+      setDraftAlert({ title: 'Erreur', message: t('common.errorDeleting', 'Erreur lors de la suppression'), type: 'danger' })
     }
   }
 
@@ -318,6 +328,29 @@ export const MyDrafts = () => {
           </div>
         )}
       </div>
+
+      {/* CONFIRM MODAL: SUPPRIMER BROUILLON */}
+      <ConfirmModal
+        isOpen={Boolean(deleteDraftId)}
+        title="Supprimer le brouillon"
+        message={t('pro.myVideos.deleteConfirmDraft', 'Êtes-vous sûr de vouloir supprimer ce brouillon ? Cette action est irréversible.')}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+        onConfirm={executeDeleteDraft}
+        onCancel={() => setDeleteDraftId(null)}
+      />
+
+      {/* ALERT FEEDBACK MODAL */}
+      <ConfirmModal
+        isOpen={Boolean(draftAlert)}
+        title={draftAlert?.title || 'Information'}
+        message={draftAlert?.message || ''}
+        confirmText="D'accord"
+        isAlert={true}
+        type={draftAlert?.type || 'info'}
+        onConfirm={() => setDraftAlert(null)}
+      />
     </div>
   )
 }

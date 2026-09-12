@@ -21,6 +21,7 @@ import {
   canModifyPhoto,
   getDaysUntilPhotoModification
 } from '../../hooks/useProfileUtils'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
@@ -199,6 +200,7 @@ const Profile = () => {
   const [showLocationModal, setShowLocationModal] = useState(false)
   const [showWebsitesModal, setShowWebsitesModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ type: 'website' | 'skill', item: string } | null>(null)
+  const [profileAlert, setProfileAlert] = useState<{ title?: string; message: string; type?: 'info' | 'warning' | 'danger' | 'success' } | null>(null)
   const [showSkillsDropdown, setShowSkillsDropdown] = useState(false)
   const [showWebsitesDropdown, setShowWebsitesDropdown] = useState(false)
   const [showMobileInfoDropdown, setShowMobileInfoDropdown] = useState(false)
@@ -411,10 +413,11 @@ const Profile = () => {
           setNewLocation('')
           setShowLocationModal(false)
         } else {
-          alert('Erreur lors de la mise à jour de la localisation')
+          setProfileAlert({ title: 'Erreur localisation', message: 'Erreur lors de la mise à jour de la localisation', type: 'danger' })
         }
       } catch (error) {
         console.error('Error updating location:', error)
+        setProfileAlert({ title: 'Erreur réseau', message: 'Erreur réseau lors de la mise à jour de la localisation', type: 'danger' })
       }
     }
   }
@@ -428,8 +431,9 @@ const Profile = () => {
     if (!lastUpdate) return 30 // Pas de mise à jour précédente, donc autorisé
     const lastDate = new Date(lastUpdate)
     const now = new Date()
-    const daysSinceUpdate = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
-    return Math.floor(daysSinceUpdate)
+    const diffTime = Math.abs(now.getTime() - lastDate.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
   }
 
   // Modifier la spécialité
@@ -459,9 +463,9 @@ const Profile = () => {
     }
   }
 
-  // Modifier la profession
-  const handleProfessionUpdate = async () => {
-    if (newProfession.trim() && newProfession.length >= 2 && newProfession.length <= 50) {
+  // Mettre à jour la profession
+  const handleUpdateProfession = async () => {
+    if (newProfession.trim() && newProfession.length >= 3 && newProfession.length <= 50) {
       try {
         const response = await authFetch('/profil/profils/me/', {
           method: 'PATCH',
@@ -475,11 +479,11 @@ const Profile = () => {
           setShowProfessionModal(false)
         } else {
           const errorData = await response.json().catch(() => ({}))
-          alert(errorData.detail || 'Erreur lors de la mise à jour de la profession')
+          setProfileAlert({ title: 'Erreur profession', message: errorData.detail || 'Erreur lors de la mise à jour de la profession', type: 'danger' })
         }
       } catch (error) {
         console.error('Error updating profession:', error)
-        alert('Erreur lors de la mise à jour de la profession')
+        setProfileAlert({ title: 'Erreur profession', message: 'Erreur lors de la mise à jour de la profession', type: 'danger' })
       }
     }
   }
@@ -517,7 +521,7 @@ const Profile = () => {
           setNewSkill({ name: '', category: 'Technique', level: 'Intermédiaire' })
           setShowSkillModal(false)
         } else {
-          alert('Erreur lors de l\'ajout de la compétence')
+          setProfileAlert({ title: 'Erreur compétence', message: "Erreur lors de l'ajout de la compétence", type: 'danger' })
         }
       } catch (error) {
         console.error('Error adding skill:', error)
@@ -2097,6 +2101,17 @@ const Profile = () => {
           </div>
         </div>
       )}
+
+      {/* ALERT MODAL */}
+      <ConfirmModal
+        isOpen={Boolean(profileAlert)}
+        title={profileAlert?.title || 'Information'}
+        message={profileAlert?.message || ''}
+        confirmText="D'accord"
+        isAlert={true}
+        type={profileAlert?.type || 'info'}
+        onConfirm={() => setProfileAlert(null)}
+      />
     </div>
   )
 }
