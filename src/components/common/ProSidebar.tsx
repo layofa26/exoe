@@ -63,7 +63,6 @@ export const ProSidebar = (): JSX.Element | null => {
     '/pro/calendar',
     '/pro/my-videos',
     '/pro/drafts',
-    '/pro/subscribers',
     '/pro/settings',
     '/pro/conversations'
   ].some(path => location.pathname.startsWith(path))

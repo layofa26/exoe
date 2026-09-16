@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Check, CheckCheck, Star, Reply, Copy, Edit2,
-  Trash2, Forward, Flag, MoreVertical
+  Trash2, Forward, Flag, ChevronDown, Smile
 } from 'lucide-react'
 
 export interface MessageBubbleData {
@@ -17,6 +17,7 @@ export interface MessageBubbleData {
   isEdited?: boolean
   replyToId?: string
   replyPreview?: { senderName: string; content: string }
+  reactions?: Record<string, string[]> // emoji -> userIds
 }
 
 interface MessageBubbleProps {
@@ -35,6 +36,8 @@ interface MessageBubbleProps {
   onForward: (msg: MessageBubbleData) => void
   onReport: (id: string) => void
   onSelect?: (id: string) => void
+  onJumpToMessage?: (messageId: string) => void
+  onReact?: (messageId: string, emoji: string) => void
 }
 
 function highlightText(text: string, query: string): React.ReactNode {
@@ -68,6 +71,8 @@ function formatFullDate(iso: string): string {
   }
 }
 
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   isMine,
@@ -84,14 +89,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onForward,
   onReport,
   onSelect,
+  onJumpToMessage,
+  onReact,
 }) => {
   const isDark = theme === 'dark'
   const [showMenu, setShowMenu] = useState(false)
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [showImageModal, setShowImageModal] = useState<string | null>(null)
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const reactionRef = useRef<HTMLDivElement>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Touch swipe-to-reply state
+  const touchStartX = useRef<number | null>(null)
+  const [swipeOffset, setSwipeOffset] = useState(0)
 
   // Detect image in message content
   const imageMatch = message.content.match(/^\[image:(.*?)\]$/) || (message.content.startsWith('data:image/') ? [null, message.content] : null)
@@ -113,13 +127,57 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isLong = message.content.length > 240 && !imageUrl && !docMatch && !proposalMatch && !eventMatch && !sysNotifMatch
   const displayContent = isLong && !isExpanded ? message.content.slice(0, 240) + '...' : message.content
 
-  // Long-press for mobile context menu
-  const handleTouchStart = () => {
-    longPressTimer.current = setTimeout(() => setShowMenu(true), 500)
+  // Swipe-to-reply on touch devices (WhatsApp mobile behavior)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    longPressTimer.current = setTimeout(() => {
+      setShowReactionPicker(true)
+    }, 500)
   }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const diff = e.touches[0].clientX - touchStartX.current
+    if (diff > 10) {
+      // Clear long-press if swiping
+      if (longPressTimer.current) clearTimeout(longPressTimer.current)
+      // Limit swipe distance max 70px
+      setSwipeOffset(Math.min(diff * 0.7, 70))
+    }
+  }
+
   const handleTouchEnd = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    if (swipeOffset > 45) {
+      onReply(message)
+    }
+    setSwipeOffset(0)
+    touchStartX.current = null
   }
+
+  const handleQuickReaction = (emoji: string) => {
+    setSelectedEmoji(prev => prev === emoji ? null : emoji)
+    onReact?.(message.id, emoji)
+    setShowReactionPicker(false)
+  }
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false)
+      }
+      if (reactionRef.current && !reactionRef.current.contains(e.target as Node)) {
+        setShowReactionPicker(false)
+      }
+    }
+    if (showMenu || showReactionPicker) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu, showReactionPicker])
 
   const menuItems = [
     { icon: Reply, label: 'Répondre', action: () => { onReply(message); setShowMenu(false) } },
@@ -137,19 +195,40 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   return (
     <div
-      className={`group flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors duration-150
+      id={`message-${message.id}`}
+      className={`group relative flex items-end gap-2 px-2 sm:px-4 py-1 transition-all duration-200 select-none
         ${isMine ? 'flex-row-reverse' : 'flex-row'}
-        ${isSelected ? (isDark ? 'bg-violet-900/30' : 'bg-violet-50') : 'hover:bg-black/5'}
+        ${isSelected ? (isDark ? 'bg-emerald-900/20' : 'bg-emerald-50/60') : 'hover:bg-black/[0.02]'}
       `}
       onClick={() => isSelectionMode && onSelect?.(message.id)}
+      onDoubleClick={(e) => {
+        if (!isSelectionMode) {
+          e.stopPropagation()
+          onReply(message)
+        }
+      }}
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      style={{ animationDuration: '120ms' }}
+      style={{
+        transform: swipeOffset > 0 ? `translateX(${swipeOffset}px)` : undefined,
+        transition: swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none',
+      }}
     >
+      {/* Swipe to reply icon indicator behind the bubble */}
+      {swipeOffset > 15 && (
+        <div
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg transition-transform pointer-events-none"
+          style={{ transform: `scale(${Math.min(swipeOffset / 45, 1)})` }}
+        >
+          <Reply size={16} />
+        </div>
+      )}
+
       {/* Selection checkbox */}
       {isSelectionMode && (
         <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center
-          ${isSelected ? 'bg-violet-600 border-violet-600' : (isDark ? 'border-slate-500' : 'border-slate-300')}`}>
+          ${isSelected ? 'bg-emerald-600 border-emerald-600' : (isDark ? 'border-slate-500' : 'border-slate-300')}`}>
           {isSelected && <Check size={11} className="text-white" />}
         </div>
       )}
@@ -172,27 +251,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </div>
       )}
 
-      {/* Bubble + actions */}
+      {/* Bubble + actions container */}
       <div className={`relative flex flex-col max-w-[85%] sm:max-w-[72%] ${isMine ? 'items-end' : 'items-start'}`}>
-
-        {/* Reply preview */}
-        {message.replyPreview && (
-          <div className={`mb-1 px-3 py-1.5 rounded-lg border-l-4 border-violet-500 text-xs max-w-full
-            ${isDark ? 'bg-slate-800/70 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-            <span className="font-semibold text-violet-400 block">{message.replyPreview.senderName}</span>
-            <span className="truncate block" style={{ maxWidth: 220 }}>{message.replyPreview.content}</span>
-          </div>
-        )}
 
         {/* ── 1. Image Bubble ── */}
         {imageUrl ? (
-          <div className="relative rounded-2xl overflow-hidden shadow-lg border border-white/10 max-w-xs sm:max-w-sm">
+          <div className="relative rounded-2xl overflow-hidden shadow-lg border border-white/10 max-w-xs sm:max-w-sm group/bubble">
             <img
               src={imageUrl}
               alt="Image partagée"
               className="w-full h-auto max-h-72 object-cover cursor-pointer hover:opacity-95 transition-opacity"
               onClick={() => setShowImageModal(imageUrl)}
             />
+            {/* WhatsApp inline action dropdown trigger */}
+            {!isSelectionMode && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMenu(v => !v) }}
+                className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 hover:bg-black/80 text-white opacity-0 group-hover/bubble:opacity-100 transition-opacity"
+                title="Options"
+              >
+                <ChevronDown size={14} />
+              </button>
+            )}
             <div className="absolute bottom-1 right-2 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] text-white flex items-center gap-1">
               <span>{formatTime(message.createdAt)}</span>
               {isMine && (message.read ? <CheckCheck size={11} className="text-cyan-300" /> : <Check size={11} className="text-white/80" />)}
@@ -200,7 +280,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         ) : docMatch ? (
           /* ── 2. Document / File Card ── */
-          <div className={`p-3.5 rounded-2xl border shadow-lg w-full max-w-xs sm:max-w-sm ${isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`relative p-3.5 rounded-2xl border shadow-lg w-full max-w-xs sm:max-w-sm group/bubble ${isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-violet-600/20 text-violet-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
                 📄
@@ -212,23 +292,43 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <a
                 href={docMatch[3]}
                 download={docMatch[1]}
-                className="px-2.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex-shrink-0 transition-colors"
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex-shrink-0 transition-colors"
               >
                 Ouvrir
               </a>
             </div>
+            {/* Inline Chevron */}
+            {!isSelectionMode && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMenu(v => !v) }}
+                className={`absolute top-2 right-2 p-1 rounded-full opacity-0 group-hover/bubble:opacity-100 transition-opacity ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+                title="Options"
+              >
+                <ChevronDown size={14} />
+              </button>
+            )}
             <div className="text-[10px] text-slate-400 mt-2 text-right">
               {formatTime(message.createdAt)}
             </div>
           </div>
         ) : proposalMatch ? (
           /* ── 3. Enhanced Professional Proposal / Quote Card ── */
-          <div className={`p-4 rounded-2xl border shadow-2xl w-full max-w-sm sm:max-w-md ${isDark ? 'bg-slate-900/95 border-emerald-500/40 text-white' : 'bg-white border-emerald-500/40 text-slate-900'}`}>
+          <div className={`relative p-4 rounded-2xl border shadow-2xl w-full max-w-sm sm:max-w-md group/bubble ${isDark ? 'bg-slate-900/95 border-emerald-500/40 text-white' : 'bg-white border-emerald-500/40 text-slate-900'}`}>
             <div className="flex items-center justify-between gap-2 mb-2.5">
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] flex items-center gap-1">
                 💼 PROPOSITION & DEVIS PRO
               </span>
-              <span className="text-[11px] text-slate-400">{formatTime(message.createdAt)}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-slate-400">{formatTime(message.createdAt)}</span>
+                {!isSelectionMode && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowMenu(v => !v) }}
+                    className="p-1 rounded-full opacity-0 group-hover/bubble:opacity-100 transition-opacity text-slate-400 hover:text-white"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <h4 className="font-bold text-sm sm:text-base leading-snug mb-2 text-emerald-400">
@@ -276,15 +376,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
         ) : eventMatch ? (
-          /* ── 4. Event Card in Chat (Items 37-40) ── */
-          <div className={`p-4 rounded-2xl border shadow-xl w-full max-w-sm ${isDark ? 'bg-zinc-900 border-purple-500/40 text-white' : 'bg-white border-purple-500/40 text-zinc-900'}`}>
+          /* ── 4. Event Card in Chat ── */
+          <div className={`relative p-4 rounded-2xl border shadow-xl w-full max-w-sm group/bubble ${isDark ? 'bg-zinc-900 border-purple-500/40 text-white' : 'bg-white border-purple-500/40 text-zinc-900'}`}>
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase flex items-center gap-1 ${
                 eventMatch[6] === 'true' ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-purple-500/20 text-purple-400'
               }`}>
                 {eventMatch[6] === 'true' ? '🔴 EN DIRECT' : '📅 ÉVÉNEMENT'}
               </span>
-              <span className="text-[10px] text-zinc-400">{formatTime(message.createdAt)}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-zinc-400">{formatTime(message.createdAt)}</span>
+                {!isSelectionMode && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowMenu(v => !v) }}
+                    className="p-1 rounded-full opacity-0 group-hover/bubble:opacity-100 transition-opacity text-slate-400 hover:text-white"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <h4 className="font-bold text-sm sm:text-base leading-snug mb-2 text-white">
@@ -329,42 +439,88 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           </div>
         ) : sysNotifMatch ? (
-          /* ── 5. System Notification in Chat (Item 40) ── */
+          /* ── 5. System Notification in Chat ── */
           <div className="w-full text-center my-1.5">
             <span className="inline-block px-3 py-1 rounded-full bg-zinc-800/90 text-zinc-300 text-[11px] font-medium border border-zinc-700/60 shadow-sm">
               ℹ️ {sysNotifMatch[1]}
             </span>
           </div>
         ) : (
-          /* ── 3. Standard Text Bubble (with Voir Plus / Voir Moins) ── */
+          /* ── 6. Standard Text Bubble (WhatsApp Look & Feel) ── */
           <div
-            className={`relative px-4 py-2.5 shadow-md
+            className={`group/bubble relative px-3 py-2 shadow-sm transition-all duration-150
               ${isMine
-                ? 'rounded-2xl rounded-br-sm bg-gradient-to-br from-emerald-600 to-teal-700 text-white'
+                ? 'rounded-2xl rounded-tr-sm bg-emerald-600 text-white'
                 : isDark
-                  ? 'rounded-2xl rounded-bl-sm bg-slate-800 border border-slate-700 text-slate-100'
-                  : 'rounded-2xl rounded-bl-sm bg-white border border-slate-200 text-slate-800 shadow-md'
+                  ? 'rounded-2xl rounded-tl-sm bg-slate-800 border border-slate-700/70 text-slate-100'
+                  : 'rounded-2xl rounded-tl-sm bg-white border border-slate-200/80 text-slate-800 shadow-sm'
               }
             `}
-            onMouseEnter={() => !isSelectionMode && setShowMenu(false)}
           >
-            {/* Content */}
-            <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+            {/* WhatsApp-Style Inline Dropdown Chevron in Top Right */}
+            {!isSelectionMode && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowMenu(v => !v)
+                }}
+                className={`absolute top-1.5 right-1.5 p-1 rounded-full opacity-0 group-hover/bubble:opacity-100 transition-opacity z-10
+                  ${isMine
+                    ? 'text-white/80 hover:text-white hover:bg-black/20'
+                    : isDark
+                      ? 'text-slate-400 hover:text-white hover:bg-slate-700'
+                      : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'
+                  }`}
+                title="Options du message"
+              >
+                <ChevronDown size={14} />
+              </button>
+            )}
+
+            {/* ── WhatsApp-Style Quoted Message Preview EMBEDDED inside the Bubble ── */}
+            {message.replyPreview && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (message.replyToId && onJumpToMessage) {
+                    onJumpToMessage(message.replyToId)
+                  }
+                }}
+                className={`mb-2 px-2.5 py-1.5 rounded-lg border-l-[3.5px] cursor-pointer transition-all hover:opacity-90 active:scale-[0.99] select-none
+                  ${isMine
+                    ? 'bg-black/20 border-l-white/90 text-white/95'
+                    : isDark
+                      ? 'bg-black/30 border-l-emerald-400 text-slate-200'
+                      : 'bg-emerald-50 border-l-emerald-600 text-slate-800'
+                  }`}
+                title="Cliquer pour afficher le message d'origine"
+              >
+                <span className={`font-bold block truncate text-[11px] leading-tight ${isMine ? 'text-emerald-100' : 'text-emerald-500'}`}>
+                  {message.replyPreview.senderName || (message.replyPreview as any).sender_name || 'Message'}
+                </span>
+                <span className="truncate block opacity-85 text-[12px] leading-snug mt-0.5" style={{ maxWidth: 280 }}>
+                  {message.replyPreview.content}
+                </span>
+              </div>
+            )}
+
+            {/* Message Text Content */}
+            <p className="text-[13.5px] leading-relaxed break-words whitespace-pre-wrap pr-4">
               {highlightText(displayContent, searchQuery)}
             </p>
 
-            {/* Expand / Collapse Button */}
+            {/* Expand / Collapse Button for very long messages */}
             {isLong && (
               <button
                 onClick={(e) => { e.stopPropagation(); setIsExpanded(v => !v) }}
-                className={`text-xs font-bold mt-1 underline hover:no-underline block ${isMine ? 'text-white' : 'text-emerald-400'}`}
+                className={`text-xs font-bold mt-1 underline hover:no-underline block ${isMine ? 'text-emerald-100' : 'text-emerald-500'}`}
               >
                 {isExpanded ? 'Voir moins' : 'Voir plus'}
               </button>
             )}
 
-            {/* Metadata row */}
-            <div className={`flex items-center gap-1.5 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+            {/* Metadata row (Time + Read receipt + Star + Edited) */}
+            <div className={`flex items-center gap-1 mt-0.5 select-none ${isMine ? 'justify-end' : 'justify-start'}`}>
               {message.isImportant && <Star size={10} className="text-yellow-400 fill-yellow-400" />}
               {message.isEdited && (
                 <span className={`text-[10px] ${isMine ? 'text-emerald-200' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
@@ -372,7 +528,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </span>
               )}
               <span
-                className={`text-[10px] cursor-default select-none ${isMine ? 'text-emerald-200' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}
+                className={`text-[10px] cursor-default ${isMine ? 'text-emerald-100/90' : (isDark ? 'text-slate-400' : 'text-slate-400')}`}
                 title={formatFullDate(message.createdAt)}
                 onMouseEnter={() => setShowTooltip(true)}
                 onMouseLeave={() => setShowTooltip(false)}
@@ -381,40 +537,53 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               </span>
               {isMine && (
                 message.read
-                  ? <CheckCheck size={12} className="text-cyan-200" />
-                  : <Check size={12} className="text-emerald-200" />
+                  ? <CheckCheck size={13} className="text-cyan-200" />
+                  : <Check size={13} className="text-emerald-200" />
               )}
             </div>
 
-            {/* Full date tooltip */}
+            {/* Full date tooltip on hover */}
             {showTooltip && (
-              <div className={`absolute bottom-full mb-1 ${isMine ? 'right-0' : 'left-0'} z-50
-                px-2 py-1 rounded-lg text-[11px] whitespace-nowrap shadow-lg pointer-events-none
-                ${isDark ? 'bg-slate-900 text-slate-300 border border-slate-700' : 'bg-white text-slate-600 border border-slate-200 shadow-md'}`}>
+              <div className={`absolute bottom-full mb-1.5 ${isMine ? 'right-0' : 'left-0'} z-50
+                px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap shadow-xl pointer-events-none backdrop-blur-md
+                ${isDark ? 'bg-slate-900/95 text-slate-200 border border-slate-700' : 'bg-white/95 text-slate-700 border border-slate-200 shadow-md'}`}>
                 {formatFullDate(message.createdAt)}
               </div>
             )}
           </div>
         )}
 
-        {/* Hover action bar (desktop) */}
-        {!isSelectionMode && (
-          <div className={`absolute top-0 ${isMine ? 'right-full mr-1' : 'left-full ml-1'}
-            hidden group-hover:flex items-center gap-0.5 z-10`}>
-            <button
-              onClick={() => onReply(message)}
-              className={`p-1.5 rounded-full transition-colors ${isDark ? 'bg-slate-700 hover:bg-emerald-700 text-slate-300' : 'bg-white hover:bg-emerald-50 text-slate-500 shadow-sm border border-slate-200'}`}
-              title="Répondre"
-            >
-              <Reply size={13} />
-            </button>
-            <button
-              onClick={() => setShowMenu(v => !v)}
-              className={`p-1.5 rounded-full transition-colors ${isDark ? 'bg-slate-700 hover:bg-emerald-700 text-slate-300' : 'bg-white hover:bg-emerald-50 text-slate-500 shadow-sm border border-slate-200'}`}
-              title="Plus d'actions"
-            >
-              <MoreVertical size={13} />
-            </button>
+        {/* ── Floating Reaction Bar (👍 ❤️ 😂 😮 😢 🙏) ── */}
+        {showReactionPicker && (
+          <div
+            ref={reactionRef}
+            className={`absolute -top-10 ${isMine ? 'right-0' : 'left-0'} z-50 flex items-center gap-1 px-2 py-1 rounded-full shadow-2xl border backdrop-blur-lg animate-in fade-in zoom-in duration-150
+              ${isDark ? 'bg-slate-900/95 border-slate-700 text-white' : 'bg-white/95 border-slate-200 text-slate-900'}`}
+          >
+            {QUICK_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleQuickReaction(emoji)
+                }}
+                className="text-base p-1 rounded-full hover:scale-125 transition-transform"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Active Reaction Badge under bubble */}
+        {selectedEmoji && (
+          <div
+            onClick={() => handleQuickReaction(selectedEmoji)}
+            className={`-mt-2 ${isMine ? 'mr-2 self-end' : 'ml-2 self-start'} px-2 py-0.5 rounded-full text-xs font-semibold shadow-md border cursor-pointer hover:scale-105 transition-transform flex items-center gap-1
+              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+          >
+            <span>{selectedEmoji}</span>
+            <span className="text-[10px] text-emerald-500 font-bold">1</span>
           </div>
         )}
       </div>
@@ -426,32 +595,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </div>
       )}
 
-      {/* Context Menu Dropdown */}
+      {/* WhatsApp Context Menu Dropdown */}
       {showMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
           <div
             ref={menuRef}
-            className={`absolute z-50 w-52 rounded-xl shadow-2xl border overflow-hidden
-              ${isMine ? 'right-0' : 'left-0'} top-full mt-1
-              ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}
+            className={`absolute z-50 w-52 rounded-2xl shadow-2xl border overflow-hidden backdrop-blur-xl animate-in fade-in duration-150
+              ${isMine ? 'right-2' : 'left-2'} top-full mt-1
+              ${isDark ? 'bg-slate-900/95 border-slate-700' : 'bg-white/95 border-slate-200'}`}
           >
             {menuItems.map((item, i) => (
               <button
                 key={i}
-                onClick={item.action}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors
+                onClick={(e) => {
+                  e.stopPropagation()
+                  item.action()
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-left transition-colors
                   ${'danger' in item && item.danger
                     ? isDark
                       ? 'text-red-400 hover:bg-red-900/20'
                       : 'text-red-500 hover:bg-red-50'
                     : isDark
-                      ? 'text-slate-300 hover:bg-slate-800'
-                      : 'text-slate-700 hover:bg-slate-50'
+                      ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
-                <item.icon size={15} className="flex-shrink-0" />
-                {item.label}
+                <item.icon size={15} className="flex-shrink-0 opacity-80" />
+                <span>{item.label}</span>
               </button>
             ))}
           </div>

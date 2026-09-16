@@ -62,7 +62,12 @@
     "noResultsFound": "Ничего не найдено",
     "viewAll": "Смотреть все",
     "follow": "Подписаться",
-    "following": "Вы подписаны"
+    "following": "Вы подписаны",
+    "confirmLogoutTitle": "Выход",
+    "confirmLogout": "Вы действительно хотите выйти из своего аккаунта EXILE?",
+    "information": "Информация",
+    "ok": "Понятно",
+    "month": "месяц"
   },
   "nav": {
     "home": "Главная",
@@ -78,7 +83,8 @@
   "settings": {
     "sections": {
       "main": "General Settings",
-      "security": "Account & Security"
+      "security": "Account & Security",
+      "account": "Аккаунт"
     },
     "categories": {
       "account": "Account & Profile",
@@ -111,7 +117,26 @@
       "dangerZoneClean": "Danger Zone",
       "deleteAccountTitle": "Delete Account",
       "dangerZoneDescClean": "This action permanently deletes your profile, videos, and all data.",
-      "deleteAccount": "Delete account permanently"
+      "deleteAccount": "Delete account permanently",
+      "changePasswordClean": "Сменить пароль",
+      "changePassword": "Сменить пароль",
+      "changePasswordTitle": "Изменить пароль",
+      "currentPasswordPlaceholder": "Текущий пароль",
+      "newPasswordPlaceholder": "Новый пароль (минимум 8 символов)",
+      "confirmPasswordPlaceholder": "Подтвердите новый пароль",
+      "emailAssociated": "Связанный email",
+      "noEmailRegistered": "Не указан (Регистрация по телефону)",
+      "addEmailClean": "Добавить адрес электронной почты",
+      "addEmailTitle": "Добавить адрес электронной почты",
+      "currentEmailLabel": "Текущий адрес электронной почты",
+      "newEmailLabel": "Новый адрес электронной почты",
+      "newEmailPlaceholder": "name@example.com",
+      "passwordConfirmLabel": "Пароль для подтверждения",
+      "passwordConfirmPlaceholder": "Ваш пароль для подтверждения",
+      "usernameLabel": "Имя пользователя",
+      "usernameLockNotice": "Изменение заблокировано. Доступно через {{days}} дней.",
+      "usernameCanModify": "Вы можете изменить имя пользователя",
+      "usernameHelp": "Можно изменять раз в месяц. Общедоступно."
     },
     "premium": {
       "currentPlanTitle": "Current Plan",
@@ -145,7 +170,141 @@
       "contentHighlight": "Content highlight",
       "customLink": "Custom professional link",
       "prioritySupport": "Priority support",
-      "monthlyBonus": "1 visibility bonus / month"
+      "monthlyBonus": "1 visibility bonus / month",
+      "viewOffers": "Посмотреть предложения",
+      "invoiceDesc": "Просматривайте и скачивайте счета и историю транзакций.",
+      "tableDate": "Дата",
+      "tablePlan": "Тариф",
+      "tableAmount": "Сумма",
+      "tableStatus": "Статус",
+      "tableInvoice": "Квитанция",
+      "registration": "Регистрация",
+      "free": "Бесплатно"
+    },
+    "title": "Настройки",
+    "subtitle": "Управляйте личной информацией, безопасностью и настройками платформы.",
+    "logoutDesc": "Выйти из сеанса",
+    "privacy": {
+      "whoCanContactTitle": "Кто может связаться со мной?",
+      "everyone": "Все",
+      "everyoneDesc": "Все зарегистрированные участники Exile могут отправить вам личное сообщение.",
+      "followers": "Только мои подписчики",
+      "followersDesc": "Только ваши подписчики могут писать вам в личные сообщения.",
+      "verifiedPro": "Верифицированные эксперты",
+      "verifiedProDesc": "Только профили с подтвержденной профессией могут отправлять вам сообщения.",
+      "nobody": "Никто (Приватный режим)",
+      "nobodyDesc": "Блокирует создание новых чатов. Текущие диалоги остаются активными.",
+      "onlineStatusTitle": "Показывать статус 'В сети'",
+      "onlineStatusDesc": "Позволяет вашим контактам видеть, когда вы находитесь на платформе",
+      "profileVisibilityTitle": "Видимость вашего профиля",
+      "public": "Публичный (Виден всем посетителям и участникам)",
+      "members": "Только для участников (Доступно после входа)",
+      "private": "Приватный (Виден только взаимным контактам)",
+      "blockedUsersTitle": "Заблокированные пользователи",
+      "noBlocked": "В вашем списке нет заблокированных пользователей",
+      "unblock": "Разблокировать"
+    },
+    "security": {
+      "authProtection": "Аутентификация и защита",
+      "twoFactor": "Двухфакторная аутентификация (2FA)",
+      "twoFactorActive": "2FA включена",
+      "twoFactorInactive": "2FA отключена",
+      "twoFactorMethodTotp": "Защищено через приложение аутентификации (Google TOTP / Authy).",
+      "twoFactorMethodEmail": "Защищено кодом подтверждения по электронной почте.",
+      "twoFactorDesc": "Требует дополнительный код безопасности при каждой новой попытке входа.",
+      "twoFactorDisableBtn": "Отключить 2FA",
+      "twoFactorEnableBtn": "Включить 2FA",
+      "confirmDisable2FA": "Подтвердить отключение",
+      "sessionsTitle": "Активные сеансы и устройства",
+      "refresh": "Обновить",
+      "thisDevice": "Это устройство",
+      "revokeSessionTitle": "Отключение устройства",
+      "revokeSessionMsg": "Вы действительно хотите удаленно завершить сеанс на этом устройстве?",
+      "disconnect": "Отключить",
+      "passwordSecurityTitle": "Пароль учетной записи",
+      "passwordSecurityDesc": "Ваш текущий пароль остается строго конфиденциальным и скрыт в целях безопасности.",
+      "twoFactorModalTitle": "Настройка двухфакторной аутентификации",
+      "twoFactorModalDesc": "Выберите способ двухфакторной аутентификации:",
+      "twoFactorScanQR": "1. Отсканируйте QR-код в Google Authenticator или Authy:",
+      "twoFactorSecretKey": "Или введите этот секретный ключ вручную:",
+      "twoFactorEnterCode": "2. Введите сгенерированный 6-значный код:",
+      "twoFactorVerifyBtn": "Проверить и включить"
+    },
+    "notifications": {
+      "title": "Настройки уведомлений",
+      "subtitle": "Выберите, как вы хотите получать уведомления о событиях",
+      "saved": "Настройки уведомлений сохранены в базе данных.",
+      "email": "Уведомления по электронной почте",
+      "emailDesc": "Получать оповещения и сводки по электронной почте через Resend",
+      "push": "Push-уведомления",
+      "pushDesc": "Получать мгновенные уведомления в браузере или на устройстве",
+      "inApp": "Уведомления в приложении"
+    },
+    "app": {
+      "savedFeedback": "Язык и региональные настройки успешно обновлены.",
+      "themeDark": "🌙 Темная тема",
+      "themeLight": "☀️ Светлая тема",
+      "themeAuto": "💻 Системная тема",
+      "languageTitle": "Язык платформы",
+      "timezoneTitle": "Часовой пояс",
+      "timezoneDesc": "Синхронизирует время публикаций и уведомлений с вашим часовым поясом"
+    },
+    "video": {
+      "autoplay": "Включить случайное воспроизведение",
+      "interval": "Интервал автопереключения (секунды)",
+      "dataSaver": "Экономия трафика (Data Saver)",
+      "dataSaverDesc": "Автоматически подстраивает качество видео для снижения расхода трафика",
+      "networkMode": "Воспроизведение: Wi-Fi / Мобильный интернет",
+      "networkModeDesc": "Укажите, при каком типе подключения разрешена прямая трансляция и HD-качество."
+    },
+    "support": {
+      "subtitle": "Ресурсы, документация и техническая поддержка",
+      "aboutDesc": "Видение, создание и миссия платформы",
+      "reportBug": "Сообщить о технической ошибке",
+      "bugModalTitle": "Сообщить о технической проблеме",
+      "bugModalSubtitle": "Прямой отчет для инженеров EXILE",
+      "bugCategoryLabel": "Категория проблемы",
+      "bugCatVideo": "Видео / Медиаплеер",
+      "bugCatLogin": "Вход / Безопасность / Аутентификация",
+      "bugCatAudio": "Аудио / Звук видео",
+      "bugCatDisplay": "Отображение / Интерфейс / Язык",
+      "bugCatOther": "Другая неполадка",
+      "bugSubjectLabel": "Краткая тема",
+      "bugSubjectPlaceholder": "Например: Видео не загружается при нажатии",
+      "bugDescLabel": "Подробное описание ошибки",
+      "bugDescPlaceholder": "Опишите ваши действия и возникшую неполадку...",
+      "bugSubmitBtn": "Отправить отчет"
+    },
+    "helpCenter": {
+      "badge": "Центр помощи",
+      "searchTitle": "Как мы можем вам помочь?",
+      "searchSubtitle": "Найдите ответы, руководства и помощь по вашему аккаунту EXILE.",
+      "searchPlaceholder": "Поиск в справке...",
+      "catAccount": "Аккаунт и безопасность",
+      "catAccountDesc": "Управление профилем, паролем и входом",
+      "catPayments": "Платежи и Natcash",
+      "catPaymentsDesc": "Покупки, подписки и способы оплаты",
+      "catVideos": "Видео и видимость",
+      "catVideosDesc": "Публикация, конфиденциальность и охват ваших видео",
+      "catEvents": "События и прямые эфиры",
+      "catEventsDesc": "Организация и участие в профессиональных мероприятиях",
+      "catPrivacy": "Конфиденциальность и блокировки",
+      "catPrivacyDesc": "Управляйте тем, кто может вас видеть и связываться с вами",
+      "catReport": "Отчёты и ошибки",
+      "catReportDesc": "Сообщить о контенте или технической проблеме",
+      "faqTitle": "Часто задаваемые вопросы"
+    },
+    "faq": {
+      "q1": "Как редактировать мой профиль?",
+      "a1": "Перейдите в Настройки > Аккаунт и профиль > Редактировать профиль, чтобы обновить фото, биографию и информацию.",
+      "q2": "Почему моё видео не появляется в ленте?",
+      "a2": "Убедитесь, что ваше видео имеет статус «Опубликовано», а не «Черновик». Частные видео видны только вам.",
+      "q3": "Как совершить платёж через Natcash?",
+      "a3": "Перейдите в раздел Premium, нажмите «Перейти на Premium» и следуйте инструкциям, чтобы отправить сумму на указанный номер Natcash.",
+      "q4": "Как изменить имя пользователя?",
+      "a4": "Перейдите в Настройки > Редактировать профиль. Имя пользователя можно изменить только раз в месяц. Между изменениями требуется 30-дневное ожидание.",
+      "q5": "Что делать, если мой аккаунт был взломан?",
+      "a5": "Немедленно смените пароль и включите двухфакторную аутентификацию. Сообщите нам о проблеме с помощью кнопки «Сообщить об ошибке»."
     }
   },
   "pro": {
@@ -220,7 +379,8 @@
       "country": "Страна",
       "shareProfile": "Поделиться профилем",
       "viewsCount": "просмотров профиля",
-      "editModalTitle": "Редактировать данные профиля"
+      "editModalTitle": "Редактировать данные профиля",
+      "viewProfile": "Просмотреть профиль"
     },
     "feed": {
       "noResults": "По вашему запросу ничего не найдено",
@@ -580,6 +740,17 @@
       "kickedFromLive": "удален(а) из прямого эфира.",
       "cameraOff": "Камера отключена",
       "handRaised": "Рука поднята"
+    },
+    "subscriptions": {
+      "loadingVideos": "Загрузка видео ваших подписок...",
+      "noVideos": "Видео пока нет",
+      "noSubs": "Вы не подписаны ни на одного специалиста. Ознакомьтесь с предложениями ниже, чтобы начать!",
+      "noVideosCategory": "Авторы, на которых вы подписаны, ещё не опубликовали видео в этой категории.",
+      "recommended": "Рекомендуемые специалисты",
+      "subscribe": "Подписаться"
+    },
+    "video": {
+      "videos": "видео"
     }
   },
   "header": {
@@ -684,5 +855,50 @@
     "twoFactorPlaceholder": "6-значный код",
     "twoFactorVerify": "Подтвердить вход",
     "twoFactorBackToLogin": "Вернуться к входу"
+  },
+  "payment": {
+    "subscribeBtn": "Оплатить $20 / месяц (Премиум)",
+    "methodsNotice": "Natcash (вручную), MonCash и защищенные карты",
+    "chooseMethodTitle": "Выберите способ оплаты",
+    "chooseMethodSubtitle": "Подписка EXILE PRO - $20.00 USD / месяц",
+    "natcashOptionTitle": "Natcash (Ручной перевод)",
+    "natcashOptionDesc": "Отправьте на EXILE PLATEFORME • Проверка в течение макс. 4 часов",
+    "popularHaiti": "Гаити",
+    "delayBadge": "Срок проверки: до 4 часов",
+    "pgecomOptionTitle": "Банковская карта / MonCash / PG Pay",
+    "pgecomOptionDesc": "Шлюз PGecom • Мгновенная онлайн-оплата",
+    "loginRequired": "Вы должны войти в систему для оформления подписки.",
+    "sessionExpired": "Ваш сеанс истек. Пожалуйста, войдите снова.",
+    "urlUnavailable": "Ссылка на оплату недоступна.",
+    "pgecomError": "Ошибка инициализации платежа в PGecom.",
+    "statusApproved": "Одобрено",
+    "statusRejected": "Отклонено",
+    "statusPending": "В ожидании (до 4 ч.)"
+  },
+  "natcash": {
+    "title": "Оплата вручную через Natcash",
+    "subtitle": "Прямой перевод на EXILE PLATEFORME",
+    "recipientLabel": "Имя получателя:",
+    "numberLabel": "Номер Natcash:",
+    "amountLabel": "Точная сумма:",
+    "stepGuide": "Наберите *202# или воспользуйтесь приложением Natcash для отправки суммы на указанный номер.",
+    "validationDelay": "Срок подтверждения: максимум 4 часа.",
+    "delayBadge": "Время подтверждения: до 4 часов",
+    "senderPhoneLabel": "Номер телефона отправителя *",
+    "transactionIdLabel": "ID транзакции Natcash (код из SMS) *",
+    "submitBtn": "Подтвердить платеж",
+    "success": {
+      "title": "Платеж успешно зарегистрирован!",
+      "message": "Мы получили информацию о вашей транзакции Natcash. Команда EXILE PLATEFORME проверит ее и активирует Премиум-аккаунт в течение максимум 4 часов."
+    },
+    "errors": {
+      "phoneRequired": "Пожалуйста, укажите номер телефона, с которого был отправлен перевод.",
+      "txnRequired": "Пожалуйста, укажите ID транзакции Natcash (код из SMS-подтверждения).",
+      "loginRequired": "Для отправки платежа необходимо войти в систему.",
+      "generic": "Ошибка при записи платежа. Пожалуйста, проверьте код.",
+      "network": "Ошибка соединения. Пожалуйста, проверьте подключение к интернету."
+    },
+    "exchangeRateTitle": "Курс обмена",
+    "rateCalculation": "Официальный курс: 1 USD = 144.75 HTG"
   }
 }

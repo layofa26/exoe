@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { jwtDecode } from 'jwt-decode'
 import {
   Lock,
   Eye,
@@ -14,6 +15,8 @@ import {
   Loader2,
   KeyRound
 } from 'lucide-react'
+import { SocialButtons } from '../../components/auth/SocialButtons'
+import { SocialCompleteModal, type SocialUserData, type CompleteProfileData } from '../../components/auth/SocialCompleteModal'
 
 type LoginMode = 'email' | 'forgot-password' | 'reset-sent' | 'recover-email'
 
@@ -73,7 +76,7 @@ const getRemainingTime = (): number => {
 
 export const Login = (): JSX.Element => {
   const { t } = useTranslation()
-  const { login, verify2FA, resend2FAOtp } = useAuth()
+  const { login, verify2FA, resend2FAOtp, registerPro, loginWithGoogle } = useAuth()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
@@ -95,6 +98,36 @@ export const Login = (): JSX.Element => {
   const [verifying2FA, setVerifying2FA] = useState(false)
   const [resendingOtp, setResendingOtp] = useState(false)
   const [resendSuccessMsg, setResendSuccessMsg] = useState<string | null>(null)
+
+  // Finalisation directe Google
+  const [socialUser, setSocialUser] = useState<SocialUserData | null>(null)
+  const [showSocialModal, setShowSocialModal] = useState(false)
+
+  const handleSocialComplete = async (profileData: CompleteProfileData) => {
+    if (!socialUser) return { success: false, error: 'Données utilisateur manquantes' }
+    
+    // Si c'est Google, finaliser via loginWithGoogle avec vérification cryptographique
+    if (socialUser.provider === 'google' && socialUser.idToken) {
+      const authResult = await loginWithGoogle({
+        access_token: socialUser.idToken,
+        id_token: socialUser.idToken,
+        birth_date: profileData.birthDate,
+        gender: profileData.gender,
+        profession: profileData.profession,
+        specialty: profileData.specialty
+      })
+
+      if (authResult.success) {
+        setShowSocialModal(false)
+        navigate('/pro')
+        return { success: true }
+      } else {
+        return { success: false, error: authResult.error || "Erreur lors de la finalisation" }
+      }
+    }
+
+    return { success: false, error: "Fournisseur social non reconnu" }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.name === 'username' ? e.target.value.trim() : e.target.value
@@ -297,6 +330,108 @@ export const Login = (): JSX.Element => {
         </div>
       )}
 
+      {/* Bouton de connexion Google */}
+      <div className="mb-5">
+        <SocialButtons
+          onSelectProvider={(provider) => {
+            if (provider === 'google') {
+              const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1066102624726-tqcs9mv5j9ngtrco6dphca8j2evh74eo.apps.googleusercontent.com'
+
+              // Essayer le TokenClient officiel Google (ouvre le vrai popup OAuth)
+              if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+                try {
+                  const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+                    client_id: googleClientId,
+                    scope: 'openid email profile',
+                    callback: async (tokenResponse: any) => {
+                      if (tokenResponse?.access_token) {
+                        try {
+                          const authResult = await loginWithGoogle({ access_token: tokenResponse.access_token })
+                          if (authResult.success) {
+                            if (authResult.needs_profile_completion) {
+                              setSocialUser({
+                                provider: 'google',
+                                fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
+                                email: authResult.google_profile?.email || '',
+                                avatarUrl: authResult.google_profile?.avatar_url,
+                                idToken: tokenResponse.access_token
+                              })
+                              setShowSocialModal(true)
+                            } else {
+                              navigate('/pro')
+                            }
+                            return
+                          } else {
+                            setError(authResult.error || "Erreur d'authentification Google")
+                          }
+                        } catch (e) {
+                          console.error('Erreur authentification Google:', e)
+                        }
+                      }
+                    }
+                  })
+                  tokenClient.requestAccessToken({ prompt: 'select_account' })
+                  return
+                } catch (err) {
+                  console.error('Erreur TokenClient Google:', err)
+                }
+              }
+
+              // Fallback GIS One-Tap
+              if (typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
+                try {
+                  (window as any).google.accounts.id.initialize({
+                    client_id: googleClientId,
+                    callback: async (response: any) => {
+                      if (response?.credential) {
+                        try {
+                          const authResult = await loginWithGoogle({ id_token: response.credential })
+                          if (authResult.success) {
+                            if (authResult.needs_profile_completion) {
+                              setSocialUser({
+                                provider: 'google',
+                                fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
+                                email: authResult.google_profile?.email || '',
+                                avatarUrl: authResult.google_profile?.avatar_url,
+                                idToken: response.credential
+                              })
+                              setShowSocialModal(true)
+                            } else {
+                              navigate('/pro')
+                            }
+                            return
+                          } else {
+                            setError(authResult.error || "Erreur d'authentification Google")
+                          }
+                        } catch (e) {
+                          console.error('Erreur GIS Google:', e)
+                        }
+                      }
+                    }
+                  });
+                  (window as any).google.accounts.id.prompt()
+                  return
+                } catch (e) {
+                  console.error('Erreur GIS:', e)
+                }
+              }
+            }
+          }}
+          isDark={resolvedTheme === 'dark'}
+          disabled={loading}
+        />
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className={`w-full border-t ${resolvedTheme === 'dark' ? 'border-zinc-700' : 'border-gray-200'}`} />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className={`px-3 ${resolvedTheme === 'dark' ? 'bg-slate-800 text-zinc-400' : 'bg-white text-gray-500'} font-medium`}>
+              ou avec votre identifiant
+            </span>
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
         <div>
           <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1.5 sm:mb-2`}>
@@ -420,6 +555,17 @@ export const Login = (): JSX.Element => {
           {is2FAStep ? render2FAStep() : renderLoginForm()}
         </div>
       </div>
+
+      {/* Modal de Finalisation Option B (Directement sur Login sans passer par Register) */}
+      {socialUser && (
+        <SocialCompleteModal
+          isOpen={showSocialModal}
+          onClose={() => setShowSocialModal(false)}
+          socialUser={socialUser}
+          isDark={resolvedTheme === 'dark'}
+          onSubmit={handleSocialComplete}
+        />
+      )}
 
       {/* CSS Animation */}
       <style>{`

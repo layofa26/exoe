@@ -23,6 +23,24 @@ export interface AuthContextType {
   resend2FAOtp: (sessionTemp: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   registerPro: (userData: ProRegistrationData) => Promise<RegisterResult>;
   registerInstitution: (step1Data: InstitutionStep1, step2Data: InstitutionStep2) => Promise<RegisterResult>;
+  loginWithGoogle: (payload: {
+    id_token?: string
+    access_token?: string
+    birth_date?: string
+    gender?: string
+    profession?: string
+    specialty?: string
+  }) => Promise<{
+    success: boolean
+    is_new_user?: boolean
+    needs_profile_completion?: boolean
+    google_profile?: {
+      email: string
+      full_name: string
+      avatar_url?: string
+    }
+    error?: string
+  }>;
   logout: () => void;
   hasRole: (role: string) => boolean;
   hasModuleAccess: (module: 'pro' | 'social' | 'funny') => boolean;

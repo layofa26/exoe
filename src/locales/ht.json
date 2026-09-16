@@ -62,7 +62,12 @@
     "noResultsFound": "Pa gen okenn rezilta",
     "viewAll": "Wè tout",
     "follow": "Swiv",
-    "following": "W ap swiv"
+    "following": "W ap swiv",
+    "confirmLogoutTitle": "Dekoneksyon",
+    "confirmLogout": "Èske w vle dekonekte de kont EXILE ou a toutbon ?",
+    "information": "Enfòmasyon",
+    "ok": "Dakò",
+    "month": "mwa"
   },
   "nav": {
     "home": "Akèy",
@@ -78,7 +83,8 @@
   "settings": {
     "sections": {
       "main": "Paramèt Jeneral",
-      "security": "Kont & Sekirite"
+      "security": "Kont & Sekirite",
+      "account": "Kont"
     },
     "categories": {
       "account": "Kont & Pwofil",
@@ -111,7 +117,26 @@
       "dangerZoneClean": "Zòn Danje",
       "deleteAccountTitle": "Efase Kont la",
       "dangerZoneDescClean": "Aksyon sa a ap efase pwofil ou, videyo ou, ak tout done ou yo nèt.",
-      "deleteAccount": "Efase kont la nèt"
+      "deleteAccount": "Efase kont la nèt",
+      "changePasswordClean": "Chanje modpas la",
+      "changePassword": "Chanje modpas la",
+      "changePasswordTitle": "Modifye modpas la",
+      "currentPasswordPlaceholder": "Modpas aktyèl la",
+      "newPasswordPlaceholder": "Nouvo modpas (omwen 8 karaktè)",
+      "confirmPasswordPlaceholder": "Konfime nouvo modpas la",
+      "emailAssociated": "Imèl ki asosye a",
+      "noEmailRegistered": "Pa genyen (Enskripsyon pa telefòn)",
+      "addEmailClean": "Ajoute yon adrès imèl",
+      "addEmailTitle": "Ajoute yon adrès imèl",
+      "currentEmailLabel": "Adrès imèl aktyèl la",
+      "newEmailLabel": "Nouvo adrès imèl",
+      "newEmailPlaceholder": "non@egzanp.com",
+      "passwordConfirmLabel": "Modpas pou konfime a",
+      "passwordConfirmPlaceholder": "Modpas ou a pou valide",
+      "usernameLabel": "Non itilizatè",
+      "usernameLockNotice": "Modifikasyon bloke. Disponib nan {{days}} jou.",
+      "usernameCanModify": "Ou ka modifye non itilizatè ou",
+      "usernameHelp": "Ka modifye yon fwa pa mwa. Vizib piblikman."
     },
     "premium": {
       "currentPlanTitle": "Plan Aktyèl",
@@ -145,7 +170,141 @@
       "contentHighlight": "Mete kontni an valè",
       "customLink": "Lyen pwofesyonèl pèsonalize",
       "prioritySupport": "Sipò priyoritè",
-      "monthlyBonus": "1 bonis vizibilite / mwa"
+      "monthlyBonus": "1 bonis vizibilite / mwa",
+      "viewOffers": "Gade òf yo",
+      "invoiceDesc": "Gade epi telechaje fakti ak tranzaksyon ou te pase yo.",
+      "tableDate": "Dat",
+      "tablePlan": "Plan",
+      "tableAmount": "Montan",
+      "tableStatus": "Estatitid",
+      "tableInvoice": "Fakti",
+      "registration": "Enskripsyon",
+      "free": "Gratis"
+    },
+    "title": "Paramèt",
+    "subtitle": "Jere enfòmasyon pèsonèl ou, sekirite w ak preferans ou sou platfòm nan.",
+    "logoutDesc": "Kite sesyon ou a",
+    "privacy": {
+      "whoCanContactTitle": "Kiyès ki ka kontakte m ?",
+      "everyone": "Tout moun",
+      "everyoneDesc": "Tout manm ki enskri sou Exile ka voye mesaj dirèk ba ou.",
+      "followers": "Abonye m yo sèlman",
+      "followersDesc": "Se sèlman manm ki abone ak kont ou ki ka kontakte w an prive.",
+      "verifiedPro": "Pwofesyonèl verifye yo sèlman",
+      "verifiedProDesc": "Se sèlman pwofil ki gen yon pwofesyon/tit verifye ki ka voye mesaj ba ou.",
+      "nobody": "Pèsonn (Mòd Prive)",
+      "nobodyDesc": "Bloke kreyasyon tout nouvo diskisyon. Konvèsasyon ou te gentan genyen yo ap rete aktif.",
+      "onlineStatusTitle": "Montre estati m an liy",
+      "onlineStatusDesc": "Pèmèt kontak ou yo wè si w aktif sou platfòm nan kounye a",
+      "profileVisibilityTitle": "Vizibilite jeneral pwofil ou a",
+      "public": "Piblik (Vizib pou tout vizitè ak manm)",
+      "members": "Manm sèlman (Aksè apre koneksyon)",
+      "private": "Prive (Vizib sèlman pou relasyon mityèl ou yo)",
+      "blockedUsersTitle": "Itilizatè ou bloke yo",
+      "noBlocked": "Pa gen okenn itilizatè bloke nan lis ou a",
+      "unblock": "Debloke"
+    },
+    "security": {
+      "authProtection": "Otantifikasyon ak Pwoteksyon",
+      "twoFactor": "Doub otantifikasyon (2FA)",
+      "twoFactorActive": "2FA Aktive",
+      "twoFactorInactive": "2FA Dezaktive",
+      "twoFactorMethodTotp": "Pwoteje atravè aplikasyon otantifikasyon (TOTP Google / Authy).",
+      "twoFactorMethodEmail": "Pwoteje pa kòd verifikasyon pa imèl.",
+      "twoFactorDesc": "Mande yon kòd sekirite anplis chak fwa gen yon nouvo tantativ pou konekte.",
+      "twoFactorDisableBtn": "Dezaktive 2FA",
+      "twoFactorEnableBtn": "Aktive 2FA",
+      "confirmDisable2FA": "Konfime dezaktivasyon an",
+      "sessionsTitle": "Sesyon aktif ak aparèy yo",
+      "refresh": "Rafrechi",
+      "thisDevice": "Aparèy sa a",
+      "revokeSessionTitle": "Dekoneksyon aparèy la",
+      "revokeSessionMsg": "Èske w vle dekonekte aparèy sa a a distans toutbon ?",
+      "disconnect": "Dekonekte",
+      "passwordSecurityTitle": "Modpas kont la",
+      "passwordSecurityDesc": "Modpas aktyèl ou a rete strikteman konfidansyèl epi kache pou rezon sekirite.",
+      "twoFactorModalTitle": "Konfigirasyon Doub Otantifikasyon",
+      "twoFactorModalDesc": "Chwazi metòd doub otantifikasyon ou an :",
+      "twoFactorScanQR": "1. Eskane Kòd QR sa a ak Google Authenticator oswa Authy :",
+      "twoFactorSecretKey": "Oswa antre kle sekrè sa a alamen :",
+      "twoFactorEnterCode": "2. Antre kòd 6 chif ki jenere a :",
+      "twoFactorVerifyBtn": "Verifye epi Aktive"
+    },
+    "notifications": {
+      "title": "Preferans Notifikasyon",
+      "subtitle": "Chwazi kijan w ta renmen resevwa enfòmasyon sou aktivite yo",
+      "saved": "Preferans notifikasyon yo anrejistre nan bazdone a.",
+      "email": "Notifikasyon pa imèl",
+      "emailDesc": "Resevwa alèt ak rezime pa imèl atravè sèvis Resend",
+      "push": "Notifikasyon push",
+      "pushDesc": "Resevwa alèt dirèk sou navigatè w oswa aparèy ou an",
+      "inApp": "Notifikasyon anndan aplikasyon an"
+    },
+    "app": {
+      "savedFeedback": "Lang ak preferans rejyonal yo mete ajou avèk siksè.",
+      "themeDark": "🌙 Tèm Nwa (Fwans)",
+      "themeLight": "☀️ Tèm Klè",
+      "themeAuto": "💻 Tèm Sistèm Otomatik",
+      "languageTitle": "Lang platfòm nan",
+      "timezoneTitle": "Fizo orè",
+      "timezoneDesc": "Senkronize lè piblikasyon ak notifikasyon yo ak rejyon ou an"
+    },
+    "video": {
+      "autoplay": "Aktive lekti oaza (alewatwa)",
+      "interval": "Entèval wotasyon otomatik (segond)",
+      "dataSaver": "Ekonomizè done entènèt (Data Saver)",
+      "dataSaverDesc": "Ajiste otomatikman kalite videyo a pou diminye konsomasyon forfè entènèt ou",
+      "networkMode": "Lekti sou rezo : Wi-Fi / Done mobil",
+      "networkModeDesc": "Defini sou ki kalite koneksyon pou pèmèt difizyon an dirèk ak gwo kalite videyo (HD)."
+    },
+    "support": {
+      "subtitle": "Resous, dokimantasyon ak rapò teknik",
+      "aboutDesc": "Vizyon, fondasyon ak misyon platfòm nan",
+      "reportBug": "Siyale yon pwoblèm teknik (bug)",
+      "bugModalTitle": "Siyale yon Pwoblèm Teknik",
+      "bugModalSubtitle": "Rapò dirèk voye bay enjenyè EXILE yo",
+      "bugCategoryLabel": "Kategori pwoblèm nan",
+      "bugCatVideo": "Videyo / Jwè miltimedya",
+      "bugCatLogin": "Koneksyon / Sekirite / Otantifikasyon",
+      "bugCatAudio": "Odyo / Son videyo yo",
+      "bugCatDisplay": "Afichaj / Entèfas / Lang",
+      "bugCatOther": "Lòt pwoblèm",
+      "bugSubjectLabel": "Sijè an rezime",
+      "bugSubjectPlaceholder": "Eg: Videyo a pa chaje lè m klike sou li",
+      "bugDescLabel": "Deskripsyon detaye pwoblèm nan",
+      "bugDescPlaceholder": "Eksplike kisa w t ap fè ak kisa ki pase...",
+      "bugSubmitBtn": "Voye rapò a"
+    },
+    "helpCenter": {
+      "badge": "Sant Èd",
+      "searchTitle": "Kijan nou ka ede ou?",
+      "searchSubtitle": "Jwenn repons, gid, ak èd pou kont EXILE ou.",
+      "searchPlaceholder": "Chèche nan èd...",
+      "catAccount": "Kont & Sekirite",
+      "catAccountDesc": "Jere pwofil ou, modpas ak koneksyon ou",
+      "catPayments": "Peman & Natcash",
+      "catPaymentsDesc": "Acha, abòman ak metòd peman",
+      "catVideos": "Videyo & Vizibilite",
+      "catVideosDesc": "Piblikasyon, konfidansyalite ak pote videyo ou yo",
+      "catEvents": "Evènman & Lives",
+      "catEventsDesc": "Òganizasyon ak patisipasyon nan evènman pwofesyonèl",
+      "catPrivacy": "Konfidansyalite & Blokaj",
+      "catPrivacyDesc": "Kontwole ki moun ki ka wè ou ak kontakte ou",
+      "catReport": "Rapò & Bugs",
+      "catReportDesc": "Rapòte yon kontni oswa yon pwoblèm teknik",
+      "faqTitle": "Kesyon souvan poze"
+    },
+    "faq": {
+      "q1": "Kijan pou mwen modifye pwofil mwen?",
+      "a1": "Al nan Paramèt > Kont & Pwofil > Modifye pwofil pou mete ajou foto, bio ak enfòmasyon ou.",
+      "q2": "Poukisa videyo mwen an pa parèt nan feed la?",
+      "a2": "Tcheke si videyo ou an gen estati « Pibliye » pa « Bouyon ». Videyo prive yo sèlman parèt pou ou.",
+      "q3": "Kijan pou mwen fè yon peman via Natcash?",
+      "a3": "Ale nan seksyon Premium, klike sou 'Pase Premium' epi swiv enstriksyon yo pou voye montan an nan nimewo Natcash endike a.",
+      "q4": "Kijan pou mwen chanje non itilizatè mwen?",
+      "a4": "Al nan Paramèt > Modifye pwofil. Non itilizatè ou ka chanje yon fwa pa mwa. Gen yon dela 30 jou ant chak modifikasyon.",
+      "q5": "Kisa pou mwen fè si kont mwen an te pirate?",
+      "a5": "Chanje modpas ou imedyatman epi aktive otantifikasyon de faktè. Rapòte pwoblèm nan pou nou via bouton 'Rapòte yon bug'."
     }
   },
   "pro": {
@@ -220,7 +379,8 @@
       "country": "Peyi",
       "shareProfile": "Pataje pwofil",
       "viewsCount": "vizit sou pwofil",
-      "editModalTitle": "Modifye enfòmasyon pwofil ou"
+      "editModalTitle": "Modifye enfòmasyon pwofil ou",
+      "viewProfile": "Wè pwofil"
     },
     "feed": {
       "noResults": "Pa gen okenn rezilta pou rechèch ou an",
@@ -580,6 +740,17 @@
       "kickedFromLive": "te ekspilse nan live la.",
       "cameraOff": "Kamera etenn",
       "handRaised": "Men leve"
+    },
+    "subscriptions": {
+      "loadingVideos": "Chajman videyo abòne ou yo...",
+      "noVideos": "Pa gen videyo pou kounye a",
+      "noSubs": "Ou pa abòne okenn pwofesyonèl. Jwenn sijèsyon ki anba pou kòmanse!",
+      "noVideosCategory": "Kreyatè ou swiv yo poko pibliye videyo nan kategori sa a.",
+      "recommended": "Pwofesyonèl rekòmande",
+      "subscribe": "Abòne"
+    },
+    "video": {
+      "videos": "videyo"
     }
   },
   "header": {
@@ -684,5 +855,50 @@
     "twoFactorPlaceholder": "Kòd 6 chif",
     "twoFactorVerify": "Valide koneksyon an",
     "twoFactorBackToLogin": "Retounen nan koneksyon"
+  },
+  "payment": {
+    "subscribeBtn": "Peye $20 / Mwa (Premium)",
+    "methodsNotice": "Natcash (Manyèl), MonCash ak Kat Sekirize",
+    "chooseMethodTitle": "Chwazi Mwayen Peman",
+    "chooseMethodSubtitle": "Abònman EXILE PRO - $20.00 USD / Mwa",
+    "natcashOptionTitle": "Natcash (Transfè Manyèl)",
+    "natcashOptionDesc": "Voye bay EXILE PLATEFORME • Validasyon an 4h maksimòm",
+    "popularHaiti": "Ayiti",
+    "delayBadge": "Delè validasyon : 4H de tan",
+    "pgecomOptionTitle": "Kat Kredi / MonCash / PG Pay",
+    "pgecomOptionDesc": "Passerelle PGecom • Peman an liy otomatik",
+    "loginRequired": "Ou dwe konekte pou w ka abòne. Tanpri rekonekte.",
+    "sessionExpired": "Sesyon ou ekspire. Tanpri rekonekte.",
+    "urlUnavailable": "URL peman an pa disponib.",
+    "pgecomError": "Erè pandan inisyasyon peman an sou PGecom.",
+    "statusApproved": "Valide",
+    "statusRejected": "Rejte",
+    "statusPending": "An atant (Delè 4h)"
+  },
+  "natcash": {
+    "title": "Peman Manyèl Natcash",
+    "subtitle": "Transfè dirèk bay EXILE PLATEFORME",
+    "recipientLabel": "Non Benefisyè :",
+    "numberLabel": "Nimewo Natcash :",
+    "amountLabel": "Montan egzak :",
+    "stepGuide": "Konpoze *202# oswa itilize aplikasyon Natcash pou voye montan an bay nimewo anlè a.",
+    "validationDelay": "Delè validasyon : 4 èdtan de tan maksimòm.",
+    "delayBadge": "Delè validasyon : 4H de tan maksimòm",
+    "senderPhoneLabel": "Nimewo telefòn ki voye lajan an *",
+    "transactionIdLabel": "ID Tranzaksyon Natcash (kòd nan SMS la) *",
+    "submitBtn": "Konfime Peman Mwen",
+    "success": {
+      "title": "Peman Anrejistre avèk Siksè !",
+      "message": "Nou byen resevwa tranzaksyon Natcash ou a. Ekip EXILE PLATEFORME ap valide l epi aktive kont Premium ou a nan yon delè 4 èdtan maksimòm."
+    },
+    "errors": {
+      "phoneRequired": "Tanpri mete nimewo telefòn ou itilize pou voye transfè a.",
+      "txnRequired": "Tanpri mete ID Tranzaksyon Natcash la (kòd nan SMS konfimasyon an).",
+      "loginRequired": "Ou dwe konekte pou w ka soumèt peman sa a.",
+      "generic": "Erè pandan anrejistreman peman an. Tanpri verifye kòd la.",
+      "network": "Erè koneksyon. Tanpri verifye entènèt ou."
+    },
+    "exchangeRateTitle": "To Echanj",
+    "rateCalculation": "To ofisyèl : 1 USD = 144.75 HTG"
   }
 }

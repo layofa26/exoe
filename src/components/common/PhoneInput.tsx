@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
-import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { parsePhoneNumber, isValidPhoneNumber, getExampleNumber, type CountryCode } from 'libphonenumber-js'
+import examples from 'libphonenumber-js/examples.mobile.json'
 import 'flag-icons/css/flag-icons.min.css'
 import { ChevronDown } from 'lucide-react'
 
@@ -241,12 +242,27 @@ export const PhoneInput = ({ value, onChange, placeholder, className = '', error
 
   const handleCountrySelect = (country: typeof COUNTRIES[0]) => {
     setSelectedCountry(country)
+    setCountryCode(country.code)
     setIsDropdownOpen(false)
     
-    // Mettre à jour le numéro avec le nouveau code pays
-    const currentNumber = value.replace(/^\+\d+/, '')
-    const newNumber = '+' + country.dialCode + currentNumber
-    onChange(newNumber, false)
+    // Extraire les chiffres locaux actuels
+    const rawLocal = value.replace(/^\+\d+/, '').replace(/\D/g, '')
+    if (rawLocal) {
+      const newNumber = `+${country.dialCode}${rawLocal}`
+      let valid = false
+      try {
+        valid = isValidPhoneNumber(newNumber, country.code as CountryCode)
+      } catch {
+        valid = false
+      }
+      setIsValid(valid)
+      setValidationError(valid ? '' : 'Format de numéro incomplet ou invalide')
+      onChange(newNumber, valid)
+    } else {
+      setIsValid(false)
+      setValidationError('')
+      onChange(`+${country.dialCode}`, false)
+    }
   }
 
   const filteredCountries = COUNTRIES.filter(country =>
@@ -374,6 +390,30 @@ export const PhoneInput = ({ value, onChange, placeholder, className = '', error
     return value.replace(/^\+/, '')
   }
 
+  // Exemple et placeholder dynamique selon le pays sélectionné
+  const countryExample = useMemo(() => {
+    try {
+      const ex = getExampleNumber(displayedCountry.code as CountryCode, examples)
+      if (ex) {
+        const intl = ex.formatInternational()
+        const dialPrefix = `+${displayedCountry.dialCode}`
+        const local = intl.startsWith(dialPrefix)
+          ? intl.substring(dialPrefix.length).trim()
+          : ex.nationalNumber
+        return {
+          placeholder: local,
+          expectedLength: ex.nationalNumber.length
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return {
+      placeholder: '34 56 7890',
+      expectedLength: 8
+    }
+  }, [displayedCountry])
+
   const handleLocalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Nettoyer pour ne garder que les chiffres
     const rawLocal = e.target.value.replace(/[^0-9]/g, '')
@@ -384,18 +424,19 @@ export const PhoneInput = ({ value, onChange, placeholder, className = '', error
     let errorMsg = ''
     
     try {
-      if (rawLocal.length >= 8) {
-        const parsed = parsePhoneNumber(fullNumber)
-        if (parsed) {
-          valid = isValidPhoneNumber(fullNumber)
-        }
+      if (rawLocal.length >= Math.max(6, countryExample.expectedLength - 2)) {
+        valid = isValidPhoneNumber(fullNumber, displayedCountry.code as CountryCode)
       }
     } catch {
       valid = false
     }
 
-    if (!valid && rawLocal.length > 0 && rawLocal.length < 8) {
-      errorMsg = 'Continuez à saisir votre numéro...'
+    if (!valid && rawLocal.length > 0) {
+      if (rawLocal.length < countryExample.expectedLength) {
+        errorMsg = `Continuez à saisir votre numéro (${rawLocal.length}/${countryExample.expectedLength} chiffres)...`
+      } else {
+        errorMsg = 'Format de numéro invalide pour ce pays'
+      }
     }
 
     setIsValid(valid)
@@ -408,40 +449,40 @@ export const PhoneInput = ({ value, onChange, placeholder, className = '', error
       type="button"
       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
       aria-label="Choisir le pays"
-      className="flex items-center gap-1.5 pr-2.5 border-r border-gray-300 dark:border-zinc-700 hover:opacity-80 transition-opacity flex-shrink-0"
+      className="flex items-center gap-1.5 px-3 py-2.5 sm:py-3 border-r border-gray-300 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800/60 transition-colors flex-shrink-0 select-none cursor-pointer"
     >
-      <span className={`fi fi-${displayedCountry.code.toLowerCase()} fis rounded text-base`}></span>
-      <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-zinc-200">+{displayedCountry.dialCode}</span>
-      <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+      <span className={`fi fi-${displayedCountry.code.toLowerCase()} fis rounded text-base flex-shrink-0`}></span>
+      <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-zinc-200 whitespace-nowrap">+{displayedCountry.dialCode}</span>
+      <ChevronDown className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
     </button>
   )
 
-  const resolvedPlaceholder = placeholder ?? '6 12 34 56 78'
+  const resolvedPlaceholder = placeholder ?? countryExample.placeholder
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center">
+    <div className="relative w-full" ref={dropdownRef}>
+      <div className={`flex items-center w-full border rounded-lg overflow-hidden transition-all focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent ${
+        error ? 'border-red-500' : isValid ? 'border-green-500' : 'border-gray-300 dark:border-zinc-700'
+      } ${className}`}>
         {getFlag()}
+        <input
+          type="tel"
+          value={getDisplayValue()}
+          onChange={handleLocalChange}
+          placeholder={resolvedPlaceholder}
+          className="flex-1 min-w-0 bg-transparent px-3 py-2.5 sm:py-3 text-sm sm:text-base border-0 focus:outline-none focus:ring-0 text-inherit placeholder-gray-400 dark:placeholder-zinc-500"
+        />
+        {isValid && (
+          <div className="pr-3 text-green-500 font-bold flex-shrink-0">
+            ✓
+          </div>
+        )}
+        {error && (
+          <div className="pr-3 text-red-500 font-bold flex-shrink-0">
+            ✕
+          </div>
+        )}
       </div>
-      <input
-        type="tel"
-        value={getDisplayValue()}
-        onChange={handleLocalChange}
-        placeholder={resolvedPlaceholder}
-        className={`w-full pl-28 sm:pl-32 pr-12 py-2.5 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm sm:text-base ${
-          error ? 'border-red-500' : isValid ? 'border-green-500' : 'border-gray-300 dark:border-zinc-700'
-        } ${className}`}
-      />
-      {isValid && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold">
-          ✓
-        </div>
-      )}
-      {error && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 font-bold">
-          ✕
-        </div>
-      )}
 
       {/* Dropdown de sélection de pays */}
       {isDropdownOpen && (

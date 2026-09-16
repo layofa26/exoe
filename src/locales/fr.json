@@ -26,7 +26,7 @@
     "error": "Une erreur est survenue",
     "search": "Rechercher...",
     "back": "Retour",
-    "logout": "Déconnexion",
+    "logout": "Se déconnecter",
     "yes": "Oui",
     "no": "Non",
     "new": "Nouveau",
@@ -62,7 +62,12 @@
     "noResultsFound": "Aucun résultat trouvé",
     "viewAll": "Voir tout",
     "follow": "Suivre",
-    "following": "Suivi"
+    "following": "Suivi",
+    "confirmLogoutTitle": "Déconnexion",
+    "confirmLogout": "Voulez-vous vraiment vous déconnecter de votre compte EXILE ?",
+    "information": "Information",
+    "ok": "D'accord",
+    "month": "mois"
   },
   "nav": {
     "home": "Accueil",
@@ -78,7 +83,8 @@
   "settings": {
     "sections": {
       "main": "Paramètres généraux",
-      "security": "Compte & sécurité"
+      "security": "Compte & sécurité",
+      "account": "Compte"
     },
     "categories": {
       "account": "Compte & Profil",
@@ -111,7 +117,26 @@
       "dangerZoneClean": "Zone dangereuse",
       "deleteAccountTitle": "Supprimer le compte",
       "dangerZoneDescClean": "Cette action supprime définitivement votre profil, vos vidéos et vos données.",
-      "deleteAccount": "Supprimer définitivement"
+      "deleteAccount": "Supprimer définitivement",
+      "changePasswordClean": "Changer le mot de passe",
+      "changePassword": "Changer le mot de passe",
+      "changePasswordTitle": "Modifier le mot de passe",
+      "currentPasswordPlaceholder": "Mot de passe actuel",
+      "newPasswordPlaceholder": "Nouveau mot de passe (min 8 car.)",
+      "confirmPasswordPlaceholder": "Confirmer le nouveau mot de passe",
+      "emailAssociated": "Email associé",
+      "noEmailRegistered": "Non renseigné (Inscription via téléphone)",
+      "addEmailClean": "Ajouter une adresse email",
+      "addEmailTitle": "Ajouter une adresse email",
+      "currentEmailLabel": "Adresse email actuelle",
+      "newEmailLabel": "Nouvelle adresse email",
+      "newEmailPlaceholder": "nom@exemple.com",
+      "passwordConfirmLabel": "Mot de passe de confirmation",
+      "passwordConfirmPlaceholder": "Votre mot de passe pour valider",
+      "usernameLabel": "Nom d'utilisateur",
+      "usernameLockNotice": "Modification verrouillée. Disponible dans {{days}} jours.",
+      "usernameCanModify": "Vous pouvez modifier votre nom d'utilisateur",
+      "usernameHelp": "Modifiable une fois par mois. Visible publiquement."
     },
     "premium": {
       "currentPlanTitle": "Plan actuel",
@@ -145,7 +170,141 @@
       "contentHighlight": "Mise en avant du contenu",
       "customLink": "Lien professionnel personnalisé",
       "prioritySupport": "Support prioritaire",
-      "monthlyBonus": "1 bonus de visibilité / mois"
+      "monthlyBonus": "1 bonus de visibilité / mois",
+      "viewOffers": "Voir les offres",
+      "invoiceDesc": "Consultez et téléchargez vos factures et transactions passées.",
+      "tableDate": "Date",
+      "tablePlan": "Plan",
+      "tableAmount": "Montant",
+      "tableStatus": "Statut",
+      "tableInvoice": "Facture",
+      "registration": "Inscription",
+      "free": "Gratuit"
+    },
+    "title": "Paramètres",
+    "subtitle": "Gérez vos informations personnelles, votre sécurité et vos préférences de plateforme.",
+    "logoutDesc": "Quitter votre session",
+    "privacy": {
+      "whoCanContactTitle": "Qui peut me contacter ?",
+      "everyone": "Tout le monde",
+      "everyoneDesc": "Tous les membres inscrits sur Exile peuvent vous envoyer un message direct.",
+      "followers": "Mes abonnés uniquement",
+      "followersDesc": "Seuls les membres abonnés à votre compte peuvent vous contacter en privé.",
+      "verifiedPro": "Professionnels vérifiés",
+      "verifiedProDesc": "Seuls les profils avec un métier/titre vérifié peuvent vous envoyer des messages.",
+      "nobody": "Personne (Mode Privé)",
+      "nobodyDesc": "Bloque la création de toute nouvelle discussion. Vos conversations existantes restent actives.",
+      "onlineStatusTitle": "Afficher mon statut en ligne",
+      "onlineStatusDesc": "Permet à vos contacts de voir si vous êtes actuellement actif sur la plateforme",
+      "profileVisibilityTitle": "Visibilité globale de votre profil",
+      "public": "Public (Visible par tous les visiteurs et membres)",
+      "members": "Membres uniquement (Accessible après connexion)",
+      "private": "Privé (Visible uniquement par vos relations mutuelles)",
+      "blockedUsersTitle": "Utilisateurs bloqués",
+      "noBlocked": "Aucun utilisateur bloqué dans votre liste",
+      "unblock": "Débloquer"
+    },
+    "security": {
+      "authProtection": "Authentification & Protection",
+      "twoFactor": "Double authentification (2FA)",
+      "twoFactorActive": "2FA Activée",
+      "twoFactorInactive": "2FA Désactivée",
+      "twoFactorMethodTotp": "Protégé via application d’authentification (TOTP Google / Authy).",
+      "twoFactorMethodEmail": "Protégé via code de vérification par email.",
+      "twoFactorDesc": "Exige un code de sécurité supplémentaire lors de toute nouvelle tentative de connexion.",
+      "twoFactorDisableBtn": "Désactiver la 2FA",
+      "twoFactorEnableBtn": "Activer la 2FA",
+      "confirmDisable2FA": "Confirmer la désactivation",
+      "sessionsTitle": "Sessions actives et appareils",
+      "refresh": "Actualiser",
+      "thisDevice": "Cet appareil",
+      "revokeSessionTitle": "Déconnexion de l'appareil",
+      "revokeSessionMsg": "Voulez-vous vraiment déconnecter cet appareil à distance ?",
+      "disconnect": "Déconnecter",
+      "passwordSecurityTitle": "Mot de passe du compte",
+      "passwordSecurityDesc": "Votre mot de passe actuel reste strictement confidentiel et masqué par mesure de sécurité.",
+      "twoFactorModalTitle": "Configuration de la Double Authentification",
+      "twoFactorModalDesc": "Choisissez votre méthode de double authentification :",
+      "twoFactorScanQR": "1. Scannez ce QR Code avec Google Authenticator ou Authy :",
+      "twoFactorSecretKey": "Ou saisissez manuellement cette clé secrète :",
+      "twoFactorEnterCode": "2. Entrez le code à 6 chiffres généré :",
+      "twoFactorVerifyBtn": "Vérifier et Activer"
+    },
+    "notifications": {
+      "title": "Préférences de Notifications",
+      "subtitle": "Choisissez comment vous souhaitez être informé des activités",
+      "saved": "Préférences de notifications enregistrées dans la base de données.",
+      "email": "Notifications par email",
+      "emailDesc": "Recevoir des alertes et récapitulatifs par email via le service Resend",
+      "push": "Notifications push",
+      "pushDesc": "Recevoir des alertes directes sur votre navigateur ou appareil",
+      "inApp": "Notifications in-app"
+    },
+    "app": {
+      "savedFeedback": "Langue et préférences régionales mises à jour avec succès.",
+      "themeDark": "🌙 Thème Sombre",
+      "themeLight": "☀️ Thème Clair",
+      "themeAuto": "💻 Thème Système Automatique",
+      "languageTitle": "Langue de la plateforme",
+      "timezoneTitle": "Fuseau horaire",
+      "timezoneDesc": "Synchronise les heures de publication et les notifications avec votre région"
+    },
+    "video": {
+      "autoplay": "Activer la lecture aléatoire",
+      "interval": "Intervalle de rotation automatique (secondes)",
+      "dataSaver": "Économiseur de données (Data Saver)",
+      "dataSaverDesc": "Ajuste automatiquement la qualité de la vidéo pour réduire la consommation de votre forfait internet",
+      "networkMode": "Lecture réseau : Wi-Fi / Données mobiles",
+      "networkModeDesc": "Définissez sur quel type de connexion autoriser le streaming en direct et la haute définition."
+    },
+    "support": {
+      "subtitle": "Ressources, documentation et signalement technique",
+      "aboutDesc": "Vision, fondation et mission de la plateforme",
+      "reportBug": "Signaler un bug technique",
+      "bugModalTitle": "Signaler un Problème Technique",
+      "bugModalSubtitle": "Rapport direct transmis aux ingénieurs EXILE",
+      "bugCategoryLabel": "Catégorie du problème",
+      "bugCatVideo": "Vidéos / Lecteur multimédia",
+      "bugCatLogin": "Connexion / Sécurité / Authentification",
+      "bugCatAudio": "Audio / Son des vidéos",
+      "bugCatDisplay": "Affichage / Interface / Langue",
+      "bugCatOther": "Autre dysfonctionnement",
+      "bugSubjectLabel": "Sujet résumé",
+      "bugSubjectPlaceholder": "Ex: La vidéo ne se charge pas au clic",
+      "bugDescLabel": "Description détaillée du bug",
+      "bugDescPlaceholder": "Décrivez ce que vous faisiez et ce qui s'est produit...",
+      "bugSubmitBtn": "Transmettre le rapport"
+    },
+    "helpCenter": {
+      "badge": "Centre d'aide",
+      "searchTitle": "Comment pouvons-nous vous aider ?",
+      "searchSubtitle": "Trouvez des réponses, des guides et de l'aide pour votre compte EXILE.",
+      "searchPlaceholder": "Rechercher dans l'aide...",
+      "catAccount": "Compte & Sécurité",
+      "catAccountDesc": "Gestion de votre profil, mot de passe et connexion",
+      "catPayments": "Paiements & Natcash",
+      "catPaymentsDesc": "Achats, abonnements et méthodes de paiement",
+      "catVideos": "Vidéos & Visibilité",
+      "catVideosDesc": "Publication, confidentialité et portée de vos vidéos",
+      "catEvents": "Événements & Lives",
+      "catEventsDesc": "Organisation et participation aux événements professionnels",
+      "catPrivacy": "Confidentialité & Blocages",
+      "catPrivacyDesc": "Contrôlez qui peut vous voir et vous contacter",
+      "catReport": "Signalements & Bugs",
+      "catReportDesc": "Signaler un contenu ou un problème technique",
+      "faqTitle": "Questions fréquentes"
+    },
+    "faq": {
+      "q1": "Comment modifier mon profil ?",
+      "a1": "Rendez-vous dans Paramètres > Compte & Profil > Modifier le profil pour mettre à jour votre photo, bio et informations.",
+      "q2": "Pourquoi ma vidéo ne s'affiche pas dans le feed ?",
+      "a2": "Vérifiez que votre vidéo est en statut « Publié » et non « Brouillon ». Les vidéos privées n'apparaissent que pour vous.",
+      "q3": "Comment effectuer un paiement via Natcash ?",
+      "a3": "Accédez à la section Premium, cliquez sur 'Passer Premium' et suivez les instructions pour envoyer le montant au numéro Natcash indiqué.",
+      "q4": "Comment changer mon nom d'utilisateur ?",
+      "a4": "Allez dans Paramètres > Modifier le profil. Votre nom d'utilisateur ne peut être modifié qu'une fois par mois. Un délai de 30 jours est requis entre chaque modification.",
+      "q5": "Que faire si mon compte a été piraté ?",
+      "a5": "Changez immédiatement votre mot de passe et activez l'authentification à deux facteurs. Signalez-nous le problème via le bouton 'Signaler un bug'."
     }
   },
   "pro": {
@@ -220,7 +379,8 @@
       "country": "Pays",
       "shareProfile": "Partager le profil",
       "viewsCount": "vues de profil",
-      "editModalTitle": "Modifier les informations de profil"
+      "editModalTitle": "Modifier les informations de profil",
+      "viewProfile": "Voir le profil"
     },
     "feed": {
       "noResults": "Aucun résultat trouvé pour votre recherche",
@@ -580,6 +740,17 @@
       "kickedFromLive": "a été expulsé(e) du live.",
       "cameraOff": "Caméra désactivée",
       "handRaised": "Main levée"
+    },
+    "subscriptions": {
+      "loadingVideos": "Chargement des vidéos de vos abonnements...",
+      "noVideos": "Aucune vidéo pour le moment",
+      "noSubs": "Vous n'êtes abonné à aucun professionnel. Découvrez les suggestions ci-dessous pour commencer !",
+      "noVideosCategory": "Les créateurs que vous suivez n'ont pas encore publié de vidéo dans cette catégorie.",
+      "recommended": "Professionnels recommandés",
+      "subscribe": "S'abonner"
+    },
+    "video": {
+      "videos": "vidéos"
     }
   },
   "header": {
@@ -684,5 +855,50 @@
     "twoFactorPlaceholder": "Code à 6 chiffres",
     "twoFactorVerify": "Valider la connexion",
     "twoFactorBackToLogin": "Retour à la connexion"
+  },
+  "payment": {
+    "subscribeBtn": "Payer $20 / Mois (Premium)",
+    "methodsNotice": "Natcash (Manuel), MonCash et Cartes Sécurisées",
+    "chooseMethodTitle": "Choisir le Moyen de Paiement",
+    "chooseMethodSubtitle": "Abonnement EXILE PRO - $20.00 USD / Mois",
+    "natcashOptionTitle": "Natcash (Transfert Manuel)",
+    "natcashOptionDesc": "Envoyer à EXILE PLATEFORME • Validation en 4h maximum",
+    "popularHaiti": "Haïti",
+    "delayBadge": "Délai de validation : 4H de temps",
+    "pgecomOptionTitle": "Carte Bancaire / MonCash / PG Pay",
+    "pgecomOptionDesc": "Passerelle PGecom • Paiement en ligne automatique",
+    "loginRequired": "Vous devez être connecté pour vous abonner. Veuillez vous reconnecter.",
+    "sessionExpired": "Votre session a expiré. Veuillez vous reconnecter.",
+    "urlUnavailable": "L'URL de paiement n'est pas disponible.",
+    "pgecomError": "Erreur lors de l'initialisation du paiement sur PGecom.",
+    "statusApproved": "Validé",
+    "statusRejected": "Rejeté",
+    "statusPending": "En attente (Délai 4h)"
+  },
+  "natcash": {
+    "title": "Paiement Manuel Natcash",
+    "subtitle": "Transfert direct à EXILE PLATEFORME",
+    "recipientLabel": "Nom du Bénéficiaire :",
+    "numberLabel": "Numéro Natcash :",
+    "amountLabel": "Montant exact :",
+    "stepGuide": "Composez *202# ou utilisez l'application Natcash pour envoyer le montant au numéro ci-dessus.",
+    "validationDelay": "Délai de validation : 4 heures de temps maximum.",
+    "delayBadge": "Délai de validation : 4H de temps maximum",
+    "senderPhoneLabel": "Numéro de téléphone qui a envoyé l'argent *",
+    "transactionIdLabel": "ID de Transaction Natcash (code dans le SMS) *",
+    "submitBtn": "Confirmer Mon Paiement",
+    "success": {
+      "title": "Paiement Enregistré avec Succès !",
+      "message": "Nous avons bien reçu votre transaction Natcash. L'équipe EXILE PLATEFORME va la valider et activer votre compte Premium dans un délai de 4 heures maximum."
+    },
+    "errors": {
+      "phoneRequired": "Veuillez renseigner le numéro de téléphone utilisé pour envoyer le transfert.",
+      "txnRequired": "Veuillez renseigner l'ID de Transaction Natcash (code dans le SMS de confirmation).",
+      "loginRequired": "Vous devez être connecté pour soumettre ce paiement.",
+      "generic": "Erreur lors de l'enregistrement du paiement. Veuillez vérifier le code.",
+      "network": "Erreur de connexion. Veuillez vérifier votre connexion internet."
+    },
+    "exchangeRateTitle": "Taux de change",
+    "rateCalculation": "Taux officiel : 1 USD = 144.75 HTG"
   }
 }

@@ -553,6 +553,9 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
                       alt=""
                       className="w-full h-full object-cover pointer-events-none"
                       loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
                     />
                   )}
                   <div className="absolute inset-0 bg-black/40 backdrop-blur-[0.5px] pointer-events-none" />

@@ -6,7 +6,8 @@ import {
   Eye, EyeOff, ChevronRight, Play,
   User, Camera, MapPin, Briefcase, Plus, X, Info,
   Check, MessageSquare, UserCheck, UserX, AlertCircle,
-  RefreshCw, Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key, Crown, Wifi, Sparkles
+  Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key, Crown, Wifi, Sparkles, RefreshCw,
+  Search, FileText, Video, ShieldCheck, CreditCard, ChevronDown
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -15,7 +16,9 @@ import { cacheService } from '../../services/cacheService'
 import { 
   syncStoredProfile,
   canModifyProfession,
-  getDaysUntilProfessionModification
+  getDaysUntilProfessionModification,
+  canModifyUsername,
+  getDaysUntilUsernameModification
 } from '../../hooks/useProfileUtils'
 import { useTranslation } from 'react-i18next'
 import { SUPPORTED_LANGUAGES } from '../../i18n'
@@ -121,6 +124,7 @@ const Settings = () => {
   }))
   const [newSkill, setNewSkill] = useState('')
   const [lastProfessionUpdate, setLastProfessionUpdate] = useState<string | null>(cachedProfile?.lastProfessionUpdate || null)
+  const [lastUsernameUpdate, setLastUsernameUpdate] = useState<string | null>(cachedProfile?.last_name_update || cachedProfile?.lastUsernameUpdate || localStorage.getItem('exile_last_username_update') || null)
   const [uploadedPhoto, setUploadedPhoto] = useState<string>('')
   const [photoPreview, setPhotoPreview] = useState<string>(cachedProfile?.avatarUrl || cachedProfile?.photo || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -237,6 +241,43 @@ const Settings = () => {
   const daysUntilProfessionUpdate = () => {
     return getDaysUntilProfessionModification(lastProfessionUpdate)
   }
+
+  const daysUntilUsernameUpdate = () => {
+    return getDaysUntilUsernameModification(lastUsernameUpdate)
+  }
+
+  // Centre d'aide Facebook-style
+  const [supportSearchQuery, setSupportSearchQuery] = useState('')
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
+  const [selectedHelpCategory, setSelectedHelpCategory] = useState<string | null>(null)
+
+  // Peman Manyèl Natcash (EXILE PLATEFORME)
+  const [natcashPayments, setNatcashPayments] = useState<any[]>([])
+
+  const loadNatcashPayments = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+      if (!token) return
+      const res = await fetch(`${API_BASE_URL}/abonnement/abonnements/mon_statut_natcash/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const d = await res.json()
+        if (d && d.success && Array.isArray(d.data)) {
+          setNatcashPayments(d.data)
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching natcash payments:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeCategory === 'premium') {
+      loadNatcashPayments()
+    }
+  }, [activeCategory, loadNatcashPayments])
+
 
   // ==========================================================================
   // CHARGEMENT RÉEL DU PROFIL & PARAMÈTRES DEPUIS DJANGO / POSTGRESQL
@@ -718,8 +759,8 @@ const Settings = () => {
       const token = localStorage.getItem('accessToken')
       if (!token) return
 
-      const updateData = {
-        full_name: `${profileData.firstName} ${profileData.lastName}`.trim(),
+      const updateData: any = {
+        ...(canModifyUsername(lastUsernameUpdate) && profileData.username ? { username: profileData.username } : {}),
         ...(canModifyProfession(lastProfessionUpdate) ? { profession: profileData.profession } : {}),
         bio: profileData.bio,
         city: profileData.city,
@@ -739,6 +780,11 @@ const Settings = () => {
 
       if (response.ok) {
         const updated = await response.json().catch(() => null)
+        if (canModifyUsername(lastUsernameUpdate) && profileData.username) {
+          const nowIso = new Date().toISOString()
+          setLastUsernameUpdate(nowIso)
+          localStorage.setItem('exile_last_username_update', nowIso)
+        }
         syncStoredProfile(updated)
         setShowProfileEditModal(false)
         loadProfile()
@@ -910,23 +956,6 @@ const Settings = () => {
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                loadProfile()
-                loadSessions()
-                loadBlockedUsers()
-              }}
-              title={t('settings.security.refresh', 'Actualiser')}
-              className={`p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 ${
-                resolvedTheme === 'dark' ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              } transition-colors`}
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span className="hidden md:inline">{t('settings.security.refresh', 'Actualiser')}</span>
-            </button>
-          </div>
         </div>
       </header>
 
@@ -940,10 +969,10 @@ const Settings = () => {
           <aside className={`md:col-span-5 lg:col-span-4 xl:col-span-3 ${mobileShowContent ? 'hidden md:block' : 'block'}`}>
             <div className="space-y-4 md:sticky md:top-20 lg:top-24">
               
-              {/* Carte Profil Rapide (comme dans l'image de référence) */}
+              {/* Carte Profil Rapide (clique redirige vers /pro/profile) */}
               <div 
-                onClick={() => { setActiveCategory('account'); setMobileShowContent(true); }}
-                className={`p-3.5 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-all border ${
+                onClick={() => navigate('/pro/profile')}
+                className={`p-3.5 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-all border group ${
                   resolvedTheme === 'dark' 
                     ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 shadow-sm' 
                     : 'bg-white border-gray-100 shadow-sm hover:shadow'
@@ -954,19 +983,19 @@ const Settings = () => {
                     {photoPreview ? (
                       <img src={photoPreview} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-base">{profileData.firstName?.[0]?.toUpperCase() || 'U'}</span>
+                      <span className="text-base">{(profileData.username?.replace('@', '')?.[0] || 'U').toUpperCase()}</span>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className={`text-sm sm:text-base font-bold truncate ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                      {profileData.firstName || profileData.lastName ? `${profileData.firstName} ${profileData.lastName}`.trim() : 'Utilisateur'}
+                      {profileData.username ? (profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`) : '@utilisateur'}
                     </p>
                     <p className={`text-xs font-medium truncate mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                      {profileData.username ? (profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`) : '@utilisateur'}
+                      {profileData.profession || t('pro.profile.viewProfile', 'Voir mon profil')}
                     </p>
                   </div>
                 </div>
-                <ChevronRight className={`w-5 h-5 flex-shrink-0 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
+                <ChevronRight className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
               </div>
 
               {/* SECTION: COMPTE */}
@@ -1258,6 +1287,32 @@ const Settings = () => {
               </div>
             )}
 
+            {/* En-tête de section claire et visible */}
+            <div className="mb-5 pb-3 border-b border-gray-200 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-gray-950 dark:text-white">
+                  {activeCategory === 'account' && t('settings.categories.account', 'Informations personnelles')}
+                  {activeCategory === 'privacy' && t('settings.categories.privacy', 'Confidentialité & contacts')}
+                  {activeCategory === 'security' && t('settings.categories.security', 'Sécurité & sessions')}
+                  {activeCategory === 'notifications' && t('settings.categories.notifications', 'Notifications')}
+                  {activeCategory === 'app' && t('settings.categories.app', 'Langue & fuseau horaire')}
+                  {activeCategory === 'video' && t('settings.categories.video', 'Lecture vidéo')}
+                  {activeCategory === 'support' && t('settings.categories.support', 'Support & aide')}
+                  {activeCategory === 'premium' && t('settings.categories.premium', 'Passer à Premium')}
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-zinc-400 mt-0.5">
+                  {activeCategory === 'account' && t('settings.categories.accountDesc', 'Nom, bio, coordonnées et photo de profil')}
+                  {activeCategory === 'privacy' && t('settings.categories.privacyDesc', 'Qui peut vous contacter, visibilité et utilisateurs bloqués')}
+                  {activeCategory === 'security' && t('settings.categories.securityDesc', 'Mot de passe, 2FA, sessions et appareils connectés')}
+                  {activeCategory === 'notifications' && t('settings.categories.notificationsDesc', 'Email, push, sons et alertes en direct')}
+                  {activeCategory === 'app' && t('settings.categories.appDesc', 'Langue d’affichage, fuseau horaire et région')}
+                  {activeCategory === 'video' && t('settings.categories.videoDesc', 'Lecture automatique, qualité et économiseur de données')}
+                  {activeCategory === 'support' && t('settings.categories.supportDesc', 'FAQ, assistance en ligne et conditions d’utilisation')}
+                  {activeCategory === 'premium' && t('settings.categories.premiumDesc', 'Débloquez plus de fonctionnalités et monétisez vos lives')}
+                </p>
+              </div>
+            </div>
+
             {/* ------------------------------------------------------------ */}
             {/* 1. SECTION : COMPTE & PROFIL                                 */}
             {/* ------------------------------------------------------------ */}
@@ -1275,7 +1330,7 @@ const Settings = () => {
                           {photoPreview ? (
                             <img src={photoPreview} alt="Avatar" className="w-full h-full object-cover" />
                           ) : (
-                            profileData.firstName?.[0]?.toUpperCase() || 'U'
+                            (profileData.username?.replace('@', '')?.[0] || 'U').toUpperCase()
                           )}
                         </div>
                         <button
@@ -1290,13 +1345,13 @@ const Settings = () => {
                       </div>
                       <div>
                         <h2 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                          {profileData.firstName} {profileData.lastName}
+                          {profileData.username ? (profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`) : '@utilisateur'}
                         </h2>
                         <p className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                          {profileData.username ? (profileData.username.startsWith('@') ? profileData.username : `@${profileData.username}`) : '@utilisateur'}
+                          {profileData.profession || 'Créateur de contenu'}
                         </p>
                         <p className={`text-xs mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                          {profileData.profession || 'Créateur de contenu'} • {profileData.city || 'Localisation non définie'}
+                          {profileData.city || 'Localisation non définie'}
                         </p>
                       </div>
                     </div>
@@ -1357,7 +1412,9 @@ const Settings = () => {
                           </h3>
                         </div>
                         <p className={`text-xs font-medium truncate ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
-                          {profileData.email && profileData.email.includes('@') && !profileData.email.startsWith('@') ? profileData.email : 'Non renseigné'}
+                          {profileData.email && profileData.email.includes('@') && !profileData.email.startsWith('@')
+                            ? profileData.email
+                            : t('settings.account.noEmailRegistered', 'Non renseigné (Inscription via téléphone)')}
                         </p>
                       </div>
                       <button
@@ -1372,7 +1429,9 @@ const Settings = () => {
                           resolvedTheme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700' : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200 shadow-sm'
                         }`}
                       >
-                        {t('settings.account.changeEmailClean', "Changer l'email")}
+                        {profileData.email && profileData.email.includes('@') && !profileData.email.startsWith('@')
+                          ? t('settings.account.changeEmailClean', "Changer l'email")
+                          : t('settings.account.addEmailClean', "Ajouter une adresse email")}
                       </button>
                     </div>
 
@@ -2184,38 +2243,202 @@ const Settings = () => {
             {/* 7. SECTION : SUPPORT & AIDE                                  */}
             {/* ------------------------------------------------------------ */}
             {activeCategory === 'support' && (
-              <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-5 sm:p-6 shadow-sm space-y-4`}>
-                <div className="flex items-center gap-3 pb-3 border-b border-zinc-800/60">
-                  <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-500">
-                    <HelpCircle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className={`text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                      {t('settings.support.title', "Centre d'Assistance & Vision")}
+              <div className="space-y-6">
+                {/* 1. Header Banner Help Center avec Barre de Recherche style Facebook */}
+                <div className={`${resolvedTheme === 'dark' ? 'bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 border-zinc-800' : 'bg-gradient-to-br from-blue-50 via-indigo-50/50 to-white border-blue-100'} border rounded-3xl p-6 sm:p-8 shadow-sm text-center relative overflow-hidden`}>
+                  <div className="relative z-10 max-w-2xl mx-auto space-y-3">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <HelpCircle className="w-4 h-4" />
+                      <span>{t('settings.helpCenter.badge', "Centre d'Assistance EXILE")}</span>
+                    </div>
+                    <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {t('settings.helpCenter.searchTitle', 'Comment pouvons-nous vous aider ?')}
                     </h2>
-                    <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                      {t('settings.support.subtitle', 'Ressources, documentation et signalement technique')}
+                    <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
+                      {t('settings.helpCenter.searchSubtitle', 'Recherchez une solution, explorez nos guides détaillés ou contactez notre équipe.')}
                     </p>
+
+                    {/* Barre de Recherche */}
+                    <div className="pt-2">
+                      <div className="relative max-w-xl mx-auto">
+                        <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={supportSearchQuery}
+                          onChange={(e) => setSupportSearchQuery(e.target.value)}
+                          placeholder={t('settings.helpCenter.searchPlaceholder', "Rechercher un sujet (ex: Natcash, nom d'utilisateur, bug, mot de passe...)")}
+                          className={`w-full pl-12 pr-10 py-3.5 rounded-2xl border text-sm font-medium transition-all shadow-sm ${
+                            resolvedTheme === 'dark'
+                              ? 'bg-zinc-800/90 border-zinc-700 text-white placeholder-zinc-500 focus:border-blue-500 focus:bg-zinc-800'
+                              : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                          }`}
+                        />
+                        {supportSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setSupportSearchQuery('')}
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <button
-                    onClick={() => navigate('/about')}
-                    className="w-full flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/40 border border-zinc-700/20 hover:border-blue-500 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
-                        <Info className="w-4 h-4" />
+                {/* 2. Grille des Catégories d'Aide (Style Facebook Help Topics) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {[
+                    {
+                      id: 'account',
+                      icon: <ShieldCheck className="w-5 h-5 text-blue-500" />,
+                      title: t('settings.helpCenter.catAccount', 'Compte & Sécurité'),
+                      desc: t('settings.helpCenter.catAccountDesc', "Nom d'utilisateur (règle des 30j), mot de passe, 2FA et connexion.")
+                    },
+                    {
+                      id: 'payments',
+                      icon: <CreditCard className="w-5 h-5 text-emerald-500" />,
+                      title: t('settings.helpCenter.catPayments', 'Paiements & Natcash'),
+                      desc: t('settings.helpCenter.catPaymentsDesc', 'Validation Natcash 4h (2,895 HTG), abonnement Premium et reçus.')
+                    },
+                    {
+                      id: 'videos',
+                      icon: <Video className="w-5 h-5 text-orange-500" />,
+                      title: t('settings.helpCenter.catVideos', 'Vidéos & Visibilité'),
+                      desc: t('settings.helpCenter.catVideosDesc', "Formats, feed, droits d'auteur et affichage de vos publications.")
+                    },
+                    {
+                      id: 'events',
+                      icon: <Clock className="w-5 h-5 text-purple-500" />,
+                      title: t('settings.helpCenter.catEvents', 'Événements & Lives'),
+                      desc: t('settings.helpCenter.catEventsDesc', 'Billetterie, webinaires, salons live et participation en direct.')
+                    },
+                    {
+                      id: 'privacy',
+                      icon: <Shield className="w-5 h-5 text-cyan-500" />,
+                      title: t('settings.helpCenter.catPrivacy', 'Confidentialité & Blocages'),
+                      desc: t('settings.helpCenter.catPrivacyDesc', 'Visibilité en ligne, qui peut vous contacter et modération.')
+                    },
+                    {
+                      id: 'report',
+                      icon: <AlertTriangle className="w-5 h-5 text-amber-500" />,
+                      title: t('settings.helpCenter.catReport', 'Signalements & Bugs'),
+                      desc: t('settings.helpCenter.catReportDesc', 'Transmettre un problème technique ou signaler un comportement abusif.')
+                    }
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedHelpCategory(selectedHelpCategory === cat.id ? null : cat.id)
+                      }}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        selectedHelpCategory === cat.id
+                          ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md bg-blue-500/5'
+                          : resolvedTheme === 'dark'
+                            ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 shadow-sm'
+                            : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 rounded-xl bg-gray-100 dark:bg-zinc-800">
+                          {cat.icon}
+                        </div>
+                        <h4 className={`text-sm font-bold truncate ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          {cat.title}
+                        </h4>
                       </div>
-                      <div className="text-left">
-                        <span className={`text-sm font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{t('settings.support.about', "À propos d'EXILE")}</span>
-                        <span className="text-xs text-zinc-500">{t('settings.support.aboutDesc', 'Vision, fondation et mission de la plateforme')}</span>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-zinc-400 rtl-flip" />
-                  </button>
+                      <p className={`text-xs leading-relaxed line-clamp-2 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                        {cat.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
 
+                {/* 3. Section FAQ (Questions Fréquentes - Accordéon interactif) */}
+                <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border rounded-2xl p-5 sm:p-6 shadow-sm space-y-4`}>
+                  <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-2.5">
+                      <FileText className="w-5 h-5 text-blue-500" />
+                      <h3 className={`text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {t('settings.helpCenter.faqTitle', 'Questions fréquentes (FAQ)')}
+                      </h3>
+                    </div>
+                    <span className="text-xs text-gray-400 font-medium">EXILE Help</span>
+                  </div>
+
+                  <div className="divide-y divide-gray-100 dark:divide-zinc-800/80">
+                    {[
+                      {
+                        q: t('settings.faq.q1', "Comment puis-je modifier mon nom d'utilisateur ?"),
+                        a: t('settings.faq.a1', "Vous pouvez mettre à jour votre nom d’utilisateur dès la création de votre compte dans Paramètres > Compte & Profil. Conformément à nos règles de sécurité, vous pouvez le modifier une seule fois tous les 30 jours civils."),
+                        cat: 'account'
+                      },
+                      {
+                        q: t('settings.faq.q2', 'Comment fonctionne le paiement manuel par Natcash ?'),
+                        a: t('settings.faq.a2', "Effectuez un transfert de 2,895 HTG ($20 USD) au numéro EXILE PLATEFORME via *202# ou l'app Natcash. Soumettez votre numéro et l'ID de transaction. Notre équipe valide votre compte Premium en 4 heures maximum."),
+                        cat: 'payments'
+                      },
+                      {
+                        q: t('settings.faq.q3', "Pourquoi une vidéo partagée n'apparaît pas dans mon fil ?"),
+                        a: t('settings.faq.a3', "Vérifiez que votre vidéo est bien publique et que l'envoi s'est terminé avec succès. Vous pouvez retrouver toutes vos vidéos publiées et brouillons dans la section \"Mes Vidéos\"."),
+                        cat: 'videos'
+                      },
+                      {
+                        q: t('settings.faq.q4', 'Qui a accès à mon profil public ?'),
+                        a: t('settings.faq.a4', "Votre profil public affiche uniquement votre identifiant (@nom_utilisateur), vos compétences, votre biographie et vos vidéos publiques. Votre nom et prénom réels ne sont jamais divulgués."),
+                        cat: 'privacy'
+                      },
+                      {
+                        q: t('settings.faq.q5', 'Comment signaler un bug ou problème sur la plateforme ?'),
+                        a: t('settings.faq.a5', "Cliquez sur le bouton \"Signaler un bug technique\" ci-dessous pour transmettre une capture d'écran et un descriptif directement à nos ingénieurs."),
+                        cat: 'report'
+                      }
+                    ]
+                      .filter(item => {
+                        if (selectedHelpCategory && item.cat !== selectedHelpCategory) return false
+                        if (supportSearchQuery) {
+                          const sq = supportSearchQuery.toLowerCase()
+                          return item.q.toLowerCase().includes(sq) || item.a.toLowerCase().includes(sq)
+                        }
+                        return true
+                      })
+                      .map((faq, idx) => {
+                        const isOpen = expandedFaq === idx
+                        return (
+                          <div key={`faq-${idx}`} className="py-3.5">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedFaq(isOpen ? null : idx)}
+                              className="w-full flex items-center justify-between gap-3 text-left group cursor-pointer"
+                            >
+                              <span className={`text-sm font-semibold transition-colors ${
+                                isOpen ? 'text-blue-600 dark:text-blue-400' : resolvedTheme === 'dark' ? 'text-zinc-200 group-hover:text-white' : 'text-gray-800 group-hover:text-black'
+                              }`}>
+                                {faq.q}
+                              </span>
+                              <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${
+                                isOpen ? 'rotate-180 text-blue-500' : 'text-gray-400'
+                              }`} />
+                            </button>
+                            {isOpen && (
+                              <div className="pt-2.5 pr-6 animate-fadeIn">
+                                <p className={`text-xs sm:text-sm leading-relaxed ${
+                                  resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'
+                                }`}>
+                                  {faq.a}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+
+                {/* 4. Cartes d'actions rapides (Signaler un Bug & À Propos) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -2225,18 +2448,51 @@ const Settings = () => {
                       setBugSuccess(null)
                       setShowBugModal(true)
                     }}
-                    className="w-full flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/40 border border-zinc-700/20 hover:border-yellow-500 transition-colors text-left cursor-pointer"
+                    className={`p-4 rounded-2xl border flex items-center justify-between text-left transition-all group cursor-pointer ${
+                      resolvedTheme === 'dark'
+                        ? 'bg-zinc-900 border-zinc-800 hover:border-amber-500/50 shadow-sm'
+                        : 'bg-white border-gray-200 hover:border-amber-400 shadow-sm'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-500">
-                        <AlertTriangle className="w-4 h-4" />
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+                        <AlertTriangle className="w-5 h-5" />
                       </div>
-                      <div className="text-left">
-                        <span className={`text-sm font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{t('settings.support.reportBug', 'Signaler un bug technique')}</span>
-                        <span className="text-xs text-zinc-500">{t('settings.support.reportBugDesc', "Transmettre un rapport directement à l'équipe technique EXILE")}</span>
+                      <div>
+                        <span className={`text-sm font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          {t('settings.support.reportBug', 'Signaler un bug technique')}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          {t('settings.support.reportBugDesc', "Rapport direct vers l'équipe technique")}
+                        </span>
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-zinc-400 rtl-flip" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/about')}
+                    className={`p-4 rounded-2xl border flex items-center justify-between text-left transition-all group cursor-pointer ${
+                      resolvedTheme === 'dark'
+                        ? 'bg-zinc-900 border-zinc-800 hover:border-blue-500/50 shadow-sm'
+                        : 'bg-white border-gray-200 hover:border-blue-400 shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500">
+                        <Info className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className={`text-sm font-bold block ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          {t('settings.support.about', "À propos d'EXILE")}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          {t('settings.support.aboutDesc', 'Vision, fondation et mission de la plateforme')}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
                   </button>
                 </div>
               </div>
@@ -2472,7 +2728,7 @@ const Settings = () => {
                       </div>
                     </div>
 
-                    <PayerPremiumButton montant={20.00} />
+                    <PayerPremiumButton montant={20.00} onSuccess={loadNatcashPayments} />
                   </div>
 
                 </div>
@@ -2485,7 +2741,7 @@ const Settings = () => {
                         Historique paiement
                       </h3>
                       <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
-                        Consultez et téléchargez vos factures et transactions passées.
+                        {t('settings.premium.invoiceDesc', 'Consultez et téléchargez vos factures et transactions passées.')}
                       </p>
                     </div>
                   </div>
@@ -2494,21 +2750,56 @@ const Settings = () => {
                     <table className="w-full text-left text-xs">
                       <thead>
                         <tr className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800 text-zinc-400' : 'border-gray-200 text-gray-500'}`}>
-                          <th className="py-2.5 px-3 font-semibold">Date</th>
-                          <th className="py-2.5 px-3 font-semibold">Plan</th>
-                          <th className="py-2.5 px-3 font-semibold">Montant</th>
-                          <th className="py-2.5 px-3 font-semibold">Statut</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Facture</th>
+                          <th className="py-2.5 px-3 font-semibold">{t('settings.premium.tableDate', 'Date')}</th>
+                          <th className="py-2.5 px-3 font-semibold">{t('settings.premium.tablePlan', 'Plan')}</th>
+                          <th className="py-2.5 px-3 font-semibold">{t('settings.premium.tableAmount', 'Montant')}</th>
+                          <th className="py-2.5 px-3 font-semibold">{t('settings.premium.tableStatus', 'Statut')}</th>
+                          <th className="py-2.5 px-3 font-semibold text-right">{t('settings.premium.tableInvoice', 'Facture')}</th>
                         </tr>
                       </thead>
                       <tbody>
+                        {/* Peman Natcash Manyèl soumèt pa itilizatè a */}
+                        {natcashPayments.map((np) => (
+                          <tr key={`np-${np.id}`} className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800/40 text-zinc-300' : 'border-gray-100 text-gray-700'}`}>
+                            <td className="py-3 px-3">
+                              {new Date(np.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="py-3 px-3 font-medium flex items-center gap-1.5">
+                              <Smartphone className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                              <span>Natcash (EXILE PRO)</span>
+                            </td>
+                            <td className="py-3 px-3 font-bold">
+                              ${np.amount_usd} ({Number(np.amount_htg).toLocaleString()} HTG)
+                            </td>
+                            <td className="py-3 px-3">
+                              {np.status === 'approved' ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
+                                  {t('payment.statusApproved', 'Valide')}
+                                </span>
+                              ) : np.status === 'rejected' ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400">
+                                  {t('payment.statusRejected', 'Rejte')}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 inline-flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {t('payment.statusPending', 'An atant (Delè 4h)')}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono text-zinc-400 text-xs">
+                              {np.transaction_id}
+                            </td>
+                          </tr>
+                        ))}
+
                         <tr className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800/40 text-zinc-300' : 'border-gray-100 text-gray-700'}`}>
-                          <td className="py-3 px-3">Inscription</td>
+                          <td className="py-3 px-3">{t('settings.premium.registration', 'Inscription')}</td>
                           <td className="py-3 px-3 font-medium">FREE Plan</td>
                           <td className="py-3 px-3 font-bold">$0.00</td>
                           <td className="py-3 px-3">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
-                              Gratuit
+                              {t('settings.premium.free', 'Gratuit')}
                             </span>
                           </td>
                           <td className="py-3 px-3 text-right text-zinc-400">
@@ -2648,7 +2939,11 @@ const Settings = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fadeIn">
           <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-gray-200 text-gray-900'} border rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4`}>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">{t('settings.account.modifyEmail', "Modifier l'adresse email")}</h3>
+              <h3 className="text-lg font-bold">
+                {profileData.email && profileData.email.includes('@') && !profileData.email.startsWith('@')
+                  ? t('settings.account.modifyEmail', "Modifier l'adresse email")
+                  : t('settings.account.addEmailTitle', "Ajouter une adresse email")}
+              </h3>
               <button
                 onClick={() => setShowEmailModal(false)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-white"
@@ -2805,28 +3100,38 @@ const Settings = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1">Prénom</label>
-                <input
-                  type="text"
-                  value={profileData.firstName}
-                  onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
-                  className={`w-full px-3.5 py-2 rounded-xl border text-sm ${
-                    resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1">Nom</label>
-                <input
-                  type="text"
-                  value={profileData.lastName}
-                  onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
-                  className={`w-full px-3.5 py-2 rounded-xl border text-sm ${
-                    resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'
-                  }`}
-                />
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold mb-1 flex items-center justify-between">
+                  <span>{t('settings.account.usernameLabel', "Nom d'utilisateur")}</span>
+                  {!canModifyUsername(lastUsernameUpdate) ? (
+                    <span className="text-[11px] text-amber-500 font-medium">
+                      {t('settings.account.usernameLockNotice', 'Modifiable dans {{days}} jours (règle des 30 jours)', { days: daysUntilUsernameUpdate() })}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-emerald-500 font-medium">
+                      {t('settings.account.usernameCanModify', 'Modifiable (1 fois tous les 30 jours)')}
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">@</span>
+                  <input
+                    type="text"
+                    value={profileData.username?.replace(/^@/, '') || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
+                      setProfileData({ ...profileData, username: `@${val}` })
+                    }}
+                    disabled={!canModifyUsername(lastUsernameUpdate)}
+                    placeholder="nom_utilisateur"
+                    className={`w-full pl-8 pr-3.5 py-2 rounded-xl border text-sm font-medium ${
+                      resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'
+                    } disabled:opacity-60 disabled:cursor-not-allowed`}
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {t('settings.account.usernameHelp', 'Votre identifiant unique sur EXILE. Visible publiquement.')}
+                </p>
               </div>
 
               <div className="sm:col-span-2">
@@ -3260,7 +3565,7 @@ const Settings = () => {
                 className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {twoFactorDisableLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>Confirmer la désactivation</span>
+                <span>{t('settings.security.confirmDisable2FA', 'Confirmer la désactivation')}</span>
               </button>
             </div>
           </div>
@@ -3277,8 +3582,8 @@ const Settings = () => {
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold">Signaler un Problème Technique</h3>
-                  <p className="text-xs text-zinc-400">Rapport direct transmis aux ingénieurs EXILE</p>
+                  <h3 className="text-base font-bold">{t('settings.support.bugModalTitle', 'Signaler un Problème Technique')}</h3>
+                  <p className="text-xs text-zinc-400">{t('settings.support.bugModalSubtitle', 'Rapport direct transmis aux ingénieurs EXILE')}</p>
                 </div>
               </div>
               <button
@@ -3305,7 +3610,7 @@ const Settings = () => {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold mb-1 text-zinc-300">Catégorie du problème</label>
+                <label className="block text-xs font-semibold mb-1 text-zinc-300">{t('settings.support.bugCategoryLabel', 'Catégorie du problème')}</label>
                 <select
                   value={bugCategory}
                   onChange={(e) => setBugCategory(e.target.value as any)}
@@ -3313,21 +3618,21 @@ const Settings = () => {
                     resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'
                   }`}
                 >
-                  <option value="video">Vidéos / Lecteur multimédia</option>
-                  <option value="login">Connexion / Sécurité / Authentification</option>
-                  <option value="audio">Audio / Son des vidéos</option>
-                  <option value="display">Affichage / Interface / Langue</option>
-                  <option value="other">Autre dysfonctionnement</option>
+                  <option value="video">{t('settings.support.bugCatVideo', 'Vidéos / Lecteur multimédia')}</option>
+                  <option value="login">{t('settings.support.bugCatLogin', 'Connexion / Sécurité / Authentification')}</option>
+                  <option value="audio">{t('settings.support.bugCatAudio', 'Audio / Son des vidéos')}</option>
+                  <option value="display">{t('settings.support.bugCatDisplay', 'Affichage / Interface / Langue')}</option>
+                  <option value="other">{t('settings.support.bugCatOther', 'Autre dysfonctionnement')}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1 text-zinc-300">Sujet résumé</label>
+                <label className="block text-xs font-semibold mb-1 text-zinc-300">{t('settings.support.bugSubjectLabel', 'Sujet résumé')}</label>
                 <input
                   type="text"
                   value={bugSubject}
                   onChange={(e) => setBugSubject(e.target.value)}
-                  placeholder="Ex: La vidéo ne se charge pas au clic"
+                  placeholder={t('settings.support.bugSubjectPlaceholder', 'Ex: La vidéo ne se charge pas au clic')}
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-sm ${
                     resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'
                   }`}
@@ -3335,12 +3640,12 @@ const Settings = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1 text-zinc-300">Description détaillée du bug</label>
+                <label className="block text-xs font-semibold mb-1 text-zinc-300">{t('settings.support.bugDescLabel', 'Description détaillée du bug')}</label>
                 <textarea
                   rows={4}
                   value={bugDescription}
                   onChange={(e) => setBugDescription(e.target.value)}
-                  placeholder="Décrivez ce que vous faisiez et ce qui s'est produit..."
+                  placeholder={t('settings.support.bugDescPlaceholder', "Décrivez ce que vous faisiez et ce qui s'est produit...")}
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-sm resize-none ${
                     resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'
                   }`}
@@ -3365,7 +3670,7 @@ const Settings = () => {
                 className="flex-1 py-2.5 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {bugLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>Transmettre le rapport</span>
+                <span>{t('settings.support.bugSubmitBtn', 'Transmettre le rapport')}</span>
               </button>
             </div>
           </div>
@@ -3390,10 +3695,10 @@ const Settings = () => {
       {/* CONFIRM MODAL: RÉVOQUER SESSION */}
       <ConfirmModal
         isOpen={Boolean(revokeConfirmSession)}
-        title="Déconnexion de l'appareil"
-        message={`Voulez-vous vraiment déconnecter l'appareil "${revokeConfirmSession?.name || 'Inconnu'}" à distance ?`}
-        confirmText="Déconnecter"
-        cancelText="Annuler"
+        title={t('settings.security.revokeSessionTitle', "Déconnexion de l'appareil")}
+        message={t('settings.security.revokeSessionMsg', `Voulez-vous vraiment déconnecter l'appareil "${revokeConfirmSession?.name || 'Inconnu'}" à distance ?`)}
+        confirmText={t('settings.security.disconnect', 'Déconnecter')}
+        cancelText={t('common.cancel', 'Annuler')}
         type="warning"
         onConfirm={executeRevokeSession}
         onCancel={() => setRevokeConfirmSession(null)}
@@ -3402,9 +3707,9 @@ const Settings = () => {
       {/* MODAL ALERTE / INFORMATION */}
       <ConfirmModal
         isOpen={Boolean(settingsAlert)}
-        title={settingsAlert?.title || 'Information'}
+        title={settingsAlert?.title || t('common.information', 'Information')}
         message={settingsAlert?.message || ''}
-        confirmText="D'accord"
+        confirmText={t('common.ok', "D'accord")}
         isAlert={true}
         type={settingsAlert?.type || 'info'}
         onConfirm={() => {

@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import {
   Users, Inbox, Search, Clock, XCircle,
   ArrowLeft, Loader2, X, Shield, MessageSquare,
-  Send, Check, Ban, CheckCheck, MessageCircle, UserX
+  Send, Check, Ban, CheckCheck, MessageCircle, UserX,
+  Pin, Archive
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -88,6 +89,8 @@ interface Demande {
   status: DemandeStatus
   createdAt: string
   lastMessage?: LastMessageInfo | null
+  is_pinned?: boolean
+  is_archived?: boolean
 }
 
 interface BlockedUser {
@@ -132,6 +135,8 @@ function normalizeDemande(item: any): Demande {
     status: normalizeStatus(item.status),
     createdAt: item.created_at || new Date().toISOString(),
     lastMessage: item.last_message || null,
+    is_pinned: false,
+    is_archived: false,
   }
 }
 
@@ -155,6 +160,8 @@ function normalizeConversationToDemande(c: any, currentUserId: string | null): D
     message: lastMsg?.content || '',
     status: 'accepted' as DemandeStatus,
     createdAt: c.updated_at || c.created_at || (lastMsg?.created_at) || new Date().toISOString(),
+    is_pinned: Boolean(c.is_pinned),
+    is_archived: Boolean(c.is_archived),
     lastMessage: lastMsg ? {
       id: lastMsg.id,
       content: lastMsg.content,
@@ -270,10 +277,10 @@ export const Requests = (): JSX.Element => {
     return getCurrentUserId()
   }, [user])
 
-  type Tab = 'all' | 'accepted' | 'received' | 'sent'
+  type Tab = 'all' | 'accepted' | 'received' | 'sent' | 'archived'
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get('tab')
-    if (t === 'sent' || t === 'received' || t === 'accepted' || t === 'all') return t as Tab
+    if (t === 'sent' || t === 'received' || t === 'accepted' || t === 'all' || t === 'archived') return t as Tab
     return 'all'
   })
 
@@ -293,7 +300,7 @@ export const Requests = (): JSX.Element => {
 
   useEffect(() => {
     const t = searchParams.get('tab')
-    if (t === 'sent' || t === 'received' || t === 'accepted' || t === 'all') {
+    if (t === 'sent' || t === 'received' || t === 'accepted' || t === 'all' || t === 'archived') {
       setActiveTab(t as Tab)
     }
   }, [searchParams])
@@ -410,8 +417,49 @@ export const Requests = (): JSX.Element => {
       refetchData()
     }
 
+    const handlePinned = (e: any) => {
+      if (e.detail?.id) {
+        setAllItems((prev: Demande[]) => prev.map(d => {
+          const match = String(d.conversationId) === String(e.detail.id) || d.id === `conv-${e.detail.id}`
+          return match ? { ...d, is_pinned: e.detail.isPinned } : d
+        }))
+      }
+    }
+
+    const handleArchived = (e: any) => {
+      if (e.detail?.id) {
+        setAllItems((prev: Demande[]) => prev.map(d => {
+          const match = String(d.conversationId) === String(e.detail.id) || d.id === `conv-${e.detail.id}`
+          return match ? { ...d, is_archived: e.detail.isArchived } : d
+        }))
+      }
+    }
+
+    const handleDeleted = (e: any) => {
+      if (e.detail?.id) {
+        setAllItems((prev: Demande[]) => prev.filter(d =>
+          String(d.conversationId) !== String(e.detail.id) && d.id !== `conv-${e.detail.id}`
+        ))
+        setSelectedConversationId(prev => String(prev) === String(e.detail.id) ? null : prev)
+        setSelectedDemande(prev => (prev && (String(prev.conversationId) === String(e.detail.id) || prev.id === `conv-${e.detail.id}`)) ? null : prev)
+      }
+    }
+
+    const handleBlocked = (e: any) => {
+      if (e.detail?.userId) {
+        setAllItems((prev: Demande[]) => prev.map(d => {
+          const match = String(d.senderId) === String(e.detail.userId) || String(d.receiverId) === String(e.detail.userId)
+          return match ? { ...d, status: 'blocked' as DemandeStatus } : d
+        }))
+      }
+    }
+
     window.addEventListener('exile_demande_created', handleDataChange)
     window.addEventListener('exile_demande_updated', handleDataChange)
+    window.addEventListener('exile_conversation_pinned', handlePinned)
+    window.addEventListener('exile_conversation_archived', handleArchived)
+    window.addEventListener('exile_conversation_deleted', handleDeleted)
+    window.addEventListener('exile_user_blocked', handleBlocked)
     window.addEventListener('storage', handleDataChange)
 
     const interval = setInterval(() => {
@@ -421,10 +469,14 @@ export const Requests = (): JSX.Element => {
     return () => {
       window.removeEventListener('exile_demande_created', handleDataChange)
       window.removeEventListener('exile_demande_updated', handleDataChange)
+      window.removeEventListener('exile_conversation_pinned', handlePinned)
+      window.removeEventListener('exile_conversation_archived', handleArchived)
+      window.removeEventListener('exile_conversation_deleted', handleDeleted)
+      window.removeEventListener('exile_user_blocked', handleBlocked)
       window.removeEventListener('storage', handleDataChange)
       clearInterval(interval)
     }
-  }, [refetchData])
+  }, [refetchData, setAllItems])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
   const updateStatus = useCallback((id: string, status: DemandeStatus, conversationId?: string | number) => {
@@ -611,16 +663,19 @@ export const Requests = (): JSX.Element => {
     let baseList: Demande[] = []
     if (activeTab === 'received') {
       // Tout reçues
-      baseList = (allItems || []).filter(d => !d.id.startsWith('conv-') && String(d.receiverId) === String(currentUserId))
+      baseList = (allItems || []).filter(d => !d.id.startsWith('conv-') && String(d.receiverId) === String(currentUserId) && !d.is_archived)
     } else if (activeTab === 'sent') {
       // Tout envoyées
-      baseList = (allItems || []).filter(d => !d.id.startsWith('conv-') && String(d.senderId) === String(currentUserId))
+      baseList = (allItems || []).filter(d => !d.id.startsWith('conv-') && String(d.senderId) === String(currentUserId) && !d.is_archived)
     } else if (activeTab === 'accepted') {
       // Tout discussions
-      baseList = deduplicatedDemandes.filter(d => d.status === 'accepted' || (Boolean(d.conversationId) && d.status !== 'rejected' && d.status !== 'cancelled'))
+      baseList = deduplicatedDemandes.filter(d => (d.status === 'accepted' || (Boolean(d.conversationId) && d.status !== 'rejected' && d.status !== 'cancelled')) && !d.is_archived)
+    } else if (activeTab === 'archived') {
+      // Archivées
+      baseList = deduplicatedDemandes.filter(d => Boolean(d.is_archived))
     } else {
-      // Tous
-      baseList = deduplicatedDemandes
+      // Tous (sans les archivées)
+      baseList = deduplicatedDemandes.filter(d => !d.is_archived)
     }
 
     const list = baseList.filter(d => {
@@ -632,6 +687,11 @@ export const Requests = (): JSX.Element => {
     })
 
     return list.sort((a, b) => {
+      const aPinned = Boolean(a.is_pinned)
+      const bPinned = Boolean(b.is_pinned)
+      if (aPinned && !bPinned) return -1
+      if (!aPinned && bPinned) return 1
+
       const timeA = new Date(a.lastMessage?.created_at || a.createdAt).getTime()
       const timeB = new Date(b.lastMessage?.created_at || b.createdAt).getTime()
       return timeB - timeA
@@ -642,10 +702,11 @@ export const Requests = (): JSX.Element => {
   const counts = useMemo(() => {
     const rawList = allItems || []
     return {
-      all: deduplicatedDemandes.length,
-      accepted: deduplicatedDemandes.filter(d => d.status === 'accepted' || (Boolean(d.conversationId) && d.status !== 'rejected' && d.status !== 'cancelled')).length,
-      received: rawList.filter(d => !d.id.startsWith('conv-') && String(d.receiverId) === String(currentUserId)).length,
-      sent: rawList.filter(d => !d.id.startsWith('conv-') && String(d.senderId) === String(currentUserId)).length,
+      all: deduplicatedDemandes.filter(d => !d.is_archived).length,
+      accepted: deduplicatedDemandes.filter(d => (d.status === 'accepted' || (Boolean(d.conversationId) && d.status !== 'rejected' && d.status !== 'cancelled')) && !d.is_archived).length,
+      received: rawList.filter(d => !d.id.startsWith('conv-') && String(d.receiverId) === String(currentUserId) && !d.is_archived).length,
+      sent: rawList.filter(d => !d.id.startsWith('conv-') && String(d.senderId) === String(currentUserId) && !d.is_archived).length,
+      archived: deduplicatedDemandes.filter(d => Boolean(d.is_archived)).length,
     }
   }, [deduplicatedDemandes, allItems, currentUserId])
 
@@ -654,6 +715,7 @@ export const Requests = (): JSX.Element => {
     { id: 'accepted', label: t('pro.requests.discussions', 'Discussions'), icon: MessageCircle },
     { id: 'received', label: t('pro.requests.received', 'Reçues'), icon: Inbox },
     { id: 'sent', label: t('pro.requests.sent', 'Envoyées'), icon: Send },
+    { id: 'archived', label: t('pro.requests.archived', 'Archivées'), icon: Archive },
   ]
 
   const base = isDark ? 'bg-[#0b0e14] text-white' : 'bg-slate-50 text-slate-900'
@@ -675,7 +737,7 @@ export const Requests = (): JSX.Element => {
       )}
 
       {/* ── LEFT PANE : Requests & Discussions Hub (WhatsApp Style List) ── */}
-      <div className={`flex flex-col border-r ${leftBg} ${selectedConversationId ? 'hidden lg:flex lg:w-[420px] xl:w-[460px]' : 'w-full lg:w-[420px] xl:w-[460px]'} flex-shrink-0 h-full overflow-hidden`}>
+      <div className={`flex flex-col border-r ${leftBg} ${selectedConversationId || selectedDemande ? 'hidden lg:flex lg:w-[420px] xl:w-[460px]' : 'w-full lg:w-[420px] xl:w-[460px]'} flex-shrink-0 h-full overflow-hidden`}>
         
         {/* Top Header */}
         <div className={`flex-shrink-0 p-3.5 border-b backdrop-blur-xl ${isDark ? 'border-white/5 bg-black/40' : 'border-slate-200 bg-white/80'}`}>
@@ -796,9 +858,19 @@ export const Requests = (): JSX.Element => {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <h3 className="font-bold text-sm truncate text-emerald-400">
-                          @{otherUsername.replace(/^@/, '')}
-                        </h3>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <h3 className="font-bold text-sm truncate text-emerald-400">
+                            @{otherUsername.replace(/^@/, '')}
+                          </h3>
+                          {d.is_pinned && (
+                            <Pin size={12} className="text-emerald-400 fill-emerald-400 flex-shrink-0" />
+                          )}
+                          {d.is_archived && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20 flex-shrink-0">
+                              Archivée
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">
                           {msgTime}
                         </span>

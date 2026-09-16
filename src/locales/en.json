@@ -26,7 +26,7 @@
     "error": "An error occurred",
     "search": "Search...",
     "back": "Back",
-    "logout": "Log out",
+    "logout": "Sign out",
     "yes": "Yes",
     "no": "No",
     "new": "New",
@@ -62,7 +62,12 @@
     "noResultsFound": "No results found",
     "viewAll": "View all",
     "follow": "Follow",
-    "following": "Following"
+    "following": "Following",
+    "confirmLogoutTitle": "Log Out",
+    "confirmLogout": "Do you really want to log out of your EXILE account?",
+    "information": "Information",
+    "ok": "OK",
+    "month": "month"
   },
   "nav": {
     "home": "Home",
@@ -78,7 +83,8 @@
   "settings": {
     "sections": {
       "main": "General Settings",
-      "security": "Account & Security"
+      "security": "Account & Security",
+      "account": "Account"
     },
     "categories": {
       "account": "Account & Profile",
@@ -111,7 +117,26 @@
       "dangerZoneClean": "Danger Zone",
       "deleteAccountTitle": "Delete Account",
       "dangerZoneDescClean": "This action permanently deletes your profile, videos, and all data.",
-      "deleteAccount": "Delete account permanently"
+      "deleteAccount": "Delete account permanently",
+      "changePasswordClean": "Change password",
+      "changePassword": "Change password",
+      "changePasswordTitle": "Modify password",
+      "currentPasswordPlaceholder": "Current password",
+      "newPasswordPlaceholder": "New password (min 8 chars)",
+      "confirmPasswordPlaceholder": "Confirm new password",
+      "emailAssociated": "Associated email",
+      "noEmailRegistered": "Not provided (Registered via phone)",
+      "addEmailClean": "Add an email address",
+      "addEmailTitle": "Add an email address",
+      "currentEmailLabel": "Current email address",
+      "newEmailLabel": "New email address",
+      "newEmailPlaceholder": "name@example.com",
+      "passwordConfirmLabel": "Confirmation password",
+      "passwordConfirmPlaceholder": "Your password to validate",
+      "usernameLabel": "Username",
+      "usernameLockNotice": "Modification locked. Available in {{days}} days.",
+      "usernameCanModify": "You can modify your username",
+      "usernameHelp": "Modifiable once per month. Publicly visible."
     },
     "premium": {
       "currentPlanTitle": "Current Plan",
@@ -145,7 +170,141 @@
       "contentHighlight": "Content highlight",
       "customLink": "Custom professional link",
       "prioritySupport": "Priority support",
-      "monthlyBonus": "1 visibility bonus / month"
+      "monthlyBonus": "1 visibility bonus / month",
+      "viewOffers": "View offers",
+      "invoiceDesc": "View and download your past invoices and transactions.",
+      "tableDate": "Date",
+      "tablePlan": "Plan",
+      "tableAmount": "Amount",
+      "tableStatus": "Status",
+      "tableInvoice": "Invoice",
+      "registration": "Registration",
+      "free": "Free"
+    },
+    "title": "Settings",
+    "subtitle": "Manage your personal information, security and platform preferences.",
+    "logoutDesc": "Log out of your session",
+    "privacy": {
+      "whoCanContactTitle": "Who can contact me?",
+      "everyone": "Everyone",
+      "everyoneDesc": "All registered members on Exile can send you a direct message.",
+      "followers": "My followers only",
+      "followersDesc": "Only members following your account can contact you privately.",
+      "verifiedPro": "Verified professionals",
+      "verifiedProDesc": "Only profiles with a verified job/title can send you messages.",
+      "nobody": "Nobody (Private Mode)",
+      "nobodyDesc": "Blocks the creation of any new conversation. Existing chats remain active.",
+      "onlineStatusTitle": "Show my online status",
+      "onlineStatusDesc": "Allows your contacts to see if you are currently active on the platform",
+      "profileVisibilityTitle": "Global profile visibility",
+      "public": "Public (Visible to all visitors and members)",
+      "members": "Members only (Accessible after sign in)",
+      "private": "Private (Visible only to mutual connections)",
+      "blockedUsersTitle": "Blocked users",
+      "noBlocked": "No blocked users in your list",
+      "unblock": "Unblock"
+    },
+    "security": {
+      "authProtection": "Authentication & Protection",
+      "twoFactor": "Two-Factor Authentication (2FA)",
+      "twoFactorActive": "2FA Enabled",
+      "twoFactorInactive": "2FA Disabled",
+      "twoFactorMethodTotp": "Protected via authenticator app (Google TOTP / Authy).",
+      "twoFactorMethodEmail": "Protected via email verification code.",
+      "twoFactorDesc": "Requires an additional security code on every new sign-in attempt.",
+      "twoFactorDisableBtn": "Disable 2FA",
+      "twoFactorEnableBtn": "Enable 2FA",
+      "confirmDisable2FA": "Confirm deactivation",
+      "sessionsTitle": "Active sessions and devices",
+      "refresh": "Refresh",
+      "thisDevice": "This device",
+      "revokeSessionTitle": "Device Sign Out",
+      "revokeSessionMsg": "Do you really want to sign out this device remotely?",
+      "disconnect": "Disconnect",
+      "passwordSecurityTitle": "Account password",
+      "passwordSecurityDesc": "Your current password remains strictly confidential and hidden for security purposes.",
+      "twoFactorModalTitle": "Two-Factor Authentication Setup",
+      "twoFactorModalDesc": "Choose your two-factor authentication method:",
+      "twoFactorScanQR": "1. Scan this QR Code with Google Authenticator or Authy:",
+      "twoFactorSecretKey": "Or manually enter this secret key:",
+      "twoFactorEnterCode": "2. Enter the generated 6-digit code:",
+      "twoFactorVerifyBtn": "Verify and Enable"
+    },
+    "notifications": {
+      "title": "Notification Preferences",
+      "subtitle": "Choose how you want to be informed of activities",
+      "saved": "Notification preferences saved in database.",
+      "email": "Email notifications",
+      "emailDesc": "Receive alerts and summaries by email via Resend service",
+      "push": "Push notifications",
+      "pushDesc": "Receive direct alerts on your browser or device",
+      "inApp": "In-app notifications"
+    },
+    "app": {
+      "savedFeedback": "Language and regional preferences successfully updated.",
+      "themeDark": "🌙 Dark Theme",
+      "themeLight": "☀️ Light Theme",
+      "themeAuto": "💻 System Automatic Theme",
+      "languageTitle": "Platform Language",
+      "timezoneTitle": "Timezone",
+      "timezoneDesc": "Synchronizes post times and notifications with your region"
+    },
+    "video": {
+      "autoplay": "Enable shuffle autoplay",
+      "interval": "Auto-rotation interval (seconds)",
+      "dataSaver": "Data Saver",
+      "dataSaverDesc": "Automatically adjusts video quality to reduce your internet data consumption",
+      "networkMode": "Network playback: Wi-Fi / Mobile Data",
+      "networkModeDesc": "Set which connection type allows live streaming and high definition playback."
+    },
+    "support": {
+      "subtitle": "Resources, documentation and technical bug reporting",
+      "aboutDesc": "Vision, foundation and mission of the platform",
+      "reportBug": "Report a technical bug",
+      "bugModalTitle": "Report a Technical Issue",
+      "bugModalSubtitle": "Direct report sent to EXILE engineers",
+      "bugCategoryLabel": "Issue category",
+      "bugCatVideo": "Videos / Media player",
+      "bugCatLogin": "Login / Security / Authentication",
+      "bugCatAudio": "Audio / Video sound",
+      "bugCatDisplay": "Display / Interface / Language",
+      "bugCatOther": "Other issue",
+      "bugSubjectLabel": "Summary subject",
+      "bugSubjectPlaceholder": "E.g., Video does not load when clicked",
+      "bugDescLabel": "Detailed bug description",
+      "bugDescPlaceholder": "Describe what you were doing and what happened...",
+      "bugSubmitBtn": "Submit report"
+    },
+    "helpCenter": {
+      "badge": "Help Center",
+      "searchTitle": "How can we help you?",
+      "searchSubtitle": "Find answers, guides and help for your EXILE account.",
+      "searchPlaceholder": "Search in help...",
+      "catAccount": "Account & Security",
+      "catAccountDesc": "Manage your profile, password and login",
+      "catPayments": "Payments & Natcash",
+      "catPaymentsDesc": "Purchases, subscriptions and payment methods",
+      "catVideos": "Videos & Visibility",
+      "catVideosDesc": "Publication, privacy and reach of your videos",
+      "catEvents": "Events & Lives",
+      "catEventsDesc": "Organizing and participating in professional events",
+      "catPrivacy": "Privacy & Blocking",
+      "catPrivacyDesc": "Control who can see and contact you",
+      "catReport": "Reports & Bugs",
+      "catReportDesc": "Report content or a technical issue",
+      "faqTitle": "Frequently Asked Questions"
+    },
+    "faq": {
+      "q1": "How do I edit my profile?",
+      "a1": "Go to Settings > Account & Profile > Edit Profile to update your photo, bio and information.",
+      "q2": "Why isn't my video appearing in the feed?",
+      "a2": "Check that your video is in 'Published' status, not 'Draft'. Private videos only appear to you.",
+      "q3": "How do I make a payment via Natcash?",
+      "a3": "Go to the Premium section, click 'Go Premium' and follow the instructions to send the amount to the indicated Natcash number.",
+      "q4": "How do I change my username?",
+      "a4": "Go to Settings > Edit Profile. Your username can only be changed once per month. A 30-day wait is required between changes.",
+      "q5": "What to do if my account was hacked?",
+      "a5": "Immediately change your password and enable two-factor authentication. Report the issue to us via the 'Report a bug' button."
     }
   },
   "pro": {
@@ -220,7 +379,8 @@
       "country": "Country",
       "shareProfile": "Share profile",
       "viewsCount": "profile views",
-      "editModalTitle": "Edit your profile details"
+      "editModalTitle": "Edit your profile details",
+      "viewProfile": "View profile"
     },
     "feed": {
       "noResults": "No results found for your search",
@@ -580,6 +740,17 @@
       "kickedFromLive": "has been removed from the live session.",
       "cameraOff": "Camera turned off",
       "handRaised": "Hand raised"
+    },
+    "subscriptions": {
+      "loadingVideos": "Loading your subscriptions' videos...",
+      "noVideos": "No videos for now",
+      "noSubs": "You are not subscribed to any professional. Discover suggestions below to get started!",
+      "noVideosCategory": "The creators you follow haven't published any video in this category yet.",
+      "recommended": "Recommended professionals",
+      "subscribe": "Subscribe"
+    },
+    "video": {
+      "videos": "videos"
     }
   },
   "header": {
@@ -684,5 +855,50 @@
     "twoFactorPlaceholder": "6-digit code",
     "twoFactorVerify": "Confirm sign in",
     "twoFactorBackToLogin": "Back to login"
+  },
+  "payment": {
+    "subscribeBtn": "Pay $20 / Month (Premium)",
+    "methodsNotice": "Natcash (Manual), MonCash and Secure Cards",
+    "chooseMethodTitle": "Choose Payment Method",
+    "chooseMethodSubtitle": "EXILE PRO Subscription - $20.00 USD / Month",
+    "natcashOptionTitle": "Natcash (Manual Transfer)",
+    "natcashOptionDesc": "Send to EXILE PLATEFORME • Validation within 4 hours max",
+    "popularHaiti": "Haiti",
+    "delayBadge": "Validation delay: 4 hours max",
+    "pgecomOptionTitle": "Credit Card / MonCash / PG Pay",
+    "pgecomOptionDesc": "PGecom Gateway • Instant online payment",
+    "loginRequired": "You must be logged in to subscribe. Please sign in again.",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "urlUnavailable": "Payment URL is not available.",
+    "pgecomError": "Error initiating payment on PGecom.",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "statusPending": "Pending (4h delay)"
+  },
+  "natcash": {
+    "title": "Manual Natcash Payment",
+    "subtitle": "Direct transfer to EXILE PLATEFORME",
+    "recipientLabel": "Beneficiary Name:",
+    "numberLabel": "Natcash Number:",
+    "amountLabel": "Exact Amount:",
+    "stepGuide": "Dial *202# or use the Natcash app to transfer the amount to the number above.",
+    "validationDelay": "Validation delay: 4 hours maximum.",
+    "delayBadge": "Validation delay: 4 hours maximum",
+    "senderPhoneLabel": "Phone number that sent the money *",
+    "transactionIdLabel": "Natcash Transaction ID (code from SMS) *",
+    "submitBtn": "Confirm My Payment",
+    "success": {
+      "title": "Payment Successfully Recorded!",
+      "message": "We have received your Natcash transaction. The EXILE PLATEFORME team will validate it and activate your Premium account within 4 hours maximum."
+    },
+    "errors": {
+      "phoneRequired": "Please provide the phone number used to send the transfer.",
+      "txnRequired": "Please provide the Natcash Transaction ID (code from the confirmation SMS).",
+      "loginRequired": "You must be signed in to submit this payment.",
+      "generic": "Error recording payment. Please verify the code.",
+      "network": "Connection error. Please check your internet connection."
+    },
+    "exchangeRateTitle": "Exchange Rate",
+    "rateCalculation": "Official rate: 1 USD = 144.75 HTG"
   }
 }

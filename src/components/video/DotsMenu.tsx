@@ -13,10 +13,17 @@ interface DotsMenuProps {
 
 export function DotsMenu({ videoId, authorId, show, saved = false, onSave, onShare, onContact }: DotsMenuProps) {
   const [open, setOpen] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const menuHeight = 280;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpwards(spaceBelow < menuHeight && rect.top > spaceBelow);
+    }
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     const hKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', h);
@@ -68,7 +75,9 @@ export function DotsMenu({ videoId, authorId, show, saved = false, onSave, onSha
         <span className="w-4 h-4"><DotsIcon /></span>
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-full mt-1 z-[200] w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl overflow-hidden py-1">
+        <div role="menu" className={`absolute right-0 z-[200] w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl overflow-hidden py-1 ${
+          openUpwards ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+        }`}>
           {items.map((item, i) => (
             <button key={i} role="menuitem" onClick={item.action}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left">

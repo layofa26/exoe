@@ -30,12 +30,12 @@ export default function EventStatsModal({ isOpen, onClose, eventId, eventTitle }
     registrations: 0,
     attendees: 0,
     revenue: 0,
-    capacity: 100,
+    capacity: 0,
     peakViewers: 0,
-    averageWatchTime: 40,
-    averageRating: 5.0,
+    averageWatchTime: 0,
+    averageRating: 0,
     ratingsCount: 0,
-    deviceBreakdown: { desktop: 52, mobile: 42, tablet: 6 },
+    deviceBreakdown: { desktop: 0, mobile: 0, tablet: 0 },
     dailyRegistrations: [
       { date: 'Lun', count: 0 }, { date: 'Mar', count: 0 }, { date: 'Mer', count: 0 },
       { date: 'Jeu', count: 0 }, { date: 'Ven', count: 0 }, { date: 'Sam', count: 0 }, { date: 'Dim', count: 0 }
@@ -55,7 +55,7 @@ export default function EventStatsModal({ isOpen, onClose, eventId, eventTitle }
         setStats(prev => ({
           ...prev,
           ...data,
-          capacity: data.capacity || 100,
+          capacity: data.capacity || 0,
           deviceBreakdown: data.deviceBreakdown || prev.deviceBreakdown,
           dailyRegistrations: data.dailyRegistrations || prev.dailyRegistrations
         }))
@@ -114,7 +114,7 @@ export default function EventStatsModal({ isOpen, onClose, eventId, eventTitle }
                   { icon: Eye, value: stats.views, label: 'Vues réelles', color: 'text-blue-400', bg: 'bg-blue-950/30' },
                   { icon: Users, value: stats.registrations, label: 'Inscriptions', color: 'text-emerald-400', bg: 'bg-emerald-950/30' },
                   { icon: DollarSign, value: `${stats.revenue}$`, label: 'Revenus billets', color: 'text-amber-400', bg: 'bg-amber-950/30' },
-                  { icon: Star, value: `${stats.averageRating || 5.0}/5`, label: `${stats.ratingsCount || 0} avis`, color: 'text-yellow-400', bg: 'bg-yellow-950/30' }
+                  { icon: Star, value: stats.averageRating ? `${stats.averageRating}/5` : '0/5', label: `${stats.ratingsCount || 0} avis`, color: 'text-yellow-400', bg: 'bg-yellow-950/30' }
                 ].map((kpi, i) => (
                   <div key={i} className="bg-zinc-900/80 rounded-xl border border-zinc-800/60 p-3.5">
                     <div className={`w-8 h-8 rounded-lg ${kpi.bg} flex items-center justify-center mb-2`}>

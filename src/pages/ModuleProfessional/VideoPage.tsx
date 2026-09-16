@@ -42,13 +42,6 @@ export default function VideoPage() {
         const current = mapApiVideo(result.data)
         setVideo(current)
 
-        // Comptabiliser la vue
-        videoApi.incrementView(numericId).then((viewResult) => {
-          if (viewResult.success && typeof viewResult.views === 'number') {
-            setVideo(prev => (prev ? { ...prev, views: viewResult.views } : prev))
-          }
-        })
-
         // Vidéos similaires : les autres vidéos publiques
         const listResult = await videoApi.getVideos()
         if (listResult.success && listResult.data) {

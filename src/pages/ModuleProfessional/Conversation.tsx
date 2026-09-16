@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Send, MoreVertical, Search, X, Paperclip,
-  Reply, CheckCheck, Check, Pin, Archive, Shield, Phone,
-  Video, Star, Wifi, WifiOff, Loader2, Edit2, Trash2, Flag, Forward, Clock
+  Reply, CheckCheck, Check, Pin, PinOff, Archive, Shield, Phone,
+  Video, Star, Wifi, WifiOff, Loader2, Edit2, Trash2, Flag, Forward, Clock,
+  UserCheck, UserX
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -190,6 +191,10 @@ export const ConversationView = ({
   const [showMenu, setShowMenu] = useState(false)
   const [showConfirm, setShowConfirm] = useState<{ type: 'block' | 'delete' | null }>({ type: null })
   const [toast, setToast] = useState<string | null>(null)
+  const [isPinned, setIsPinned] = useState(false)
+  const [isArchived, setIsArchived] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [loadingAction, setLoadingAction] = useState<string | null>(null)
 
   // Messaging features
   const [replyingTo, setReplyingTo] = useState<ReplyContext | null>(null)
@@ -199,6 +204,18 @@ export const ConversationView = ({
   const [forwardModal, setForwardModal] = useState<MessageBubbleData | null>(null)
   const [reportModal, setReportModal] = useState<{ id: string } | null>(null)
   const [reportReason, setReportReason] = useState('Contenu inapproprié ou spam')
+
+  // ─── Jump to quoted original message with smooth scroll and highlight flash ───
+  const jumpToMessage = useCallback((targetId: string) => {
+    const el = document.getElementById(`message-${targetId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('animate-message-highlight')
+      setTimeout(() => {
+        el.classList.remove('animate-message-highlight')
+      }, 2000)
+    }
+  }, [])
 
   // WebSocket state
   const [typingUser, setTypingUser] = useState<{ userId: string; username: string } | null>(null)
@@ -243,21 +260,46 @@ export const ConversationView = ({
           if (res.ok && isMounted) {
             const data = await res.json()
             setConversation(data)
+            setIsPinned(Boolean(data.is_pinned))
+            setIsArchived(Boolean(data.is_archived))
             const normalized: MessageBubbleData[] = (data.messages || []).map((m: any) => ({
               id: String(m.id),
               content: m.content || '',
-              senderId: String(m.sender?.id || ''),
-              senderName: m.sender?.full_name || m.sender?.username || 'Utilisateur',
-              senderAvatar: m.sender?.avatar_url || undefined,
-              senderUsername: m.sender?.username || '',
+              senderId: String(m.sender?.id || m.sender_id || ''),
+              senderName: m.sender?.full_name || m.sender?.username || m.sender_name || 'Utilisateur',
+              senderAvatar: m.sender?.avatar_url || m.sender_avatar || undefined,
+              senderUsername: m.sender?.username || m.sender_username || '',
               createdAt: m.created_at || new Date().toISOString(),
-              read: m.read || false,
-              isImportant: m.is_important || false,
+              read: Boolean(m.read),
+              isImportant: Boolean(m.is_important),
               isEdited: false,
-              replyToId: undefined,
-              replyPreview: undefined,
+              replyToId: m.reply_to ? String(m.reply_to) : (m.reply_to_id ? String(m.reply_to_id) : undefined),
+              replyPreview: m.reply_preview
+                ? {
+                    senderName: m.reply_preview.sender_name || m.reply_preview.senderName || 'Utilisateur',
+                    content: m.reply_preview.content || '',
+                  }
+                : undefined,
             }))
-            setMessages(normalized)
+            if (normalized.length > 0) {
+              setMessages(normalized)
+            } else if (initialMessage) {
+              const isMine = Boolean(isDemandeSender)
+              setMessages([{
+                id: 'init-msg',
+                content: initialMessage,
+                senderId: isMine ? String(currentUserId || '') : String(partnerId || ''),
+                senderName: isMine ? 'Moi' : (partnerUsername || 'Utilisateur'),
+                senderUsername: isMine ? '' : (partnerUsername || ''),
+                senderAvatar: isMine ? undefined : (partnerAvatar || undefined),
+                createdAt: new Date().toISOString(),
+                read: true,
+                isImportant: false,
+                isEdited: false
+              }])
+            } else {
+              setMessages([])
+            }
             apiFetch(`/conversations/${id}/mark_read/`, { method: 'POST' }).catch(() => {})
             setIsLoading(false)
             return
@@ -277,20 +319,38 @@ export const ConversationView = ({
             if (startData.id) {
               setActiveConvId(String(startData.id))
               setConversation(startData)
-              if (startData.messages && startData.messages.length > 0) {
-                const normalized: MessageBubbleData[] = startData.messages.map((m: any) => ({
-                  id: String(m.id),
-                  content: m.content || '',
-                  senderId: String(m.sender?.id || m.sender_id || ''),
-                  senderName: m.sender?.full_name || m.sender?.username || m.sender_name || 'Utilisateur',
-                  senderAvatar: m.sender?.avatar_url || m.sender_avatar || undefined,
-                  senderUsername: m.sender?.username || m.sender_username || '',
-                  createdAt: m.created_at || new Date().toISOString(),
-                  read: m.read || false,
-                  isImportant: m.is_important || false,
-                  isEdited: false,
-                }))
+              setIsPinned(Boolean(startData.is_pinned))
+              setIsArchived(Boolean(startData.is_archived))
+              const normalized: MessageBubbleData[] = (startData.messages || []).map((m: any) => ({
+                id: String(m.id),
+                content: m.content || '',
+                senderId: String(m.sender?.id || m.sender_id || ''),
+                senderName: m.sender?.full_name || m.sender?.username || m.sender_name || 'Utilisateur',
+                senderAvatar: m.sender?.avatar_url || m.sender_avatar || undefined,
+                senderUsername: m.sender?.username || m.sender_username || '',
+                createdAt: m.created_at || new Date().toISOString(),
+                read: Boolean(m.read),
+                isImportant: Boolean(m.is_important),
+                isEdited: false,
+                replyToId: m.reply_to ? String(m.reply_to) : (m.reply_to_id ? String(m.reply_to_id) : undefined),
+                replyPreview: m.reply_preview || undefined,
+              }))
+              if (normalized.length > 0) {
                 setMessages(normalized)
+              } else if (initialMessage) {
+                const isMine = Boolean(isDemandeSender)
+                setMessages([{
+                  id: 'init-msg',
+                  content: initialMessage,
+                  senderId: isMine ? String(currentUserId || '') : String(partnerId || ''),
+                  senderName: isMine ? 'Moi' : (partnerUsername || 'Utilisateur'),
+                  senderUsername: isMine ? '' : (partnerUsername || ''),
+                  senderAvatar: isMine ? undefined : (partnerAvatar || undefined),
+                  createdAt: new Date().toISOString(),
+                  read: true,
+                  isImportant: false,
+                  isEdited: false
+                }])
               }
               setIsLoading(false)
               return
@@ -348,6 +408,13 @@ export const ConversationView = ({
               read: m.read || false,
               isImportant: m.is_important || false,
               isEdited: false,
+              replyToId: m.reply_to ? String(m.reply_to) : (m.reply_to_id ? String(m.reply_to_id) : undefined),
+              replyPreview: m.reply_preview
+                ? {
+                    senderName: m.reply_preview.sender_name || m.reply_preview.senderName || 'Utilisateur',
+                    content: m.reply_preview.content || '',
+                  }
+                : undefined,
             }))
 
             setMessages(prev => {
@@ -405,7 +472,13 @@ export const ConversationView = ({
           read: Boolean(msg.read),
           isImportant: Boolean(msg.is_important),
           isEdited: false,
-          replyToId: msg.reply_to_id as string | undefined,
+          replyToId: (msg.reply_to_id as string | undefined) || ((msg as any).reply_to ? String((msg as any).reply_to) : undefined),
+          replyPreview: (msg as any).reply_preview
+            ? {
+                senderName: (msg as any).reply_preview.sender_name || (msg as any).reply_preview.senderName || 'Utilisateur',
+                content: (msg as any).reply_preview.content || '',
+              }
+            : undefined,
         }
         setMessages(prev => {
           if (prev.some(m => m.id === incoming.id)) return prev
@@ -527,6 +600,7 @@ export const ConversationView = ({
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
 
     // Optimistic UI
+    const replyTarget = replyingTo ? { ...replyingTo } : null
     const optimisticId = `temp_${Date.now()}`
     const optimisticMsg: MessageBubbleData = {
       id: optimisticId,
@@ -537,9 +611,9 @@ export const ConversationView = ({
       read: false,
       isImportant: false,
       isEdited: false,
-      replyToId: replyingTo?.id,
-      replyPreview: replyingTo
-        ? { senderName: replyingTo.senderName, content: replyingTo.content }
+      replyToId: replyTarget?.id,
+      replyPreview: replyTarget
+        ? { senderName: replyTarget.senderName, content: replyTarget.content }
         : undefined,
     }
     setMessages(prev => [...prev, optimisticMsg])
@@ -575,7 +649,11 @@ export const ConversationView = ({
       try {
         const postRes = await apiFetch('/conversations/messages/', {
           method: 'POST',
-          body: JSON.stringify({ content, conversation: Number(realConvId) }),
+          body: JSON.stringify({
+            content,
+            conversation: Number(realConvId),
+            reply_to: replyTarget?.id && /^\d+$/.test(String(replyTarget.id)) ? Number(replyTarget.id) : null,
+          }),
         })
         if (postRes.ok) {
           const savedMsg = await postRes.json()
@@ -583,7 +661,12 @@ export const ConversationView = ({
           setMessages(prev => prev.map(m => m.id === optimisticId ? {
             ...m,
             id: String(savedMsg.id),
-            createdAt: savedMsg.created_at || m.createdAt
+            createdAt: savedMsg.created_at || m.createdAt,
+            replyToId: savedMsg.reply_to ? String(savedMsg.reply_to) : (m.replyToId || (replyTarget?.id ? String(replyTarget.id) : undefined)),
+            replyPreview: savedMsg.reply_preview ? {
+              senderName: savedMsg.reply_preview.sender_name || savedMsg.reply_preview.senderName || replyTarget?.senderName || 'Utilisateur',
+              content: savedMsg.reply_preview.content || replyTarget?.content || '',
+            } : m.replyPreview,
           } : m))
           // Backend MessageViewSet automatically broadcasts via channel_layer to all WebSocket clients!
           return
@@ -601,7 +684,7 @@ export const ConversationView = ({
       wsSend({
         type: 'chat.message',
         content,
-        reply_to_id: replyingTo?.id || null,
+        reply_to_id: replyTarget?.id || null,
       })
     } else if (!savedSuccessfully && !realConvId) {
       showToast('Erreur lors de l\'envoi. Vérifiez votre connexion.')
@@ -795,6 +878,124 @@ export const ConversationView = ({
     )
   }, [messages, searchQuery])
 
+  // ─── Blocked User Check ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const targetUserId = otherParticipant?.id || partnerId
+    if (!targetUserId || targetUserId === 'other') return
+    const checkBlocked = async () => {
+      try {
+        const res = await apiFetch('/blocked/blocked-users/')
+        if (res.ok) {
+          const list = await res.json()
+          const arr = Array.isArray(list) ? list : (list.results || [])
+          const found = arr.some((b: any) => String(b.blocked?.id || b.blocked_user) === String(targetUserId))
+          setIsBlocked(found)
+        }
+      } catch {}
+    }
+    checkBlocked()
+  }, [otherParticipant?.id, partnerId])
+
+  // ─── Pin / Archive / Block / Delete Handlers ─────────────────────────────────
+  const handleTogglePin = useCallback(async () => {
+    setShowMenu(false)
+    if (!id || id === 'temp') return
+    const newPinned = !isPinned
+    setIsPinned(newPinned)
+    try {
+      const res = await apiFetch(`/conversations/${id}/toggle_pin/`, { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        const actual = Boolean(data.is_pinned)
+        setIsPinned(actual)
+        showToast(actual ? t('pro.requests.pinnedToast', 'Discussion épinglée 📌') : t('pro.requests.unpinnedToast', 'Discussion désépinglée'))
+        window.dispatchEvent(new CustomEvent('exile_conversation_pinned', { detail: { id, isPinned: actual } }))
+        window.dispatchEvent(new Event('storage'))
+      }
+    } catch {
+      setIsPinned(!newPinned)
+      showToast(t('common.error', 'Erreur'), 'error')
+    }
+  }, [id, isPinned, showToast, t])
+
+  const handleToggleArchive = useCallback(async () => {
+    setShowMenu(false)
+    if (!id || id === 'temp') return
+    const newArchived = !isArchived
+    setIsArchived(newArchived)
+    try {
+      const res = await apiFetch(`/conversations/${id}/toggle_archive/`, { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        const actual = Boolean(data.is_archived)
+        setIsArchived(actual)
+        showToast(actual ? t('pro.requests.archivedToast', 'Discussion archivée 📦') : t('pro.requests.unarchivedToast', 'Discussion désarchivée'))
+        window.dispatchEvent(new CustomEvent('exile_conversation_archived', { detail: { id, isArchived: actual } }))
+        window.dispatchEvent(new Event('storage'))
+      }
+    } catch {
+      setIsArchived(!newArchived)
+      showToast(t('common.error', 'Erreur'), 'error')
+    }
+  }, [id, isArchived, showToast, t])
+
+  const handleBlockUserAction = useCallback(async () => {
+    setShowMenu(false)
+    const targetUserId = otherParticipant?.id || partnerId
+    if (!targetUserId || targetUserId === 'other') return
+    setLoadingAction('block')
+    try {
+      if (isBlocked) {
+        const res = await apiFetch('/blocked/blocked-users/', {
+          method: 'DELETE',
+          body: JSON.stringify({ blocked_user: targetUserId }),
+        })
+        if (res.ok) {
+          setIsBlocked(false)
+          showToast(t('pro.requests.unblockedToast', 'Utilisateur débloqué ✓'))
+          window.dispatchEvent(new CustomEvent('exile_user_unblocked', { detail: { userId: targetUserId } }))
+        }
+      } else {
+        const res = await apiFetch('/blocked/blocked-users/', {
+          method: 'POST',
+          body: JSON.stringify({ blocked_user: targetUserId }),
+        })
+        if (res.ok) {
+          setIsBlocked(true)
+          showToast(t('pro.requests.blockedToast', '🚫 Utilisateur bloqué'))
+          if (onBlockUser) onBlockUser()
+          window.dispatchEvent(new CustomEvent('exile_user_blocked', { detail: { userId: targetUserId } }))
+        }
+      }
+    } catch {
+      showToast(t('common.error', 'Erreur'), 'error')
+    } finally {
+      setLoadingAction(null)
+      setShowConfirm({ type: null })
+    }
+  }, [otherParticipant, partnerId, isBlocked, onBlockUser, showToast, t])
+
+  const handleDeleteConversationAction = useCallback(async () => {
+    setShowConfirm({ type: null })
+    if (!id || id === 'temp') return
+    setLoadingAction('delete')
+    try {
+      await apiFetch(`/conversations/${id}/`, { method: 'DELETE' })
+      showToast(t('pro.requests.chatDeletedToast', 'Conversation supprimée 🗑️'))
+      window.dispatchEvent(new CustomEvent('exile_conversation_deleted', { detail: { id } }))
+      window.dispatchEvent(new Event('storage'))
+      if (onClose) {
+        onClose()
+      } else {
+        navigate('/pro/requests')
+      }
+    } catch {
+      showToast(t('common.error', 'Erreur de suppression'), 'error')
+    } finally {
+      setLoadingAction(null)
+    }
+  }, [id, onClose, navigate, showToast, t])
+
   // ─── Render ────────────────────────────────────────────────────────────────────
 
   if (error) {
@@ -805,10 +1006,12 @@ export const ConversationView = ({
           <p className={`text-lg ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{error}</p>
           <button
             onClick={() => {
-              if (window.history.length > 1) {
+              if (onClose) {
+                onClose()
+              } else if (window.history.length > 1) {
                 navigate(-1)
               } else {
-                navigate('/pro/conversations')
+                navigate('/pro/requests')
               }
             }}
             className="px-6 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 transition-colors"
@@ -821,7 +1024,7 @@ export const ConversationView = ({
   }
 
   return (
-    <div className={`flex flex-col h-screen max-h-screen overflow-hidden ${isDark ? 'bg-[#0f0f13]' : 'bg-[#f0f4f8]'}`}>
+    <div className={`flex flex-col h-full max-h-full min-h-0 overflow-hidden ${isDark ? 'bg-[#0f0f13]' : 'bg-[#f0f4f8]'}`}>
 
       {/* ── Toast ── */}
       {toast && (
@@ -846,7 +1049,7 @@ export const ConversationView = ({
             } else if (window.history.length > 1) {
               navigate(-1)
             } else {
-              navigate('/pro/conversations')
+              navigate('/pro/requests')
             }
           }}
           className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
@@ -861,7 +1064,6 @@ export const ConversationView = ({
               <img
                 src={resolveMediaUrl(otherParticipant.avatar_url)}
                 alt=""
-
                 onError={(e) => { (e.target as HTMLElement).style.display = 'none' }}
                 className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-500/30"
               />
@@ -877,9 +1079,21 @@ export const ConversationView = ({
           </div>
 
           <div className="min-w-0">
-            <h2 className="font-semibold text-sm truncate">
-              @{((otherParticipant?.username || otherParticipant?.full_name || 'Utilisateur')).replace(/^@/, '')}
-            </h2>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h2 className="font-bold text-sm truncate">
+                @{((otherParticipant?.username || otherParticipant?.full_name || 'Utilisateur')).replace(/^@/, '')}
+              </h2>
+              {isPinned && (
+                <span title={t('pro.requests.pinned', 'Épinglée')} className="text-emerald-400 flex-shrink-0">
+                  <Pin size={13} className="fill-emerald-400" />
+                </span>
+              )}
+              {isArchived && (
+                <span title={t('pro.requests.archived', 'Archivée')} className="text-amber-400 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-400/10 border border-amber-400/20 flex-shrink-0">
+                  Archivée
+                </span>
+              )}
+            </div>
             <p className={`text-xs truncate ${isOtherOnline ? 'text-emerald-400' : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
               {isOtherOnline ? t('pro.requests.online', 'En ligne') : t('pro.requests.offline', 'Hors ligne')}
             </p>
@@ -918,11 +1132,42 @@ export const ConversationView = ({
             <div className={`absolute top-16 right-3 z-50 w-52 rounded-2xl shadow-2xl border overflow-hidden
               ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
               {[
-                { icon: Pin, label: t('pro.requests.pin', 'Épingler'), action: () => { apiFetch(`/conversations/${id}/toggle_pin/`, { method: 'POST' }); setShowMenu(false) } },
-                { icon: Archive, label: t('pro.requests.archive', 'Archiver'), action: () => { setShowMenu(false) } },
-                { icon: CheckCheck, label: t('pro.requests.multiSelect', 'Sélection multiple'), action: () => { setIsSelectionMode(true); setShowMenu(false) } },
-                { icon: Shield, label: t('pro.requests.block', 'Bloquer'), action: () => { setShowConfirm({ type: 'block' }); setShowMenu(false) }, danger: true },
-                { icon: Trash2, label: t('pro.requests.deleteConversation', 'Supprimer la conv.'), action: () => { setShowConfirm({ type: 'delete' }); setShowMenu(false) }, danger: true },
+                {
+                  icon: isPinned ? PinOff : Pin,
+                  label: isPinned ? t('pro.requests.unpin', 'Désépingler') : t('pro.requests.pin', 'Épingler'),
+                  action: handleTogglePin,
+                  active: isPinned,
+                },
+                {
+                  icon: Archive,
+                  label: isArchived ? t('pro.requests.unarchive', 'Désarchiver') : t('pro.requests.archive', 'Archiver'),
+                  action: handleToggleArchive,
+                  active: isArchived,
+                },
+                {
+                  icon: CheckCheck,
+                  label: t('pro.requests.multiSelect', 'Sélection multiple'),
+                  action: () => { setIsSelectionMode(true); setShowMenu(false) },
+                },
+                {
+                  icon: isBlocked ? UserCheck : Shield,
+                  label: isBlocked ? t('pro.requests.unblock', 'Débloquer') : t('pro.requests.block', 'Bloquer'),
+                  action: () => {
+                    if (isBlocked) {
+                      handleBlockUserAction()
+                    } else {
+                      setShowConfirm({ type: 'block' })
+                      setShowMenu(false)
+                    }
+                  },
+                  danger: !isBlocked,
+                },
+                {
+                  icon: Trash2,
+                  label: t('pro.requests.deleteConversation', 'Supprimer la conv.'),
+                  action: () => { setShowConfirm({ type: 'delete' }); setShowMenu(false) },
+                  danger: true,
+                },
               ].map((item, i) => (
                 <button
                   key={i}
@@ -930,7 +1175,9 @@ export const ConversationView = ({
                   className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors
                     ${'danger' in item && item.danger
                       ? isDark ? 'text-red-400 hover:bg-red-900/20' : 'text-red-500 hover:bg-red-50'
-                      : isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}
+                      : item.active
+                        ? 'text-emerald-400 font-semibold bg-emerald-500/10'
+                        : isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}
                 >
                   <item.icon size={15} /> {item.label}
                 </button>
@@ -939,6 +1186,23 @@ export const ConversationView = ({
           </>
         )}
       </div>
+
+      {/* ── Blocked Warning Banner ── */}
+      {isBlocked && (
+        <div className={`flex-shrink-0 px-4 py-2.5 border-b flex items-center justify-between text-xs
+          ${isDark ? 'bg-orange-950/40 border-orange-500/20 text-orange-300' : 'bg-orange-50 border-orange-200 text-orange-800'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Shield size={16} className="text-orange-400 flex-shrink-0" />
+            <span className="truncate">{t('pro.requests.blockedWarning', 'Cet utilisateur est bloqué. Vous ne pouvez plus échanger de messages.')}</span>
+          </div>
+          <button
+            onClick={handleBlockUserAction}
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 transition-colors flex-shrink-0 ml-2"
+          >
+            {t('pro.modals.unblock', 'Débloquer')}
+          </button>
+        </div>
+      )}
 
       {/* ── Search Bar ── */}
       {showSearch && (
@@ -1047,26 +1311,47 @@ export const ConversationView = ({
           </div>
         ) : (
           <>
-            {filteredMessages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                isMine={String(msg.senderId) === String(currentUserId)}
-                theme={resolvedTheme as 'dark' | 'light'}
-                isSelected={selectedMessageIds.has(msg.id)}
-                isSelectionMode={isSelectionMode}
-                searchQuery={searchQuery}
-                onReply={(m) => setReplyingTo({ id: m.id, senderName: m.senderName, content: m.content })}
-                onCopy={copyMessage}
-                onEdit={(m) => setEditingMessage({ id: m.id, content: m.content })}
-                onDeleteForMe={deleteForMe}
-                onDeleteForAll={deleteForAll}
-                onToggleImportant={toggleImportant}
-                onForward={(m) => setForwardModal(m)}
-                onReport={(msgId) => setReportModal({ id: msgId })}
-                onSelect={toggleSelect}
-              />
-            ))}
+            {filteredMessages.map((msg) => {
+              const effectiveReplyPreview = (msg.replyPreview && (msg.replyPreview.senderName || (msg.replyPreview as any).sender_name))
+                ? {
+                    senderName: msg.replyPreview.senderName || (msg.replyPreview as any).sender_name,
+                    content: msg.replyPreview.content || '',
+                  }
+                : msg.replyToId
+                ? (() => {
+                    const parent = messages.find(p => String(p.id) === String(msg.replyToId))
+                    return parent ? { senderName: parent.senderName, content: parent.content } : undefined
+                  })()
+                : undefined
+
+              return (
+                <MessageBubble
+                  key={msg.id}
+                  message={{
+                    ...msg,
+                    replyPreview: effectiveReplyPreview,
+                  }}
+                  isMine={String(msg.senderId) === String(currentUserId)}
+                  theme={resolvedTheme as 'dark' | 'light'}
+                  isSelected={selectedMessageIds.has(msg.id)}
+                  isSelectionMode={isSelectionMode}
+                  searchQuery={searchQuery}
+                  onReply={(m) => {
+                    setReplyingTo({ id: m.id, senderName: m.senderName, content: m.content })
+                    setTimeout(() => inputRef.current?.focus(), 50)
+                  }}
+                  onCopy={copyMessage}
+                  onEdit={(m) => setEditingMessage({ id: m.id, content: m.content })}
+                  onDeleteForMe={deleteForMe}
+                  onDeleteForAll={deleteForAll}
+                  onToggleImportant={toggleImportant}
+                  onForward={(m) => setForwardModal(m)}
+                  onReport={(msgId) => setReportModal({ id: msgId })}
+                  onSelect={toggleSelect}
+                  onJumpToMessage={jumpToMessage}
+                />
+              )
+            })}
             {/* Typing indicator */}
             {typingUser && (
               <TypingIndicator
@@ -1079,19 +1364,37 @@ export const ConversationView = ({
         )}
       </div>
 
-      {/* ── Reply Banner ── */}
+      {/* ── WhatsApp-Style Reply Banner above Input ── */}
       {replyingTo && (
-        <div className={`flex-shrink-0 flex items-center gap-3 px-4 py-2 border-t border-l-4 border-l-violet-500
-          ${isDark ? 'bg-slate-900/80 border-white/5' : 'bg-violet-50 border-violet-100'}`}>
-          <Reply size={14} className="text-violet-400 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-semibold text-violet-400">{replyingTo.senderName}</span>
-            <p className={`text-xs truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {replyingTo.content.substring(0, 80)}
-            </p>
+        <div className={`flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 border-t border-b transition-all duration-200 animate-in slide-in-from-bottom-2
+          ${isDark ? 'bg-slate-900/95 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* WhatsApp left colored accent bar */}
+            <div className="w-1 h-8 rounded-full bg-emerald-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Reply size={12} className="text-emerald-500 flex-shrink-0" />
+                <span className="text-xs font-bold text-emerald-500 truncate">
+                  {replyingTo.senderName === 'Moi' ? 'Répondre à vous-même' : `Répondre à ${replyingTo.senderName}`}
+                </span>
+              </div>
+              <p className={`text-xs truncate leading-tight mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                {replyingTo.content.startsWith('[image:')
+                  ? '📷 Photo'
+                  : replyingTo.content.startsWith('[document:')
+                    ? '📄 Document'
+                    : replyingTo.content.substring(0, 100)}
+              </p>
+            </div>
           </div>
-          <button onClick={() => setReplyingTo(null)}>
-            <X size={14} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+          <button
+            onClick={() => setReplyingTo(null)}
+            className={`p-1.5 rounded-full transition-colors ${
+              isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-200 text-slate-500 hover:text-slate-800'
+            }`}
+            title="Annuler la réponse"
+          >
+            <X size={16} />
           </button>
         </div>
       )}
@@ -1196,18 +1499,20 @@ export const ConversationView = ({
 
           {/* Attachment button */}
           <button
-            onClick={() => setShowAttachMenu(v => !v)}
-            title={t('pro.requests.attachTitle', 'Partager un fichier, image ou devis pro')}
-            className={`p-1.5 rounded-xl transition-colors mb-0.5 ${showAttachMenu ? 'bg-emerald-500/20 text-emerald-400' : isDark ? 'text-slate-400 hover:text-emerald-400 hover:bg-slate-700' : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-200'}`}
+            onClick={() => !isBlocked && setShowAttachMenu(v => !v)}
+            disabled={isBlocked}
+            title={isBlocked ? t('pro.requests.blockedAction', 'Action indisponible (utilisateur bloqué)') : t('pro.requests.attachTitle', 'Partager un fichier, image ou devis pro')}
+            className={`p-1.5 rounded-xl transition-colors mb-0.5 ${isBlocked ? 'opacity-40 cursor-not-allowed text-slate-500' : showAttachMenu ? 'bg-emerald-500/20 text-emerald-400' : isDark ? 'text-slate-400 hover:text-emerald-400 hover:bg-slate-700' : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-200'}`}
           >
             <Paperclip size={18} />
           </button>
 
           {/* Quick Devis Pro button */}
           <button
-            onClick={() => setShowProOfferModal(true)}
-            title={t('pro.requests.createProOffer', 'Créer un Devis / Proposition Professionnelle')}
-            className="p-1.5 rounded-xl transition-colors mb-0.5 text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1 font-bold text-xs"
+            onClick={() => !isBlocked && setShowProOfferModal(true)}
+            disabled={isBlocked}
+            title={isBlocked ? t('pro.requests.blockedAction', 'Action indisponible (utilisateur bloqué)') : t('pro.requests.createProOffer', 'Créer un Devis / Proposition Professionnelle')}
+            className={`p-1.5 rounded-xl transition-colors mb-0.5 flex items-center gap-1 font-bold text-xs ${isBlocked ? 'opacity-40 cursor-not-allowed text-slate-500' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
           >
             <span>💼</span>
             <span className="hidden sm:inline text-[11px]">{t('pro.requests.quickOffer', 'Devis Pro')}</span>
@@ -1216,13 +1521,15 @@ export const ConversationView = ({
           {/* Textarea */}
           <textarea
             ref={inputRef}
+            disabled={isBlocked}
             value={newMessage}
             onChange={e => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('pro.conversations.typeMessage', 'Écrivez un message...')}
+            placeholder={isBlocked ? t('pro.requests.blockedInput', 'Utilisateur bloqué. Débloquez-le pour lui écrire.') : t('pro.conversations.typeMessage', 'Écrivez un message...')}
             rows={1}
             style={{ resize: 'none', minHeight: 36, maxHeight: 120 }}
             className={`flex-1 bg-transparent outline-none text-sm leading-relaxed py-1
+              ${isBlocked ? 'opacity-50 cursor-not-allowed' : ''}
               ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
             onInput={e => {
               const tEl = e.target as HTMLTextAreaElement
@@ -1234,11 +1541,13 @@ export const ConversationView = ({
           {/* Send button */}
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim()}
+            disabled={!newMessage.trim() || isBlocked}
             className={`p-2 rounded-xl transition-all mb-0.5 flex-shrink-0
-              ${newMessage.trim()
-                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/30 hover:scale-105'
-                : isDark ? 'text-slate-600' : 'text-slate-300'}`}
+              ${isBlocked
+                ? 'opacity-40 cursor-not-allowed text-slate-500'
+                : newMessage.trim()
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/30 hover:scale-105'
+                  : isDark ? 'text-slate-600' : 'text-slate-300'}`}
           >
             <Send size={16} />
           </button>
@@ -1431,30 +1740,38 @@ export const ConversationView = ({
 
       {/* ── Confirm Dialog ── */}
       {showConfirm.type && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className={`w-full max-w-sm rounded-2xl p-5 shadow-2xl
-            ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <h3 className={`font-semibold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowConfirm({ type: null })}>
+          <div className={`w-full max-w-sm rounded-2xl p-5 shadow-2xl border
+            ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
+            <h3 className={`font-bold mb-2 text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {showConfirm.type === 'block' ? `🛡️ ${t('pro.requests.blockUserConfirm', 'Bloquer cet utilisateur ?')}` : `🗑️ ${t('pro.requests.deleteConversationConfirm', 'Supprimer la conversation ?')}`}
             </h3>
-            <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-xs mb-5 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {showConfirm.type === 'block'
-                ? t('pro.requests.blockUserDesc', 'Vous ne pourrez plus vous envoyer de messages.')
-                : t('pro.requests.deleteConversationDesc', 'Cette action est irréversible. Tous les messages seront supprimés.')}
+                ? t('pro.requests.blockUserDesc', 'Vous ne pourrez plus vous envoyer de messages. Vous pourrez le débloquer à tout moment.')
+                : t('pro.requests.deleteConversationDesc', 'Cette action est irréversible. Tous les messages de cette conversation seront définitivement supprimés.')}
             </p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowConfirm({ type: null })} className={`px-4 py-2 rounded-xl text-sm ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>{t('common.cancel', 'Annuler')}</button>
               <button
-                onClick={async () => {
+                onClick={() => setShowConfirm({ type: null })}
+                className={`px-4 py-2 rounded-xl text-xs font-medium ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}
+              >
+                {t('common.cancel', 'Annuler')}
+              </button>
+              <button
+                disabled={Boolean(loadingAction)}
+                onClick={() => {
                   if (showConfirm.type === 'delete') {
-                    await apiFetch(`/conversations/${id}/`, { method: 'DELETE' })
-                    navigate('/pro/conversations')
+                    handleDeleteConversationAction()
+                  } else if (showConfirm.type === 'block') {
+                    handleBlockUserAction()
                   }
-                  setShowConfirm({ type: null })
-                  showToast(showConfirm.type === 'block' ? t('pro.requests.userBlockedToast', 'Utilisateur bloqué') : t('pro.requests.chatDeletedToast', 'Conversation supprimée'))
                 }}
-                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700"
-              >{t('common.confirm', 'Confirmer')}</button>
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-all
+                  ${showConfirm.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+              >
+                {loadingAction ? <Loader2 size={14} className="animate-spin" /> : t('common.confirm', 'Confirmer')}
+              </button>
             </div>
           </div>
         </div>

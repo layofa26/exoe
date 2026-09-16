@@ -99,9 +99,18 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
       if (profileData) {
         const rawPhoto = profileData.photo_url || profileData.photo || profileData.avatar
         const avatar = resolveAvatarUrl(rawPhoto)
-        if (avatar) {
-          setUser(prev => prev ? { ...prev, avatarUrl: avatar, fullName: profileData.full_name || prev.fullName } : prev)
-        }
+        const realUsername = profileData.username || profileData.user_username
+        setUser(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            avatarUrl: avatar || prev.avatarUrl,
+            fullName: profileData.full_name || prev.fullName,
+            username: (realUsername && !realUsername.includes('@gmail.com') && !realUsername.includes('@yahoo.'))
+              ? realUsername
+              : prev.username
+          }
+        })
       }
     } catch {}
   }
@@ -128,10 +137,14 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
           )
           const userId = decoded.id || decoded.user_id || storedProfile.id || 0
           const avatar = resolveAvatarUrl(storedProfile.photo || storedProfile.avatar_url || storedProfile.avatar)
+          const rawUsername = decoded.username || storedProfile.username || ''
+          const cleanUser = (rawUsername && !rawUsername.includes('@')) 
+            ? rawUsername 
+            : (decoded.email ? decoded.email.split('@')[0] : (storedProfile.email ? storedProfile.email.split('@')[0] : ''))
           const userData: User = {
             id: userId,
             email: decoded.email || storedProfile.email || '',
-            username: decoded.username || storedProfile.username || '',
+            username: cleanUser,
             fullName: decoded.full_name || storedProfile.name || storedProfile.full_name || '',
             avatarUrl: avatar,
             roles: [],
@@ -161,10 +174,14 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     try {
       const decoded = jwtDecode<any>(access)
       const userId = decoded.user_id || decoded.id || decoded.sub || 0
+      const rawUser = decoded.username || usernameFallback
+      const cleanUser = (rawUser && !rawUser.includes('@'))
+        ? rawUser
+        : (decoded.email ? decoded.email.split('@')[0] : (rawUser ? rawUser.split('@')[0] : 'Utilisateur'))
       const userData: User = {
         id: userId,
         email: decoded.email || '',
-        username: decoded.username || usernameFallback,
+        username: cleanUser,
         fullName: decoded.full_name || '',
         avatarUrl: undefined,
         roles: [],
@@ -422,6 +439,57 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     return user?.roles?.includes(role) || false
   }
 
+  const loginWithGoogle = async (payload: {
+    id_token?: string
+    access_token?: string
+    birth_date?: string
+    gender?: string
+    profession?: string
+    specialty?: string
+  }): Promise<{
+    success: boolean
+    is_new_user?: boolean
+    needs_profile_completion?: boolean
+    google_profile?: {
+      email: string
+      full_name: string
+      avatar_url?: string
+    }
+    error?: string
+  }> => {
+    const result = await authApi.googleAuth(payload)
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+
+    // Si nouvel utilisateur et a besoin de compléter le profil
+    if (result.needs_profile_completion) {
+      return {
+        success: true,
+        is_new_user: true,
+        needs_profile_completion: true,
+        google_profile: result.google_profile
+      }
+    }
+
+    // Si connexion réussie (ou compte créé) avec jetons JWT
+    if (result.data?.access && result.data?.refresh) {
+      const loginRes = await completeLoginSession(
+        result.data.access,
+        result.data.refresh,
+        result.data.user?.username || result.data.user?.email || 'GoogleUser'
+      )
+      return {
+        success: loginRes.success,
+        is_new_user: result.is_new_user,
+        needs_profile_completion: false,
+        error: loginRes.error
+      }
+    }
+
+    return { success: true }
+  }
+
   const hasModuleAccess = (module: 'pro' | 'social' | 'funny'): boolean => {
     if (!isAuthenticated) return false
     if (module === 'pro') return hasRole('pro') || hasRole('professional')
@@ -447,6 +515,7 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     resend2FAOtp,
     registerPro,
     registerInstitution,
+    loginWithGoogle,
     logout,
     hasRole,
     hasModuleAccess,

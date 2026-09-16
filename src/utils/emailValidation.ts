@@ -49,19 +49,19 @@ export const validateEmail = (email: string): { valid: boolean; error?: string }
 
   const domain = domainParts[1]
   if (!domain || !domain.includes('.') || domain.split('.').length < 2) {
-    return { valid: false, error: 'Domaine invalide' }
+    return { valid: false, error: 'Veuillez saisir une adresse e-mail valide' }
   }
 
-  // Vérification que le TLD a au moins 2 caractères et est dans la liste des TLDs valides
+  // Vérification que l'extension a au moins 2 caractères et est reconnue
   const tld = domain.split('.').pop()
   if (!tld || tld.length < 2) {
-    return { valid: false, error: 'Domaine invalide' }
+    return { valid: false, error: 'Veuillez saisir une adresse e-mail valide' }
   }
 
-  // Vérification que le TLD est dans la liste des TLDs valides
+  // Vérification que l'extension est dans la liste des extensions valides
   const tldLower = tld.toLowerCase()
   if (!VALID_TLDS.includes(tldLower)) {
-    return { valid: false, error: 'Domaine invalide (TLD non reconnu)' }
+    return { valid: false, error: 'Veuillez vérifier l\'extension de votre adresse e-mail (ex: .com, .fr, .net)' }
   }
 
   return { valid: true }

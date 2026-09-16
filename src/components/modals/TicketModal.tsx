@@ -54,9 +54,7 @@ export default function TicketModal({ isOpen, onClose, eventId, eventTitle }: Ti
         return
       } catch {}
     }
-    setTickets([
-      { id: 't1', name: 'Standard', description: "Accès complet à l'événement", price: 0, quantity: 100, sold: 0 }
-    ])
+    setTickets([])
   }, [cleanId, eventId])
 
   useEffect(() => {
@@ -154,7 +152,13 @@ export default function TicketModal({ isOpen, onClose, eventId, eventTitle }: Ti
           ) : (
             <>
               {/* Liste tickets */}
-              {tickets.map(ticket => (
+              {tickets.length === 0 ? (
+                <div className="text-center py-6 text-zinc-500">
+                  <Ticket className="w-8 h-8 mx-auto mb-2 opacity-40 text-zinc-400" />
+                  <p className="text-xs">Aucun billet créé pour cet événement.</p>
+                </div>
+              ) : (
+                tickets.map(ticket => (
                 <div key={ticket.id} className="bg-zinc-900/80 rounded-xl border border-zinc-800/60 p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -190,7 +194,7 @@ export default function TicketModal({ isOpen, onClose, eventId, eventTitle }: Ti
                     />
                   </div>
                 </div>
-              ))}
+              )))}
 
               {/* Ajouter ticket */}
               {showCreate ? (

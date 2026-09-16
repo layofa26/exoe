@@ -5,196 +5,321 @@ import {
   Building2, 
   Video, 
   ArrowRight, 
-  CheckCircle
+  CheckCircle2,
+  Sparkles,
+  ShieldCheck,
+  Zap,
+  Lock,
+  Layers,
+  Users,
+  Award,
+  Globe2,
+  TrendingUp,
+  MessageSquare,
+  Play
 } from 'lucide-react'
 
 export const Landing = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-white'}`}>
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary via-primary/90 to-secondary py-16 sm:py-20 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="inline-flex items-center space-x-2 bg-white/10 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 mb-6 sm:mb-8">
-            <span className="text-white/80 text-xs sm:text-sm">Par Tiger and Light LLC</span>
+    <div className={`min-h-screen ${isDark ? 'bg-[#09090b] text-zinc-100' : 'bg-slate-50 text-slate-900'} selection:bg-[#FF6B00]/30 transition-colors duration-300`}>
+      
+      {/* ── 1. HERO SECTION AVEC LUMIÈRES DYNAMIQUES ── */}
+      <section className="relative overflow-hidden pt-12 pb-20 sm:pt-16 sm:pb-28 px-4 border-b border-zinc-200/60 dark:border-zinc-800/80">
+        {/* Glow ambient orbs */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[750px] h-[350px] sm:h-[450px] bg-gradient-to-tr from-blue-600/20 via-[#FF6B00]/15 to-purple-600/20 rounded-full blur-3xl pointer-events-none -z-10" />
+        <div className="absolute top-0 right-10 w-72 h-72 bg-blue-500/10 rounded-full blur-2xl pointer-events-none -z-10" />
+        <div className="absolute bottom-10 left-10 w-72 h-72 bg-orange-500/10 rounded-full blur-2xl pointer-events-none -z-10" />
+
+        <div className="max-w-6xl mx-auto text-center relative z-10">
+          
+          {/* Badge officiel de Tiger and Light LLC */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-6 sm:mb-8 border backdrop-blur-md shadow-sm transition-transform hover:scale-105 duration-200 bg-white/70 dark:bg-zinc-900/80 border-zinc-300/80 dark:border-zinc-700/70 text-zinc-800 dark:text-zinc-200">
+            <Sparkles className="w-4 h-4 text-[#FF6B00]" />
+            <span>Par <strong className="font-bold text-blue-600 dark:text-blue-400">Tiger and Light LLC</strong></span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6">
-            EXILE
+          {/* Titre Principal EXILE */}
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight mb-4 sm:mb-6">
+            <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-[#FF6B00] bg-clip-text text-transparent drop-shadow-sm">
+              EXILE
+            </span>
           </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-3 sm:mb-4 max-w-3xl mx-auto px-2">
+
+          {/* Sous-titre percutant */}
+          <p className="text-xl sm:text-2xl md:text-3xl font-extrabold mb-4 sm:mb-6 max-w-3xl mx-auto text-zinc-900 dark:text-white leading-tight">
             La plateforme 3-en-1 qui sépare les mondes
           </p>
-          <p className="text-base sm:text-lg text-white/70 mb-8 sm:mb-12 max-w-2xl mx-auto px-2">
-            Professionnel. Social institutionnel. Divertissement. <br className="hidden sm:block" />
-            Chacun sa place, chacun sa crédibilité.
+
+          {/* Description claire */}
+          <p className="text-sm sm:text-base md:text-lg text-zinc-600 dark:text-zinc-400 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
+            <span className="font-semibold text-zinc-800 dark:text-zinc-200">Professionnel. Social institutionnel. Divertissement.</span><br />
+            Chacun sa place, chacun son écosystème, chacun sa crédibilité.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4 px-4">
+          {/* Boutons d'Action Principaux */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4 max-w-md sm:max-w-none mx-auto">
             <Link
               to="/pro"
-              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto shadow-lg shadow-blue-600/30"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm sm:text-base text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-500/25 transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 group"
             >
+              <Play className="w-4 h-4 fill-white group-hover:scale-110 transition-transform" />
               <span>Accéder directement aux Vidéos Pro</span>
-              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
+
             <Link
               to="/register"
-              className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 text-white hover:bg-zinc-700 border border-zinc-700' : 'bg-white text-primary hover:bg-gray-100'} font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto`}
+              className={`w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm sm:text-base transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 border shadow-sm ${
+                isDark 
+                  ? 'bg-zinc-800/90 hover:bg-zinc-700/90 text-white border-zinc-700' 
+                  : 'bg-white hover:bg-zinc-100 text-zinc-900 border-zinc-300'
+              }`}
             >
               <span>Créer un compte</span>
             </Link>
           </div>
 
+          {/* Garanties rapides */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-12 sm:mt-16 pt-8 border-t border-zinc-200 dark:border-zinc-800/80 text-left">
+            {[
+              { icon: Layers, title: 'Feeds 100% Étanches', desc: 'Zéro mélange de genres' },
+              { icon: ShieldCheck, title: 'Vérification Réelle', desc: 'Identité & institutions' },
+              { icon: TrendingUp, title: 'Monétisation Pro', desc: 'Lives, devis, billetterie' },
+              { icon: Lock, title: 'Données Protégées', desc: 'Confidentialité totale' }
+            ].map((g, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/40 dark:bg-zinc-900/40 border border-zinc-200/60 dark:border-zinc-800/50">
+                <div className="w-9 h-9 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
+                  <g.icon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold truncate text-zinc-900 dark:text-white">{g.title}</p>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{g.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
         </div>
       </section>
 
-      {/* Modules Section */}
-      <section className={`py-12 sm:py-16 md:py-20 px-4 ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-white'}`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-8 sm:mb-12 md:mb-16">
-            <h2 className={`text-2xl sm:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3 sm:mb-4`}>
-              Trois modules. Une vision claire.
-            </h2>
-            <p className={`${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'} max-w-2xl mx-auto px-4 text-sm sm:text-base`}>
-              EXILE ne mélange pas les genres. Chaque module est étanche, 
-              sécurisé et conçu pour sa mission spécifique.
-            </p>
-          </div>
+      {/* ── 2. SECTION DES 3 MODULES ÉTANCHES ── */}
+      <section className="py-16 sm:py-24 px-4 max-w-6xl mx-auto">
+        <div className="text-center mb-12 sm:mb-16">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#FF6B00] mb-2 block">
+            Architecture Innovante
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-black mb-4">
+            Trois modules. Une vision claire.
+          </h2>
+          <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+            EXILE ne mélange pas les genres. Chaque module possède son propre algorithme, 
+            ses critères de publication et ses fonctionnalités dédiées.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            {/* Module Professional */}
-            <div className="bg-gradient-to-br from-pro/5 to-pro/10 rounded-2xl p-5 sm:p-6 md:p-8 border border-pro/20">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-pro/20 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
-                <Briefcase className="w-5 h-5 sm:w-7 sm:h-7 text-pro" />
+          {/* CARTE 1 : Module Professionnel */}
+          <div className="relative rounded-3xl p-6 sm:p-7 flex flex-col justify-between border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-gradient-to-b from-orange-500/5 via-transparent to-transparent border-orange-500/30 dark:border-orange-500/20">
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-13 h-13 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center shadow-inner">
+                  <Briefcase className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wide bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                  Actif
+                </span>
               </div>
-              <h3 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2 sm:mb-3`}>
+
+              <h3 className="text-xl font-bold mb-2 text-zinc-900 dark:text-white">
                 Professionnel
               </h3>
-              <p className={`${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-4 sm:mb-6 text-sm sm:text-base`}>
-                Vidéos d'expertise, lives payants, marketplace de compétences. 
-                Monétisez votre savoir-faire avec commission 15%.
+              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+                Partagez votre expertise, organisez des lives et webinaires, recevez des demandes de devis et monétisez votre savoir-faire en toute crédibilité.
               </p>
-              <ul className="space-y-1.5 sm:space-y-2 mb-4 sm:mb-6">
-                <li className={`flex items-center text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pro mr-2" />
-                  Profils créateurs
-                </li>
-                <li className={`flex items-center text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pro mr-2" />
-                  Système de demandes
-                </li>
-                <li className={`flex items-center text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pro mr-2" />
-                  Revenus directs
-                </li>
-              </ul>
-              <Link
-                to="/register"
-                className="text-pro font-semibold hover:underline flex items-center text-sm sm:text-base"
-              >
-                Rejoindre <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1" />
-              </Link>
-            </div>
-            
-            {/* Module Social */}
-            <div className="bg-gradient-to-br from-social/5 to-social/10 rounded-2xl p-5 sm:p-6 md:p-8 border border-social/20">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-social/20 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
-                <Building2 className="w-5 h-5 sm:w-7 sm:h-7 text-social" />
+
+              <div className="space-y-2.5 mb-6 text-xs sm:text-sm">
+                {[
+                  "Vidéos d'expertise éducatives et techniques",
+                  "Système de demandes de contact & devis",
+                  "Lives interactifs et billetterie d'événements",
+                  "Profils pwofesyonèl vérifiés avec compétences"
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-zinc-700 dark:text-zinc-300">{item}</span>
+                  </div>
+                ))}
               </div>
-              <h3 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2 sm:mb-3`}>
+            </div>
+
+            <Link
+              to="/pro"
+              className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-[#FF6B00] hover:bg-[#e05e00] shadow-md shadow-orange-500/20 transition-all flex items-center justify-center gap-2"
+            >
+              <span>Accéder à l'Espace Pro</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* CARTE 2 : Module Social Institutionnel */}
+          <div className="relative rounded-3xl p-6 sm:p-7 flex flex-col justify-between border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-gradient-to-b from-blue-500/5 via-transparent to-transparent border-blue-500/30 dark:border-blue-500/20">
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-13 h-13 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center shadow-inner">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wide bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                  Institutionnel
+                </span>
+              </div>
+
+              <h3 className="text-xl font-bold mb-2 text-zinc-900 dark:text-white">
                 Social Institutionnel
               </h3>
-              <p className={`${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-4 sm:mb-6 text-sm sm:text-base`}>
-                Institutions vérifiées uniquement. Alertes officielles, 
-                recrutement, appels d'offres et forums sécurisés.
+              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+                L'espace de communication fiable pour les universités, ONG, institutions publiques, ambassades et associations enregistrées.
               </p>
-              <ul className="space-y-1.5 sm:space-y-2 mb-4 sm:mb-6">
-                <li className={`flex items-center text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-social mr-2" />
-                  Badge vérifié
-                </li>
-                <li className={`flex items-center text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-social mr-2" />
-                  Alertes prioritaires
-                </li>
-                <li className={`flex items-center text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-social mr-2" />
-                  Recrutement sécurisé
-                </li>
-              </ul>
-              <Link
-                to="/social/institution/request"
-                className="text-social font-semibold hover:underline flex items-center text-sm sm:text-base"
-              >
-                Demander compte <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1" />
-              </Link>
+
+              <div className="space-y-2.5 mb-6 text-xs sm:text-sm">
+                {[
+                  "Badges de vérification officielle",
+                  "Diffusion d'alertes citoyennes prioritaires",
+                  "Publication d'offres d'emploi & recrutement",
+                  "Forums de discussion sécurisés et modérés"
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-zinc-700 dark:text-zinc-300">{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            
-            {/* Module Funny - Coming Soon */}
-            <div className={`bg-gradient-to-br ${resolvedTheme === 'dark' ? 'from-gray-800 to-gray-900 border-gray-700' : 'from-gray-100 to-gray-50 border-gray-200'} rounded-2xl p-5 sm:p-6 md:p-8 border relative`}>
-              <div className="absolute top-3 sm:top-4 right-3 sm:right-4 bg-orange-100 text-orange-700 text-[10px] sm:text-xs font-semibold px-2 sm:px-3 py-1 rounded-full">
-                Bientôt
+
+            <Link
+              to="/social/institution/request"
+              className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
+            >
+              <span>Demande de Compte Institution</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* CARTE 3 : Module Funny (Divertissement) */}
+          <div className="relative rounded-3xl p-6 sm:p-7 flex flex-col justify-between border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-gradient-to-b from-purple-500/5 via-transparent to-transparent border-purple-500/30 dark:border-purple-500/20">
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-13 h-13 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center shadow-inner">
+                  <Video className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wide bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
+                  Bientôt
+                </span>
               </div>
-              <div className={`w-12 h-12 sm:w-14 sm:h-14 ${resolvedTheme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded-xl flex items-center justify-center mb-4 sm:mb-6`}>
-                <Video className="w-5 h-5 sm:w-7 sm:h-7 text-gray-400" />
-              </div>
-              <h3 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2 sm:mb-3`}>
-                Funny
+
+              <h3 className="text-xl font-bold mb-2 text-zinc-900 dark:text-white">
+                Funny & Divertissement
               </h3>
-              <p className={`${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-4 sm:mb-6 text-sm sm:text-base`}>
-                Divertissement court-forme. Cadeaux virtuels, fan clubs, 
-                monétisation par engagement.
+              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+                Le format court axé sur la créativité et la bonne humeur. Un espace libre sans jamais interférer avec le contenu sérieux des autres modules.
               </p>
-              <ul className="space-y-1.5 sm:space-y-2 mb-4 sm:mb-6">
-                <li className="flex items-center text-xs sm:text-sm text-gray-400">
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-300 mr-2" />
-                  Vidéos courtes
-                </li>
-                <li className="flex items-center text-xs sm:text-sm text-gray-400">
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-300 mr-2" />
-                  Fan clubs
-                </li>
-                <li className="flex items-center text-xs sm:text-sm text-gray-400">
-                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-300 mr-2" />
-                  Cadeaux virtuels
-                </li>
+
+              <div className="space-y-2.5 mb-6 text-xs sm:text-sm">
+                {[
+                  "Vidéos courtes divertissantes et dynamiques",
+                  "Cadeaux virtuels et pourboires créateurs",
+                  "Clubs de fans et badges de soutien",
+                  "Algorithme dédié au divertissement pur"
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-zinc-700 dark:text-zinc-300">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              disabled
+              className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800/80 cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <span>Disponible prochainement</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── 3. POURQUOI CETTE SÉPARATION EST UNIQUE ? ── */}
+      <section className="py-16 px-4 border-y border-zinc-200/60 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-black mb-3 text-zinc-900 dark:text-white">
+              Pourquoi EXILE sépare les mondes ?
+            </h2>
+            <p className="text-xs sm:text-sm md:text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
+              Sur les réseaux classiques, une information d'urgence gouvernementale ou une masterclass médicale est perdue entre deux mèmes. EXILE redonne à chaque contenu sa dignité.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 rounded-2xl border border-red-500/20 bg-red-500/5">
+              <h3 className="text-base font-bold text-red-600 dark:text-red-400 mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Sur les plateformes traditionnelles
+              </h3>
+              <ul className="space-y-2 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
+                <li>• Algorithmes biaisés favorisant le buzz au détriment de l'expertise.</li>
+                <li>• Confusion permanente entre opinions personnelles et annonces officielles.</li>
+                <li>• Faible taux de conversion pour les professionnels qualifiés.</li>
               </ul>
-              <span className="text-gray-400 font-semibold cursor-not-allowed text-sm sm:text-base">
-                Disponible après lancement
-              </span>
+            </div>
+
+            <div className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
+              <h3 className="text-base font-bold text-emerald-600 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                L'Approche Révolutionnaire EXILE
+              </h3>
+              <ul className="space-y-2 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
+                <li>• Cloisonnement étanche : le pro reste pro, le social reste institutionnel.</li>
+                <li>• Vérification d'identité et de compétences réelle.</li>
+                <li>• Relations directes : contact client sans intermédiaire ni distraction.</li>
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-12 sm:py-16 md:py-20 px-4 bg-gradient-to-br from-primary to-secondary">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
-            Prêt à rejoindre EXILE ?
+      {/* ── 4. CTA FINAL ── */}
+      <section className="py-16 sm:py-20 px-4 text-center">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-2xl sm:text-4xl font-black mb-4 text-zinc-900 dark:text-white">
+            Prêt à rejoindre l'écosystème EXILE ?
           </h2>
-          <p className="text-base sm:text-lg md:text-xl text-white/80 mb-6 sm:mb-8 px-4">
-            Créez votre compte professionnel gratuitement ou demandez 
-            la création d'un compte institutionnel vérifié.
+          <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mb-8 max-w-xl mx-auto">
+            Créez votre compte professionnel gratuitement ou visitez directement le catalogue des vidéos d'expertise.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4 px-4">
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               to="/register"
-              className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-white text-primary hover:bg-gray-100'} font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl transition-colors w-full sm:w-auto`}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-all active:scale-95"
             >
-              Créer un compte Pro
+              Créer mon compte professionnel
             </Link>
             <Link
-              to="/social/institution/request"
-              className="border-2 border-white text-white font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl hover:bg-white/10 transition-colors w-full sm:w-auto"
+              to="/pro"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-sm border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95"
             >
-              Demander compte Institution
+              Découvrir les vidéos
             </Link>
           </div>
         </div>
       </section>
+
     </div>
   )
 }

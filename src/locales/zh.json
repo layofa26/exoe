@@ -26,7 +26,7 @@
     "error": "发生错误",
     "search": "搜索...",
     "back": "返回",
-    "logout": "退出登录",
+    "logout": "退出",
     "yes": "是",
     "no": "否",
     "new": "新建",
@@ -62,7 +62,12 @@
     "noResultsFound": "未找到相关结果",
     "viewAll": "查看全部",
     "follow": "关注",
-    "following": "已关注"
+    "following": "已关注",
+    "confirmLogoutTitle": "退出登录",
+    "confirmLogout": "您确定要退出 EXILE 账户吗？",
+    "information": "信息",
+    "ok": "好的",
+    "month": "月"
   },
   "nav": {
     "home": "首页",
@@ -78,7 +83,8 @@
   "settings": {
     "sections": {
       "main": "General Settings",
-      "security": "Account & Security"
+      "security": "Account & Security",
+      "account": "账户"
     },
     "categories": {
       "account": "Account & Profile",
@@ -111,7 +117,26 @@
       "dangerZoneClean": "Danger Zone",
       "deleteAccountTitle": "Delete Account",
       "dangerZoneDescClean": "This action permanently deletes your profile, videos, and all data.",
-      "deleteAccount": "Delete account permanently"
+      "deleteAccount": "Delete account permanently",
+      "changePasswordClean": "修改密码",
+      "changePassword": "修改密码",
+      "changePasswordTitle": "更改密码",
+      "currentPasswordPlaceholder": "当前密码",
+      "newPasswordPlaceholder": "新密码（至少8位）",
+      "confirmPasswordPlaceholder": "确认新密码",
+      "emailAssociated": "绑定邮箱",
+      "noEmailRegistered": "未填写（通过手机号注册）",
+      "addEmailClean": "添加邮箱地址",
+      "addEmailTitle": "添加邮箱地址",
+      "currentEmailLabel": "当前邮箱地址",
+      "newEmailLabel": "新邮箱地址",
+      "newEmailPlaceholder": "name@example.com",
+      "passwordConfirmLabel": "确认密码",
+      "passwordConfirmPlaceholder": "输入密码以确认",
+      "usernameLabel": "用户名",
+      "usernameLockNotice": "修改已锁定。将在 {{days}} 天后开放。",
+      "usernameCanModify": "您可以修改用户名",
+      "usernameHelp": "每月可修改一次。公开可见。"
     },
     "premium": {
       "currentPlanTitle": "Current Plan",
@@ -145,7 +170,141 @@
       "contentHighlight": "Content highlight",
       "customLink": "Custom professional link",
       "prioritySupport": "Priority support",
-      "monthlyBonus": "1 visibility bonus / month"
+      "monthlyBonus": "1 visibility bonus / month",
+      "viewOffers": "查看方案",
+      "invoiceDesc": "查看并下载您过去的账单和交易记录。",
+      "tableDate": "日期",
+      "tablePlan": "套餐",
+      "tableAmount": "金额",
+      "tableStatus": "状态",
+      "tableInvoice": "发票",
+      "registration": "注册",
+      "free": "免费"
+    },
+    "title": "设置",
+    "subtitle": "管理您的个人信息、安全和平台偏好。",
+    "logoutDesc": "退出登录",
+    "privacy": {
+      "whoCanContactTitle": "谁可以联系我？",
+      "everyone": "所有人",
+      "everyoneDesc": "所有在 Exile 注册的会员都可以向您发送私信。",
+      "followers": "仅我的关注者",
+      "followersDesc": "只有关注您账户的会员才能私信联系您。",
+      "verifiedPro": "已认证专业人士",
+      "verifiedProDesc": "只有拥有已验证职业/身份的用户才能向您发送消息。",
+      "nobody": "无人（隐私模式）",
+      "nobodyDesc": "阻止发起任何新会话。现有对话仍然有效。",
+      "onlineStatusTitle": "显示我的在线状态",
+      "onlineStatusDesc": "允许联系人查看您当前是否在线活跃",
+      "profileVisibilityTitle": "个人资料公开范围",
+      "public": "公开（对所有访客和会员可见）",
+      "members": "仅会员（登录后可见）",
+      "private": "私密（仅互相关注者可见）",
+      "blockedUsersTitle": "已屏蔽用户",
+      "noBlocked": "屏蔽名单为空",
+      "unblock": "解除屏蔽"
+    },
+    "security": {
+      "authProtection": "身份验证与防护",
+      "twoFactor": "双重身份验证 (2FA)",
+      "twoFactorActive": "2FA 已开启",
+      "twoFactorInactive": "2FA 已关闭",
+      "twoFactorMethodTotp": "通过身份验证器应用受保护（Google TOTP / Authy）。",
+      "twoFactorMethodEmail": "通过电子邮件验证码受保护。",
+      "twoFactorDesc": "在每次新登录尝试时都需要提供额外的安全验证码。",
+      "twoFactorDisableBtn": "关闭 2FA",
+      "twoFactorEnableBtn": "开启 2FA",
+      "confirmDisable2FA": "确认关闭",
+      "sessionsTitle": "活跃会话与设备",
+      "refresh": "刷新",
+      "thisDevice": "当前设备",
+      "revokeSessionTitle": "下线该设备",
+      "revokeSessionMsg": "您确定要远程退出此设备吗？",
+      "disconnect": "下线",
+      "passwordSecurityTitle": "账户密码",
+      "passwordSecurityDesc": "出于安全原因，您当前的密码将被严格保密并隐藏。",
+      "twoFactorModalTitle": "设置双重身份验证",
+      "twoFactorModalDesc": "选择您的双重身份验证方式：",
+      "twoFactorScanQR": "1. 使用 Google Authenticator 或 Authy 扫描此二维码：",
+      "twoFactorSecretKey": "或者手动输入此密钥：",
+      "twoFactorEnterCode": "2. 输入生成的 6 位数字验证码：",
+      "twoFactorVerifyBtn": "验证并启用"
+    },
+    "notifications": {
+      "title": "通知偏好设置",
+      "subtitle": "选择您希望接收活动提醒的方式",
+      "saved": "通知偏好已成功保存至数据库。",
+      "email": "电子邮件通知",
+      "emailDesc": "通过 Resend 服务接收电子邮件提醒和摘要",
+      "push": "推送通知",
+      "pushDesc": "在浏览器或设备上接收即时通知",
+      "inApp": "应用内通知"
+    },
+    "app": {
+      "savedFeedback": "语言及地区偏好已成功更新。",
+      "themeDark": "🌙 深色模式",
+      "themeLight": "☀️ 浅色模式",
+      "themeAuto": "💻 跟随系统",
+      "languageTitle": "平台语言",
+      "timezoneTitle": "时区",
+      "timezoneDesc": "将发布时间和通知与您所在的地区同步"
+    },
+    "video": {
+      "autoplay": "启用随机播放",
+      "interval": "自动轮播间隔（秒）",
+      "dataSaver": "流量节省模式 (Data Saver)",
+      "dataSaverDesc": "自动调整视频质量以减少移动数据流量消耗",
+      "networkMode": "网络播放：Wi-Fi / 移动网络",
+      "networkModeDesc": "设置允许进行直播流和高清播放的网络连接类型。"
+    },
+    "support": {
+      "subtitle": "资源、文档与技术故障报告",
+      "aboutDesc": "平台的愿景、基础与使命",
+      "reportBug": "报告技术故障",
+      "bugModalTitle": "报告技术问题",
+      "bugModalSubtitle": "直接向 EXILE 技术工程师提交的反馈报告",
+      "bugCategoryLabel": "问题分类",
+      "bugCatVideo": "视频 / 播放器",
+      "bugCatLogin": "登录 / 安全 / 身份验证",
+      "bugCatAudio": "音频 / 视频声音",
+      "bugCatDisplay": "显示 / 界面 / 语言",
+      "bugCatOther": "其他故障",
+      "bugSubjectLabel": "主题概要",
+      "bugSubjectPlaceholder": "例如：点击后视频无法加载",
+      "bugDescLabel": "故障详细描述",
+      "bugDescPlaceholder": "请描述您的操作步骤以及发生的异常情况...",
+      "bugSubmitBtn": "提交报告"
+    },
+    "helpCenter": {
+      "badge": "帮助中心",
+      "searchTitle": "我们怎样帮助您？",
+      "searchSubtitle": "查找有关您的 EXILE 帐户的答案、指南和帮助。",
+      "searchPlaceholder": "在帮助中搜索...",
+      "catAccount": "账户与安全",
+      "catAccountDesc": "管理您的个人资料、密码和登录",
+      "catPayments": "付款与 Natcash",
+      "catPaymentsDesc": "购买、订阅和付款方式",
+      "catVideos": "视频与可见性",
+      "catVideosDesc": "视频的发布、隐私和覆盖范围",
+      "catEvents": "活动与直播",
+      "catEventsDesc": "组织和参加专业活动",
+      "catPrivacy": "隐私与屏蔽",
+      "catPrivacyDesc": "控制谁可以看到您并与您联系",
+      "catReport": "举报与错误",
+      "catReportDesc": "举报内容或技术问题",
+      "faqTitle": "常见问题"
+    },
+    "faq": {
+      "q1": "如何编辑我的个人资料？",
+      "a1": "前往设置 > 账户与个人资料 > 编辑个人资料以更新您的照片、简介和信息。",
+      "q2": "为什么我的视频没有出现在信息流中？",
+      "a2": "检查您的视频是否处于'已发布'状态，而非'草稿'。私密视频仅对您可见。",
+      "q3": "如何通过 Natcash 付款？",
+      "a3": "前往 Premium 区域，点击'升级 Premium'，然后按照说明将金额发送至指定的 Natcash 号码。",
+      "q4": "如何更改我的用户名？",
+      "a4": "前往设置 > 编辑个人资料。用户名每月只能更改一次。每次更改之间需等待 30 天。",
+      "q5": "如果我的账户被盗该怎么办？",
+      "a5": "立即更改密码并启用双重身份验证。通过'报告错误'按钮向我们报告问题。"
     }
   },
   "pro": {
@@ -220,7 +379,8 @@
       "country": "国家",
       "shareProfile": "分享个人主页",
       "viewsCount": "次主页浏览",
-      "editModalTitle": "编辑个人信息"
+      "editModalTitle": "编辑个人信息",
+      "viewProfile": "查看个人资料"
     },
     "feed": {
       "noResults": "未找到相关搜索结果",
@@ -580,6 +740,17 @@
       "kickedFromLive": "已被移出直播间。",
       "cameraOff": "摄像头已关闭",
       "handRaised": "已举手"
+    },
+    "subscriptions": {
+      "loadingVideos": "正在加载订阅的视频...",
+      "noVideos": "暂无视频",
+      "noSubs": "您尚未订阅任何专业人士。在下方发现建议以开始！",
+      "noVideosCategory": "您关注的创作者尚未在此类别发布任何视频。",
+      "recommended": "推荐专业人士",
+      "subscribe": "订阅"
+    },
+    "video": {
+      "videos": "视频"
     }
   },
   "header": {
@@ -684,5 +855,50 @@
     "twoFactorPlaceholder": "6位验证码",
     "twoFactorVerify": "确认登录",
     "twoFactorBackToLogin": "返回登录"
+  },
+  "payment": {
+    "subscribeBtn": "支付 20 美元 / 月（高级版）",
+    "methodsNotice": "Natcash（手动）、MonCash 和安全信用卡",
+    "chooseMethodTitle": "选择支付方式",
+    "chooseMethodSubtitle": "EXILE PRO 订阅 - 20.00 美元 / 月",
+    "natcashOptionTitle": "Natcash（手动转账）",
+    "natcashOptionDesc": "汇款至 EXILE PLATEFORME • 最多 4 小时内完成审核",
+    "popularHaiti": "海地",
+    "delayBadge": "审核时间：4小时以内",
+    "pgecomOptionTitle": "信用卡 / MonCash / PG Pay",
+    "pgecomOptionDesc": "PGecom 支付网关 • 自动即时线上支付",
+    "loginRequired": "您必须登录才能订阅。请重新登录。",
+    "sessionExpired": "会话已过期。请重新登录。",
+    "urlUnavailable": "支付链接不可用。",
+    "pgecomError": "在 PGecom 发起支付时发生错误。",
+    "statusApproved": "已批准",
+    "statusRejected": "已拒绝",
+    "statusPending": "审核中（4小时内）"
+  },
+  "natcash": {
+    "title": "Natcash 手动支付",
+    "subtitle": "直接转账给 EXILE PLATEFORME",
+    "recipientLabel": "收款方姓名：",
+    "numberLabel": "Natcash 号码：",
+    "amountLabel": "应付金额：",
+    "stepGuide": "拨打 *202# 或使用 Natcash 手机应用向上述号码转账。",
+    "validationDelay": "验证生效时间：最多 4 小时。",
+    "delayBadge": "审核周期：4小时以内",
+    "senderPhoneLabel": "付款人手机号码 *",
+    "transactionIdLabel": "Natcash 交易编号（短信中的代码）*",
+    "submitBtn": "确认提交付款",
+    "success": {
+      "title": "付款信息提交成功！",
+      "message": "我们已收到您的 Natcash 交易信息。EXILE PLATEFORME 团队将在最多 4 小时内完成审核并激活您的高级账户。"
+    },
+    "errors": {
+      "phoneRequired": "请提供用于转账的手机号码。",
+      "txnRequired": "请提供 Natcash 交易代码（确认短信中的编号）。",
+      "loginRequired": "您必须登录才能提交此项付款。",
+      "generic": "提交付款信息失败。请核对交易编号。",
+      "network": "网络连接错误。请检查您的网络设置。"
+    },
+    "exchangeRateTitle": "汇率",
+    "rateCalculation": "官方汇率: 1 USD = 144.75 HTG"
   }
 }

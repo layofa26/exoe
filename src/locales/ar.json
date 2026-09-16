@@ -62,7 +62,12 @@
     "noResultsFound": "لم يتم العثور على نتائج",
     "viewAll": "عرض الكل",
     "follow": "متابعة",
-    "following": "مُتابع"
+    "following": "مُتابع",
+    "confirmLogoutTitle": "تسجيل الخروج",
+    "confirmLogout": "هل أنت متأكد أنك تريد تسجيل الخروج من حسابك على EXILE؟",
+    "information": "معلومات",
+    "ok": "حسناً",
+    "month": "شهر"
   },
   "nav": {
     "home": "الرئيسية",
@@ -78,7 +83,8 @@
   "settings": {
     "sections": {
       "main": "General Settings",
-      "security": "Account & Security"
+      "security": "Account & Security",
+      "account": "الحساب"
     },
     "categories": {
       "account": "Account & Profile",
@@ -111,7 +117,26 @@
       "dangerZoneClean": "Danger Zone",
       "deleteAccountTitle": "Delete Account",
       "dangerZoneDescClean": "This action permanently deletes your profile, videos, and all data.",
-      "deleteAccount": "Delete account permanently"
+      "deleteAccount": "Delete account permanently",
+      "changePasswordClean": "تغيير كلمة المرور",
+      "changePassword": "تغيير كلمة المرور",
+      "changePasswordTitle": "تعديل كلمة المرور",
+      "currentPasswordPlaceholder": "كلمة المرور الحالية",
+      "newPasswordPlaceholder": "كلمة المرور الجديدة (8 أحرف على الأقل)",
+      "confirmPasswordPlaceholder": "تأكيد كلمة المرور الجديدة",
+      "emailAssociated": "البريد الإلكتروني المرتبط",
+      "noEmailRegistered": "غير محدد (التسجيل عبر الهاتف)",
+      "addEmailClean": "إضافة بريد إلكتروني",
+      "addEmailTitle": "إضافة بريد إلكتروني",
+      "currentEmailLabel": "البريد الإلكتروني الحالي",
+      "newEmailLabel": "البريد الإلكتروني الجديد",
+      "newEmailPlaceholder": "name@example.com",
+      "passwordConfirmLabel": "كلمة مرور التأكيد",
+      "passwordConfirmPlaceholder": "كلمة المرور للتحقق",
+      "usernameLabel": "اسم المستخدم",
+      "usernameLockNotice": "التعديل مقفل. متاح بعد {{days}} أيام.",
+      "usernameCanModify": "يمكنك تعديل اسم المستخدم الخاص بك",
+      "usernameHelp": "قابل للتعديل مرة واحدة في الشهر. مرئي للعموم."
     },
     "premium": {
       "currentPlanTitle": "Current Plan",
@@ -145,7 +170,141 @@
       "contentHighlight": "Content highlight",
       "customLink": "Custom professional link",
       "prioritySupport": "Priority support",
-      "monthlyBonus": "1 visibility bonus / month"
+      "monthlyBonus": "1 visibility bonus / month",
+      "viewOffers": "عرض العروض",
+      "invoiceDesc": "عرض وتنزيل فواتيرك ومعاملاتك السابقة.",
+      "tableDate": "التاريخ",
+      "tablePlan": "الخطة",
+      "tableAmount": "المبلغ",
+      "tableStatus": "الحالة",
+      "tableInvoice": "الفاتورة",
+      "registration": "التسجيل",
+      "free": "مجاني"
+    },
+    "title": "الإعدادات",
+    "subtitle": "إدارة معلوماتك الشخصية والأمان وتفضيلات المنصة.",
+    "logoutDesc": "تسجيل الخروج من جلستك",
+    "privacy": {
+      "whoCanContactTitle": "من يمكنه الاتصال بي؟",
+      "everyone": "الجميع",
+      "everyoneDesc": "يمكن لجميع الأعضاء المسجلين على Exile إرسال رسالة مباشرة إليك.",
+      "followers": "متابعيني فقط",
+      "followersDesc": "يمكن فقط للأعضاء المتابعين لحسابك الاتصال بك على الخاص.",
+      "verifiedPro": "المحترفون المعتمدون",
+      "verifiedProDesc": "يمكن فقط للملفات الشخصية ذات المهنة المعتمدة إرسال رسائل إليك.",
+      "nobody": "لا أحد (الوضع الخاص)",
+      "nobodyDesc": "يمنع إنشاء أي محادثة جديدة. تبقى محادثاتك الحالية نشطة.",
+      "onlineStatusTitle": "إظهار حالتي متصل",
+      "onlineStatusDesc": "يتيح لجهات اتصالك معرفة ما إذا كنت نشطاً حالياً على المنصة",
+      "profileVisibilityTitle": "مستوى ظهور ملفك الشخصي",
+      "public": "عام (مرئي لجميع الزوار والأعضاء)",
+      "members": "للأعضاء فقط (متاح بعد تسجيل الدخول)",
+      "private": "خاص (مرئي فقط للأصدقاء المشتركين)",
+      "blockedUsersTitle": "المستخدمون المحظورون",
+      "noBlocked": "لا يوجد مستخدمون محظورون في قائمتك",
+      "unblock": "إلغاء الحظر"
+    },
+    "security": {
+      "authProtection": "المصادقة والحماية",
+      "twoFactor": "المصادقة الثنائية (2FA)",
+      "twoFactorActive": "2FA مفعّلة",
+      "twoFactorInactive": "2FA معطلة",
+      "twoFactorMethodTotp": "محمي بواسطة تطبيق المصادقة (Google TOTP / Authy).",
+      "twoFactorMethodEmail": "محمي برمز التحقق عبر البريد الإلكتروني.",
+      "twoFactorDesc": "يتطلب رمز أمان إضافي عند كل محاولة تسجيل دخول جديدة.",
+      "twoFactorDisableBtn": "تعطيل 2FA",
+      "twoFactorEnableBtn": "تفعيل 2FA",
+      "confirmDisable2FA": "تأكيد التعطيل",
+      "sessionsTitle": "الجلسات النشطة والأجهزة",
+      "refresh": "تحديث",
+      "thisDevice": "هذا الجهاز",
+      "revokeSessionTitle": "تسجيل خروج الجهاز",
+      "revokeSessionMsg": "هل تريد حقاً تسجيل خروج هذا الجهاز عن بُعد؟",
+      "disconnect": "قطع الاتصال",
+      "passwordSecurityTitle": "كلمة مرور الحساب",
+      "passwordSecurityDesc": "تبقى كلمة المرور الحالية سرية للغاية ومخفية لأسباب أمنية.",
+      "twoFactorModalTitle": "إعداد المصادقة الثنائية",
+      "twoFactorModalDesc": "اختر طريقة المصادقة الثنائية الخاصة بك:",
+      "twoFactorScanQR": "1. امسح رمز الاستجابة السريعة هذا عبر Google Authenticator أو Authy:",
+      "twoFactorSecretKey": "أو أدخل هذا المفتاح السري يدوياً:",
+      "twoFactorEnterCode": "2. أدخل الرمز المكون من 6 أرقام المستخرج:",
+      "twoFactorVerifyBtn": "التحقق والتفعيل"
+    },
+    "notifications": {
+      "title": "تفضيلات الإشعارات",
+      "subtitle": "اختر الطريقة التي تفضلها لتلقي إشعارات الأنشطة",
+      "saved": "تم حفظ تفضيلات الإشعارات في قاعدة البيانات.",
+      "email": "إشعارات البريد الإلكتروني",
+      "emailDesc": "تلقي التنبيهات والملخصات عبر البريد الإلكتروني من خلال خدمة Resend",
+      "push": "إشعارات فورية (Push)",
+      "pushDesc": "تلقي تنبيهات مباشرة على متصفحك أو جهازك",
+      "inApp": "إشعارات داخل التطبيق"
+    },
+    "app": {
+      "savedFeedback": "تم تحديث اللغة والتفضيلات الإقليمية بنجاح.",
+      "themeDark": "🌙 الوضع الداكن",
+      "themeLight": "☀️ الوضع الفاتح",
+      "themeAuto": "💻 الوضع التلقائي للنظام",
+      "languageTitle": "لغة المنصة",
+      "timezoneTitle": "المنطقة الزمنية",
+      "timezoneDesc": "مزامنة أوقات النشر والإشعارات مع منطقتك"
+    },
+    "video": {
+      "autoplay": "تفعيل التشغيل التلقائي العشوائي",
+      "interval": "الفاصل الزمني للتدوير التلقائي (بالثواني)",
+      "dataSaver": "توفير البيانات (Data Saver)",
+      "dataSaverDesc": "يضبط جودة الفيديو تلقائياً لتقليل استهلاك باقة الإنترنت لديك",
+      "networkMode": "تشغيل الشبكة: Wi-Fi / بيانات الهاتف",
+      "networkModeDesc": "حدد نوع الاتصال الذي يسمح بالبث المباشر والدقة العالية."
+    },
+    "support": {
+      "subtitle": "الموارد والتوثيق والإبلاغ عن الأخطاء التقنية",
+      "aboutDesc": "رؤية المنصة ورسالتها وأهدافها",
+      "reportBug": "الإبلاغ عن خطأ تقني",
+      "bugModalTitle": "الإبلاغ عن مشكلة فنية",
+      "bugModalSubtitle": "تقرير مباشر يرسل إلى مهندسي EXILE",
+      "bugCategoryLabel": "فئة المشكلة",
+      "bugCatVideo": "الفيديوهات / مشغل الوسائط",
+      "bugCatLogin": "تسجيل الدخول / الأمان / المصادقة",
+      "bugCatAudio": "الصوت / صوت الفيديوهات",
+      "bugCatDisplay": "العرض / الواجهة / اللغة",
+      "bugCatOther": "مشكلة أخرى",
+      "bugSubjectLabel": "موضوع موجز",
+      "bugSubjectPlaceholder": "مثال: الفيديو لا يتم تحميله عند النقر",
+      "bugDescLabel": "وصف تفصيلي للخلل",
+      "bugDescPlaceholder": "صف ما كنت تفعله وما حدث بالتفصيل...",
+      "bugSubmitBtn": "إرسال التقرير"
+    },
+    "helpCenter": {
+      "badge": "مركز المساعدة",
+      "searchTitle": "كيف يمكننا مساعدتك؟",
+      "searchSubtitle": "ابحث عن إجابات وأدلة ومساعدة لحساب EXILE الخاص بك.",
+      "searchPlaceholder": "البحث في المساعدة...",
+      "catAccount": "الحساب والأمان",
+      "catAccountDesc": "إدارة ملفك الشخصي وكلمة المرور وتسجيل الدخول",
+      "catPayments": "المدفوعات وناتكاش",
+      "catPaymentsDesc": "المشتريات والاشتراكات وطرق الدفع",
+      "catVideos": "مقاطع الفيديو والرؤية",
+      "catVideosDesc": "نشر مقاطع الفيديو وخصوصيتها ومدى وصولها",
+      "catEvents": "الفعاليات والبث المباشر",
+      "catEventsDesc": "تنظيم الفعاليات المهنية والمشاركة فيها",
+      "catPrivacy": "الخصوصية والحجب",
+      "catPrivacyDesc": "تحكّم في من يمكنه رؤيتك والتواصل معك",
+      "catReport": "التقارير والأخطاء",
+      "catReportDesc": "الإبلاغ عن محتوى أو مشكلة تقنية",
+      "faqTitle": "الأسئلة المتكررة"
+    },
+    "faq": {
+      "q1": "كيف أعدّل ملفي الشخصي؟",
+      "a1": "اذهب إلى الإعدادات > الحساب والملف الشخصي > تعديل الملف الشخصي لتحديث صورتك وسيرتك الذاتية ومعلوماتك.",
+      "q2": "لماذا لا يظهر الفيديو الخاص بي في الخلاصة؟",
+      "a2": "تأكد من أن حالة مقطع الفيديو 'منشور' وليس 'مسودة'. تظهر مقاطع الفيديو الخاصة لك فقط.",
+      "q3": "كيف أجري دفعة عبر ناتكاش؟",
+      "a3": "انتقل إلى قسم Premium، وانقر على 'الانتقال إلى Premium' واتبع التعليمات لإرسال المبلغ إلى رقم ناتكاش المحدد.",
+      "q4": "كيف أغيّر اسم المستخدم الخاص بي؟",
+      "a4": "اذهب إلى الإعدادات > تعديل الملف الشخصي. يمكن تغيير اسم المستخدم مرة واحدة فقط في الشهر. يُشترط الانتظار 30 يومًا بين كل تغيير.",
+      "q5": "ماذا أفعل إذا تم اختراق حسابي؟",
+      "a5": "غيّر كلمة مرورك فوراً وفعّل المصادقة الثنائية. أبلغنا عن المشكلة عبر زر 'الإبلاغ عن خطأ'."
     }
   },
   "pro": {
@@ -220,7 +379,8 @@
       "country": "البلد",
       "shareProfile": "مشاركة الملف الشخصي",
       "viewsCount": "مشاهدات للملف الشخصي",
-      "editModalTitle": "تعديل معلومات الملف الشخصي"
+      "editModalTitle": "تعديل معلومات الملف الشخصي",
+      "viewProfile": "عرض الملف الشخصي"
     },
     "feed": {
       "noResults": "لم يتم العثور على نتائج لبحثك",
@@ -580,6 +740,17 @@
       "kickedFromLive": "تم طرده(ا) من البث المباشر.",
       "cameraOff": "الكاميرا معطلة",
       "handRaised": "اليد مرفوعة"
+    },
+    "subscriptions": {
+      "loadingVideos": "جارٍ تحميل مقاطع الفيديو الخاصة باشتراكاتك...",
+      "noVideos": "لا توجد مقاطع فيديو في الوقت الحالي",
+      "noSubs": "لم تشترك في أي محترف. اكتشف الاقتراحات أدناه للبدء!",
+      "noVideosCategory": "لم ينشر المبدعون الذين تتابعهم أي مقطع فيديو في هذه الفئة حتى الآن.",
+      "recommended": "المهنيون الموصى بهم",
+      "subscribe": "اشترك"
+    },
+    "video": {
+      "videos": "مقاطع فيديو"
     }
   },
   "header": {
@@ -684,5 +855,50 @@
     "twoFactorPlaceholder": "الرمز المكون من 6 أرقام",
     "twoFactorVerify": "تأكيد تسجيل الدخول",
     "twoFactorBackToLogin": "العودة لتسجيل الدخول"
+  },
+  "payment": {
+    "subscribeBtn": "دفع 20 دولارًا / شهريًا (بريميوم)",
+    "methodsNotice": "Natcash (يدوي)، MonCash وبطاقات آمنة",
+    "chooseMethodTitle": "اختر طريقة الدفع",
+    "chooseMethodSubtitle": "اشتراك EXILE PRO - 20.00 دولار أمريكي / شهر",
+    "natcashOptionTitle": "Natcash (تحويل يدوي)",
+    "natcashOptionDesc": "إرسال إلى EXILE PLATEFORME • التحقق في غضون 4 ساعات كحد أقصى",
+    "popularHaiti": "هايتي",
+    "delayBadge": "وقت التحقق: 4 ساعات كحد أقصى",
+    "pgecomOptionTitle": "بطاقة ائتمان / MonCash / PG Pay",
+    "pgecomOptionDesc": "بوابة PGecom • دفع إلكتروني فوري",
+    "loginRequired": "يجب تسجيل الدخول للاشتراك. يُرجى تسجيل الدخول مرة أخرى.",
+    "sessionExpired": "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
+    "urlUnavailable": "رابط الدفع غير متاح.",
+    "pgecomError": "خطأ أثناء بدء الدفع على PGecom.",
+    "statusApproved": "تم التحقق",
+    "statusRejected": "مرفوض",
+    "statusPending": "قيد الانتظار (في غضون 4 ساعات)"
+  },
+  "natcash": {
+    "title": "دفع يدوي عبر Natcash",
+    "subtitle": "تحويل مباشر إلى EXILE PLATEFORME",
+    "recipientLabel": "اسم المستفيد:",
+    "numberLabel": "رقم Natcash:",
+    "amountLabel": "المبلغ المحدد:",
+    "stepGuide": "اتصل بـ *202# أو استخدم تطبيق Natcash لإرسال المبلغ إلى الرقم أعلاه.",
+    "validationDelay": "وقت التحقق: 4 ساعات كحد أقصى.",
+    "delayBadge": "مهلة التحقق: 4 ساعات كحد أقصى",
+    "senderPhoneLabel": "رقم الهاتف الذي أرسل المال *",
+    "transactionIdLabel": "معرف المعاملة من Natcash (الرمز الموجود في الرسالة) *",
+    "submitBtn": "تأكيد دفعتي",
+    "success": {
+      "title": "تم تسجيل الدفع بنجاح!",
+      "message": "لقد تلقينا معاملة Natcash الخاصة بك. سيقوم فريق EXILE PLATEFORME بالتحقق منها وتفعيل حسابك المتميز في غضون 4 ساعات كحد أقصى."
+    },
+    "errors": {
+      "phoneRequired": "يرجى تقديم رقم الهاتف المستخدم لإرسال التحويل.",
+      "txnRequired": "يرجى إدخال معرف معاملة Natcash (الرمز الموجود في رسالة التأكيد القصيرة).",
+      "loginRequired": "يجب أن تكون مسجلاً للدخول لإرسال هذه الدفعة.",
+      "generic": "حدث خطأ أثناء تسجيل الدفع. يرجى التحقق من الرمز.",
+      "network": "خطأ في الاتصال. يرجى التحقق من اتصالك بالإنترنت."
+    },
+    "exchangeRateTitle": "سعر الصرف",
+    "rateCalculation": "السعر الرسمي: 1 USD = 144.75 HTG"
   }
 }

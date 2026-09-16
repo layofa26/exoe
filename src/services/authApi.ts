@@ -467,6 +467,63 @@ export const authApi = {
     } catch (err) {
       return { success: false, error: 'Erreur de connexion au serveur.' }
     }
+  },
+
+  /**
+   * Authentification sécurisée Google OAuth2
+   * Endpoint: POST /api/v1/users/google/ ou /api/v1/auth/google/
+   */
+  async googleAuth(payload: {
+    id_token?: string
+    access_token?: string
+    birth_date?: string
+    gender?: string
+    profession?: string
+    specialty?: string
+  }): Promise<{
+    success: boolean
+    is_new_user?: boolean
+    needs_profile_completion?: boolean
+    google_profile?: {
+      email: string
+      full_name: string
+      avatar_url?: string
+    }
+    data?: {
+      access: string
+      refresh: string
+      user: any
+    }
+    error?: string
+  }> {
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/google/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || "Erreur lors de l'authentification Google"
+        }
+      }
+      return {
+        success: true,
+        is_new_user: data.is_new_user,
+        needs_profile_completion: data.needs_profile_completion,
+        google_profile: data.google_profile,
+        data: data.access ? { access: data.access, refresh: data.refresh, user: data.user } : undefined
+      }
+    } catch (err) {
+      return {
+        success: false,
+        error: 'Erreur de communication avec le serveur Exile.'
+      }
+    }
   }
 }
 

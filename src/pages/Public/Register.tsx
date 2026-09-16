@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { jwtDecode } from 'jwt-decode'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { searchProfessions, isValidProfession, ALL_PROFESSIONS } from '../../config/professions'
 import { isReservedName } from '../../constants/reservedNames'
 import { PhoneInput } from '../../components/common/PhoneInput'
 import { validateEmail } from '../../utils/emailValidation'
+import { SocialButtons } from '../../components/auth/SocialButtons'
+import { SocialCompleteModal, type SocialUserData, type CompleteProfileData } from '../../components/auth/SocialCompleteModal'
 import type { ProfessionValidation } from '../../types'
 import {
   Lock,
@@ -35,7 +38,7 @@ interface FormData {
 }
 
 export const Register = (): JSX.Element => {
-  const { registerPro } = useAuth()
+  const { registerPro, loginWithGoogle } = useAuth()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
 
@@ -56,15 +59,123 @@ export const Register = (): JSX.Element => {
   })
 
   const [showPassword, setShowPassword] = useState<boolean>(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
-  const [professionSuggestions, setProfessionSuggestions] = useState<string[]>([])
   const [showProfessionDropdown, setShowProfessionDropdown] = useState<boolean>(false)
+  const [professionSuggestions, setProfessionSuggestions] = useState<string[]>([])
   const [professionValidation, setProfessionValidation] = useState<ProfessionValidation | null>(null)
   const [isPhoneInput, setIsPhoneInput] = useState<boolean>(false)
   const [isPhoneValid, setIsPhoneValid] = useState<boolean>(false)
   const [isEmailValid, setIsEmailValid] = useState<boolean>(false)
   const [showWelcome, setShowWelcome] = useState<boolean>(false)
+  const [socialUser, setSocialUser] = useState<SocialUserData | null>(null)
+  const [showSocialModal, setShowSocialModal] = useState<boolean>(false)
+
+  const handleSocialSelect = async (provider: 'google') => {
+    if (provider === 'google') {
+      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1066102624726-tqcs9mv5j9ngtrco6dphca8j2evh74eo.apps.googleusercontent.com'
+      
+      // Essayer le TokenClient officiel Google (ouvre le vrai popup OAuth)
+      if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+        try {
+          const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+            client_id: googleClientId,
+            scope: 'openid email profile',
+            callback: async (tokenResponse: any) => {
+              if (tokenResponse?.access_token) {
+                // Tenter la connexion/enregistrement sécurisé auprès du backend Django
+                const authResult = await loginWithGoogle({ access_token: tokenResponse.access_token })
+                if (authResult.success) {
+                  if (authResult.needs_profile_completion) {
+                    // Nouvel utilisateur : ouvrir le modal pour recueillir les 3 champs
+                    setSocialUser({
+                      provider: 'google',
+                      fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
+                      email: authResult.google_profile?.email || '',
+                      avatarUrl: authResult.google_profile?.avatar_url,
+                      idToken: tokenResponse.access_token
+                    })
+                    setShowSocialModal(true)
+                  }
+                  // Si déjà existant, loginWithGoogle a déjà connecté l'utilisateur et redirigé vers /pro !
+                  return
+                } else {
+                  setError(authResult.error || "Erreur d'authentification Google")
+                }
+              }
+            }
+          })
+          tokenClient.requestAccessToken({ prompt: 'select_account' })
+          return
+        } catch (err) {
+          console.error('Erreur TokenClient Google:', err)
+        }
+      }
+
+      // Fallback GIS One-Tap
+      if (typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
+        try {
+          (window as any).google.accounts.id.initialize({
+            client_id: googleClientId,
+            callback: async (response: any) => {
+              if (response?.credential) {
+                const authResult = await loginWithGoogle({ id_token: response.credential })
+                if (authResult.success) {
+                  if (authResult.needs_profile_completion) {
+                    setSocialUser({
+                      provider: 'google',
+                      fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
+                      email: authResult.google_profile?.email || '',
+                      avatarUrl: authResult.google_profile?.avatar_url,
+                      idToken: response.credential
+                    })
+                    setShowSocialModal(true)
+                  }
+                  return
+                } else {
+                  setError(authResult.error || "Erreur d'authentification Google")
+                }
+              }
+            }
+          });
+          (window as any).google.accounts.id.prompt()
+          return
+        } catch (err) {
+          console.error('Erreur GIS:', err)
+        }
+      }
+    }
+  }
+
+  const handleSocialComplete = async (profileData: CompleteProfileData) => {
+    if (!socialUser) return { success: false, error: 'Données utilisateur manquantes' }
+    
+    // Finaliser via loginWithGoogle avec vérification cryptographique 100% sécurisée
+    if (socialUser.provider === 'google' && socialUser.idToken) {
+      const authResult = await loginWithGoogle({
+        access_token: socialUser.idToken,
+        id_token: socialUser.idToken,
+        birth_date: profileData.birthDate,
+        gender: profileData.gender,
+        profession: profileData.profession,
+        specialty: profileData.specialty
+      })
+
+      if (authResult.success) {
+        setShowSocialModal(false)
+        setShowWelcome(true)
+        setTimeout(() => {
+          navigate('/pro')
+        }, 2000)
+        return { success: true }
+      } else {
+        return { success: false, error: authResult.error || "Erreur lors de la finalisation Google" }
+      }
+    }
+
+    return { success: false, error: "Fournisseur social non reconnu" }
+  }
 
   useEffect(() => {
     if (formData.profession.length >= 2) {
@@ -102,35 +213,12 @@ export const Register = (): JSX.Element => {
   }
 
   const validateStep1 = (): boolean => {
-    if (!formData.fullName || (!formData.email && !isPhoneInput) || (!formData.phone && isPhoneInput) || !formData.password) {
-      setError('Veuillez remplir tous les champs obligatoires')
-      return false
-    }
-    if (!formData.birthDay || !formData.birthMonth || !formData.birthYear) {
-      setError('Veuillez remplir la date de naissance complète')
-      return false
-    }
-    if (!formData.gender) {
-      setError('Veuillez sélectionner votre genre')
-      return false
-    }
-
-    // Validation téléphone ou email
-    if (isPhoneInput) {
-      if (!formData.phone || !isPhoneValid) {
-        setError('Veuillez saisir un numéro de téléphone valide')
-        return false
-      }
-    } else {
-      const emailValidation = validateEmail(formData.email)
-      if (!emailValidation.valid) {
-        setError(emailValidation.error || 'Email invalide')
-        return false
-      }
-    }
-
-    // Validation nom complet
+    // 1. Nom complet requis
     const trimmedFullName = formData.fullName.trim()
+    if (!trimmedFullName) {
+      setError('Veuillez renseigner votre nom complet')
+      return false
+    }
 
     if (trimmedFullName.length < 3 || trimmedFullName.length > 100) {
       setError('Le nom complet doit contenir entre 3 et 100 caractères')
@@ -140,7 +228,7 @@ export const Register = (): JSX.Element => {
     // Vérifier que le nom contient au moins deux parties (nom et prénom)
     const nameParts = trimmedFullName.split(/\s+/).filter(part => part.length > 0)
     if (nameParts.length < 2) {
-      setError('Le nom complet doit contenir au moins un nom et un prénom')
+      setError('Le nom complet doit contenir au moins un nom et un prénom (séparés par un espace)')
       return false
     }
 
@@ -149,25 +237,70 @@ export const Register = (): JSX.Element => {
       setError('Ce nom ne peut pas être utilisé')
       return false
     }
-    
-    // Vérifier âge minimum 18 ans
-    const birthDate = new Date(`${formData.birthYear}-${formData.birthMonth}-${formData.birthDay}`)
+
+    // 2. Date de naissance complète
+    if (!formData.birthDay || !formData.birthMonth || !formData.birthYear) {
+      setError('Veuillez renseigner la date de naissance complète (Jour, Mois, Année)')
+      return false
+    }
+
+    const day = parseInt(formData.birthDay, 10)
+    const month = parseInt(formData.birthMonth, 10)
+    const year = parseInt(formData.birthYear, 10)
+
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      setError('Date de naissance invalide')
+      return false
+    }
+
+    const birthDateObj = new Date(year, month - 1, day)
+    if (isNaN(birthDateObj.getTime()) || birthDateObj.getFullYear() !== year) {
+      setError('Date de naissance invalide')
+      return false
+    }
+
     const today = new Date()
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    let age = today.getFullYear() - birthDateObj.getFullYear()
+    const monthDiff = today.getMonth() - birthDateObj.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
       age--
     }
+
     if (age < 18) {
       setError('Vous devez avoir au moins 18 ans pour créer un compte professionnel')
       return false
     }
-    if (isNaN(birthDate.getTime())) {
-      setError('Date de naissance invalide')
+
+    // 3. Genre obligatoire
+    if (!formData.gender) {
+      setError('Veuillez sélectionner votre genre')
       return false
     }
-    
-    // Validation mot de passe simplifiée
+
+    // 4. Validation téléphone ou email
+    if (isPhoneInput) {
+      if (!formData.phone || !isPhoneValid) {
+        setError('Veuillez saisir un numéro de téléphone valide avec l\'indicatif')
+        return false
+      }
+    } else {
+      if (!formData.email) {
+        setError('Veuillez renseigner votre adresse e-mail')
+        return false
+      }
+      const emailValidation = validateEmail(formData.email)
+      if (!emailValidation.valid) {
+        setError(emailValidation.error || 'Adresse email invalide')
+        return false
+      }
+    }
+
+    // 5. Mot de passe
+    if (!formData.password) {
+      setError('Veuillez définir un mot de passe')
+      return false
+    }
+
     if (formData.password.length < 8) {
       setError('Le mot de passe doit contenir au moins 8 caractères')
       return false
@@ -177,16 +310,16 @@ export const Register = (): JSX.Element => {
       setError('Les mots de passe ne correspondent pas')
       return false
     }
+
     return true
   }
 
   const validateStep2 = (): boolean => {
-    if (!formData.gender || !formData.profession) {
-      setError('Veuillez remplir tous les champs obligatoires')
+    if (!formData.profession) {
+      setError('Veuillez sélectionner ou renseigner votre profession')
       return false
     }
     
-    // Validation simple: profession non vide
     if (formData.profession.trim().length < 2) {
       setError('La profession doit contenir au moins 2 caractères')
       return false
@@ -195,11 +328,15 @@ export const Register = (): JSX.Element => {
     return true
   }
 
-  const handleNext = () => {
-    if (validateStep1()) {
-      setStep(2)
-      setError('')
+  const handleNext = (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault()
     }
+    if (!validateStep1()) {
+      return
+    }
+    setError('')
+    setStep(2)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -316,12 +453,32 @@ export const Register = (): JSX.Element => {
 
               {/* Step 1 */}
               {step === 1 && (
-                <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-3 sm:space-y-4">
-                  {/* Nom complet */}
+                <div className="space-y-4">
+                  {/* Connexion Google */}
                   <div>
-                    <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1 sm:mb-1.5`}>
-                      Nom complet *
-                    </label>
+                    <SocialButtons
+                      onSelectProvider={handleSocialSelect}
+                      isDark={resolvedTheme === 'dark'}
+                      disabled={loading}
+                    />
+                    <div className="relative my-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className={`w-full border-t ${resolvedTheme === 'dark' ? 'border-zinc-700' : 'border-gray-200'}`} />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className={`px-3 ${resolvedTheme === 'dark' ? 'bg-slate-800 text-zinc-400' : 'bg-white text-gray-500'} font-medium`}>
+                          ou inscription manuelle
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleNext} className="space-y-3 sm:space-y-4">
+                    {/* Nom complet */}
+                    <div>
+                      <label className={`block text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} mb-1 sm:mb-1.5`}>
+                        Nom complet *
+                      </label>
                     <input
                       type="text"
                       name="fullName"
@@ -594,10 +751,22 @@ export const Register = (): JSX.Element => {
                     Continuer
                   </button>
                 </form>
-              )}
+              </div>
+            )}
 
-              {/* Step 2 */}
-              {step === 2 && (
+            {/* Modal de Finalisation Option B (Renseigner les 3 champs manquants) */}
+            {socialUser && (
+              <SocialCompleteModal
+                isOpen={showSocialModal}
+                onClose={() => setShowSocialModal(false)}
+                socialUser={socialUser}
+                isDark={resolvedTheme === 'dark'}
+                onSubmit={handleSocialComplete}
+              />
+            )}
+
+            {/* Step 2 */}
+            {step === 2 && (
                 <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                   {/* Profession Input with Dropdown */}
                   <div className="relative">
@@ -611,6 +780,7 @@ export const Register = (): JSX.Element => {
                         name="profession"
                         value={formData.profession}
                         onChange={handleChange}
+                        onClick={() => setShowProfessionDropdown(true)}
                         onFocus={() => setShowProfessionDropdown(true)}
                         onBlur={() => setTimeout(() => setShowProfessionDropdown(false), 250)}
                         required
@@ -619,36 +789,56 @@ export const Register = (): JSX.Element => {
                             ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500'
                             : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                         }`}
-                        placeholder="Tapez ou sélectionnez une profession..."
+                        placeholder="Tapez ou cliquez pour choisir une profession..."
                         autoComplete="off"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowProfessionDropdown(prev => !prev)}
-                        className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:text-zinc-500 dark:hover:text-zinc-300"
-                        title="Ouvrir la liste"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          setShowProfessionDropdown(prev => !prev)
+                        }}
+                        className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                        title="Ouvrir la liste des professions"
                       >
                         <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${showProfessionDropdown ? 'rotate-180' : ''}`} />
                       </button>
                     </div>
 
                     {showProfessionDropdown && (
-                      <div className={`absolute z-20 w-full mt-1 border rounded-xl shadow-xl max-h-60 overflow-auto ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
-                        {ALL_PROFESSIONS.sort().filter(p => 
-                          p.toLowerCase().includes((formData.profession || '').toLowerCase())
-                        ).slice(0, 15).map((profession) => (
-                          <button
-                            key={profession}
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              handleProfessionSelect(profession)
-                            }}
-                            className={`w-full text-left px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-colors ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-white' : 'hover:bg-blue-50 text-gray-900'}`}
-                          >
-                            {profession}
-                          </button>
-                        ))}
+                      <div className={`absolute z-20 w-full mt-1 border rounded-xl shadow-2xl max-h-64 overflow-auto divide-y divide-zinc-200/50 dark:divide-zinc-700/50 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'}`}>
+                        {ALL_PROFESSIONS.filter(p => 
+                          !formData.profession || p.toLowerCase().includes(formData.profession.toLowerCase())
+                        ).length > 0 ? (
+                          ALL_PROFESSIONS.filter(p => 
+                            !formData.profession || p.toLowerCase().includes(formData.profession.toLowerCase())
+                          ).map((profession) => (
+                            <button
+                              key={profession}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                handleProfessionSelect(profession)
+                              }}
+                              className={`w-full text-left px-3.5 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-colors flex items-center justify-between ${
+                                formData.profession === profession
+                                  ? 'bg-blue-500/10 text-primary font-bold'
+                                  : resolvedTheme === 'dark'
+                                  ? 'hover:bg-zinc-700 text-white'
+                                  : 'hover:bg-blue-50 text-gray-900'
+                              }`}
+                            >
+                              <span>{profession}</span>
+                              {formData.profession === profession && (
+                                <span className="text-primary text-xs">✓</span>
+                              )}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-3 text-center text-xs text-zinc-400">
+                            Aucune profession correspondante. Vous pouvez valider "{formData.profession}".
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -708,6 +898,17 @@ export const Register = (): JSX.Element => {
           )}
         </div>
       </div>
+
+      {/* Modal de Finalisation pour Google */}
+      {socialUser && (
+        <SocialCompleteModal
+          isOpen={showSocialModal}
+          onClose={() => setShowSocialModal(false)}
+          socialUser={socialUser}
+          isDark={resolvedTheme === 'dark'}
+          onSubmit={handleSocialComplete}
+        />
+      )}
     </div>
   )
 }

@@ -120,18 +120,14 @@ function App(): JSX.Element {
                            location.pathname.startsWith('/pro/videos') ||
                            location.pathname.startsWith('/pro/events') ||
                            location.pathname.startsWith('/pro/subscriptions') ||
+                           location.pathname === '/about' ||
+                           location.pathname.startsWith('/about') ||
+                           location.pathname === '/discover' ||
+                           isVideoPlayerActive ||
                            isPubRoute
 
-  // Pages où le ProSidebar doit être masqué (demande, evenement, abonnement)
-  const isNoSidebarPage = 
-    location.pathname.startsWith('/pro/conversations') ||
-    location.pathname.startsWith('/pro/requests') ||
-    location.pathname.startsWith('/pro/demandes') ||
-    location.pathname.startsWith('/pro/events') ||
-    location.pathname.startsWith('/pro/evenements') ||
-    location.pathname.startsWith('/pro/subscriptions') ||
-    location.pathname.startsWith('/pro/subscribers') ||
-    location.pathname.startsWith('/pro/abonnement')
+  // Pages où le ProSidebar doit être masqué (conversations plein écran uniquement)
+  const isNoSidebarPage = location.pathname.startsWith('/pro/conversations')
 
   // Cacher header et sous-module sur mobile pour page détails vidéo uniquement
   const isVideoDetailPage = location.pathname.startsWith('/pro/video')
@@ -227,7 +223,7 @@ function App(): JSX.Element {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-          <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage ? 'pb-16 md:pb-0' : isSocialRoute ? 'md:pl-64' : ''}`}>
+          <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage ? 'pb-16' : isSocialRoute ? 'md:pl-64' : ''}`}>
             <Suspense fallback={<PageLoading />}>
               <Routes>
                 {/* Public Routes — Redirection directe vers /pro pour capter l'attention sans texte */}
@@ -251,6 +247,7 @@ function App(): JSX.Element {
                   <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                   <Route path="settings/privacy" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
                   <Route path="requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+                  <Route path="demandes" element={<Navigate to="/pro/requests" replace />} />
                   <Route path="conversations" element={<ProtectedRoute><Conversations /></ProtectedRoute>} />
                   <Route path="conversations/:id" element={<ProtectedRoute><ConversationPage /></ProtectedRoute>} />
                   <Route path="blocked-users" element={<ProtectedRoute><BlockedUsers /></ProtectedRoute>} />

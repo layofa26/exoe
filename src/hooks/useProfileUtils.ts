@@ -199,6 +199,31 @@ export const getDaysUntilProfessionModification = (lastProfessionUpdate?: string
 };
 
 /**
+ * Vérifier si le username est modifiable (modifiable à la première connexion, puis tous les 30 jours)
+ */
+export const canModifyUsername = (lastUsernameUpdate?: string | null) => {
+  if (!lastUsernameUpdate) return true;
+  const lastUpdate = new Date(lastUsernameUpdate);
+  if (isNaN(lastUpdate.getTime())) return true;
+  const now = new Date();
+  const daysSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
+  return daysSinceUpdate >= 30;
+};
+
+/**
+ * Calculer les jours restants avant modification du nom d'utilisateur
+ */
+export const getDaysUntilUsernameModification = (lastUsernameUpdate?: string | null) => {
+  if (!lastUsernameUpdate) return 0;
+  const lastUpdate = new Date(lastUsernameUpdate);
+  if (isNaN(lastUpdate.getTime())) return 0;
+  const now = new Date();
+  const daysSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
+  const daysRemaining = 30 - daysSinceUpdate;
+  return Math.max(0, Math.ceil(daysRemaining));
+};
+
+/**
  * Vérifier si la photo est modifiable (après 30 jours)
  */
 export const canModifyPhoto = (photoLastModified?: string | null) => {
@@ -256,6 +281,8 @@ export const useProfileUtils = () => {
     refreshProfile,
     canModifyProfession,
     getDaysUntilProfessionModification,
+    canModifyUsername,
+    getDaysUntilUsernameModification,
     canModifyPhoto,
     getDaysUntilPhotoModification
   };

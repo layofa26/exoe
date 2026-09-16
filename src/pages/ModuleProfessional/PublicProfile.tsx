@@ -229,12 +229,12 @@ export const PublicProfile = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
           
           {/* Left Column: Identity & Bio & Skills */}
-          <div className={`lg:col-span-4 xl:col-span-4 rounded-3xl border p-4 sm:p-5 ${
+          <div className={`lg:col-span-4 xl:col-span-4 rounded-3xl border overflow-hidden ${
             resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
-          } shadow-sm space-y-4`}>
+          } shadow-sm flex flex-col`}>
             
-            {/* Banner */}
-            <div className="relative rounded-2xl overflow-hidden aspect-[21/9] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 shadow-md">
+            {/* Banner flush to top edge (comme dans le profil privé) */}
+            <div className="relative w-full h-32 sm:h-36 md:h-40 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700">
               {profile.bannerUrl && (
                 <img
                   src={profile.bannerUrl}
@@ -244,22 +244,24 @@ export const PublicProfile = () => {
               )}
             </div>
 
-            {/* Avatar & Online status */}
-            <div className="flex flex-col items-center -mt-12 sm:-mt-14 relative">
-              <div className="relative">
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-extrabold text-3xl flex items-center justify-center overflow-hidden border-4 border-white dark:border-zinc-900 shadow-xl ring-2 ring-blue-500/30">
-                  {profile.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt={formattedUsername} className="w-full h-full object-cover object-center" />
-                  ) : (
-                    formattedUsername.replace('@', '').charAt(0).toUpperCase()
-                  )}
+            <div className="p-4 sm:p-5 pt-0 space-y-4">
+              {/* Avatar & Online status - parfaitement centré et incrusté sur la bannière */}
+              <div className="flex flex-col items-center -mt-12 sm:-mt-14 relative z-10">
+                <div className="relative">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-extrabold text-3xl flex items-center justify-center overflow-hidden border-4 border-white dark:border-zinc-900 shadow-xl ring-2 ring-blue-500/50">
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt={formattedUsername} className="w-full h-full object-cover object-center" />
+                    ) : (
+                      formattedUsername.replace('@', '').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <span
+                    className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm ${
+                      isOnline ? 'bg-emerald-500' : 'bg-gray-400'
+                    }`}
+                    title={isOnline ? t('pro.conversations.online', 'En ligne') : t('pro.conversations.offline', 'Hors ligne')}
+                  />
                 </div>
-                <span
-                  className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm ${
-                    isOnline ? 'bg-emerald-500' : 'bg-gray-400'
-                  }`}
-                  title={isOnline ? t('pro.conversations.online', 'En ligne') : t('pro.conversations.offline', 'Hors ligne')}
-                />
               </div>
 
               {/* Status text */}
@@ -285,7 +287,6 @@ export const PublicProfile = () => {
                   )}
                 </div>
               )}
-            </div>
 
             {/* Action CTAs */}
             <div className="grid grid-cols-2 gap-2 pt-2">
@@ -401,6 +402,7 @@ export const PublicProfile = () => {
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* Right Column: Statistics & Content Tabs */}

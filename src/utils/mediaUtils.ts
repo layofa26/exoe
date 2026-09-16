@@ -48,10 +48,22 @@ export const resolveMediaUrl = (url?: string | null): string => {
     return `${origin}${cleanPath}`
   }
 
+  // Détection des fichiers locaux Django par préfixe
+  const baseName = trimmed.replace(/^\/+/, '')
+  if (baseName.startsWith('video_')) {
+    return `/media/videos/${baseName}`
+  }
+  if (baseName.startsWith('profile_') || baseName.startsWith('banner_') || baseName.startsWith('cover_')) {
+    return `/media/images/${baseName}`
+  }
+
   // Si c'est un nom de fichier brut destiné au bucket Supabase Exile_images
   if (!cleanPath.startsWith('/api') && !cleanPath.startsWith('/static')) {
-    const supabaseBase = import.meta.env.VITE_SUPABASE_URL || 'https://yovqbztvqotktkmkkqsq.supabase.co'
-    return `${supabaseBase.replace(/\/+$/, '')}/storage/v1/object/public/Exile_images/${trimmed.replace(/^\/+/, '')}`
+    const supabaseBase = import.meta.env.VITE_SUPABASE_URL
+    if (supabaseBase) {
+      return `${supabaseBase.replace(/\/+$/, '')}/storage/v1/object/public/Exile_images/${baseName}`
+    }
+    return `/media/images/${baseName}`
   }
 
   return cleanPath

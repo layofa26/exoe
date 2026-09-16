@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import {
   Upload,
@@ -344,9 +345,9 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
           setCurrentStep('success')
           showSuccess('Votre vidéo d\'expertise est maintenant publiée !')
 
-          // Invalidation immédiate du cache feed pour affichage instantané
-          cacheService.invalidate('pro:videos:feed')
-          cacheService.clear('pro:videos:feed')
+          // Invalidation immédiate et complète de tous les caches du feed vidéo (avec wildcard)
+          cacheService.invalidate('pro:videos:*')
+          cacheService.invalidate('pro:videos:feed:v8')
 
           window.dispatchEvent(new CustomEvent('video-uploaded'))
           window.dispatchEvent(new CustomEvent('video-published'))

@@ -9,6 +9,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { api } from '../../services/apiClient'
 import { AbonnementListSchema } from '../../schemas/apiSchemas'
 import { useQuery } from '../../hooks/useQuery'
+import { FeedVideoCard } from '../../components/video/FeedVideoCard'
+import type { Video } from '../../types/video'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
@@ -90,11 +92,10 @@ export const Subscriptions = (): JSX.Element => {
   const isDark = resolvedTheme === 'dark'
   const navigate = useNavigate()
   
-  const [activeTab, setActiveTab] = useState<'feed' | 'following' | 'subscribers' | 'favorites'>('feed')
+  const [activeTab, setActiveTab] = useState<'feed' | 'subscribers' | 'favorites'>('feed')
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | 'all'>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous')
   const [searchQuery, setSearchQuery] = useState('')
-  const [unsubscribeConfirm, setUnsubscribeConfirm] = useState<string | null>(null)
   const [toast, setToast] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -365,95 +366,6 @@ export const Subscriptions = (): JSX.Element => {
     }
   }
 
-  // Toggle Notifications 100% Backend
-  const toggleNotifications = async (subId: string) => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-
-    setActionLoading(`notif_${subId}`)
-    try {
-      const res = await fetch(`${API_BASE_URL}/abonnement/abonnements/toggle_notifications/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ professionnel_id: subId })
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        const isEnabled = data.notifications_enabled
-        setSubscriptions(subscriptions.map(s => s.id === subId ? { ...s, notificationsEnabled: isEnabled } : s))
-        showToast(isEnabled ? '🔔 Notifications activées pour ce professionnel' : '🔕 Notifications désactivées')
-      }
-    } catch (err) {
-      showToast('Erreur réseau')
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  // Toggle VIP / Soutien Pro
-  const toggleVip = async (subId: string) => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-
-    setActionLoading(`vip_${subId}`)
-    try {
-      const res = await fetch(`${API_BASE_URL}/abonnement/abonnements/toggle_vip/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ professionnel_id: subId, vip_tier: 'Supporter VIP' })
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setSubscriptions(subscriptions.map(s => s.id === subId ? { ...s, isVip: data.is_vip, vipTier: data.vip_tier } : s))
-        showToast(data.is_vip ? '⭐ Statut VIP activé !' : 'Statut VIP retiré')
-      }
-    } catch (err) {
-      showToast('Erreur lors de la mise à jour VIP')
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  // Désabonnement 100% Réel dans la Base de Données
-  const unsubscribe = async (profId: string) => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-
-    setActionLoading(`unsub_${profId}`)
-    try {
-      const res = await fetch(`${API_BASE_URL}/abonnement/abonnements/toggle/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ professionnel_id: profId })
-      })
-
-      if (res.ok) {
-        setSubscriptions(subscriptions.filter(s => s.id !== profId))
-        setUnsubscribeConfirm(null)
-        showToast('Désabonné avec succès')
-        fetchStats()
-        fetchFeedVideos()
-        fetchSuggestions()
-      } else {
-        showToast('Erreur lors du désabonnement')
-      }
-    } catch (err) {
-      showToast('Erreur de connexion')
-    } finally {
-      setActionLoading(null)
-    }
-  }
 
   // S'abonner directement depuis les suggestions
   const subscribeToSuggested = async (profId: number) => {
@@ -512,12 +424,6 @@ export const Subscriptions = (): JSX.Element => {
     return matchesSearch
   })
 
-  const filteredSubscriptions = subscriptions.filter(sub => {
-    if (!searchQuery) return true
-    return sub.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           sub.specialty.toLowerCase().includes(searchQuery.toLowerCase())
-  })
-
   const filteredSubscribers = mySubscribers.filter(sub => {
     if (!searchQuery) return true
     return (sub.name || sub.username || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -529,6 +435,35 @@ export const Subscriptions = (): JSX.Element => {
            f.professionalName.toLowerCase().includes(searchQuery.toLowerCase())
   }).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
 
+  // Convertir VideoFeedItem → Video (type attendu par FeedVideoCard)
+  const toFeedVideo = (v: VideoFeedItem): Video => ({
+    id: String(v.id),
+    title: v.title,
+    description: v.description,
+    duration: String(v.duration),
+    thumbnail: v.thumbnail,
+    videoUrl: v.file_url,
+    viewsCount: v.viewsCount,
+    likesCount: v.likesCount,
+    createdAt: v.createdAt,
+    author: {
+      id: String(v.author.id),
+      name: v.author.name,
+      username: v.author.username || '',
+      profession: v.author.profession || '',
+      location: '',
+      initials: (v.author.name || 'P').charAt(0).toUpperCase(),
+      avatarColor: '#FF6B00',
+      avatarUrl: v.author.avatar || undefined,
+    }
+  })
+
+  // Ouvrir une vidéo avec header masqué (mode immersif)
+  const handleOpenVideo = (video: VideoFeedItem) => {
+    try { localStorage.setItem('exile_video_player_active', 'true') } catch {}
+    navigate(`/pro/video/${video.id}`)
+  }
+
   const base = isDark ? 'bg-[#0b0e14] text-white' : 'bg-slate-50 text-slate-900'
 
   return (
@@ -537,38 +472,6 @@ export const Subscriptions = (): JSX.Element => {
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold bg-zinc-900 text-white border border-zinc-700/80 animate-in fade-in slide-in-from-top-3 duration-200 flex items-center gap-2">
           <span>{toast}</span>
-        </div>
-      )}
-
-      {/* Modal Confirmation Désabonnement */}
-      {unsubscribeConfirm && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className={`${isDark ? 'bg-zinc-900 border-zinc-700/80' : 'bg-white border-slate-200'} rounded-3xl max-w-sm w-full p-5 shadow-2xl border space-y-4`}>
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-3">
-                <Users className="w-6 h-6" />
-              </div>
-              <h3 className="font-bold text-base">{t('pro.subscribers.unsubscribeModalTitle', 'Se désabonner ?')}</h3>
-              <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                {t('pro.subscribers.unsubscribeModalDesc', 'Vous ne recevrez plus les publications ni alertes de ce professionnel.')}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setUnsubscribeConfirm(null)} 
-                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'}`}
-              >
-                {t('common.cancel', 'Annuler')}
-              </button>
-              <button 
-                onClick={() => unsubscribe(unsubscribeConfirm)} 
-                disabled={Boolean(actionLoading)}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
-              >
-                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('common.confirm', 'Confirmer')}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -589,28 +492,29 @@ export const Subscriptions = (): JSX.Element => {
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border ${isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'}`}>
-          <Search size={15} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('pro.subscribers.searchPlaceholder', 'Rechercher une vidéo ou un créateur...')}
-            className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')}>
-              <X size={13} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
-            </button>
-          )}
+        {/* Search Bar — raccourcie à gauche */}
+        <div className="flex items-center justify-start">
+          <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border w-full max-w-xs sm:max-w-sm ${isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'}`}>
+            <Search size={15} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('pro.subscribers.searchPlaceholder', 'Rechercher...')}
+              className="flex-1 bg-transparent outline-none text-xs sm:text-sm min-w-0"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')}>
+                <X size={13} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Tabs Principaux */}
         <div className="flex gap-1.5 pt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {[
             { id: 'feed', label: t('pro.subscribers.feedTab', 'Fil des Vidéos'), icon: Play, count: displayedVideos.length },
-            { id: 'following', label: t('pro.subscribers.channelsTab', 'Mes Chaînes'), icon: Users, count: stats.following_count },
             { id: 'subscribers', label: t('pro.subscribers.subscribersTab', 'Mes Abonnés'), icon: UserPlus, count: stats.subscribers_count },
             { id: 'favorites', label: t('pro.subscribers.favoritesTab', 'Favoris'), icon: Bookmark, count: sortedFavorites.length }
           ].map((tTab) => {
@@ -637,27 +541,73 @@ export const Subscriptions = (): JSX.Element => {
         </div>
       </div>
 
-      {/* ── CONTENU DÉFILANT RESPONSIVE ── */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 max-w-5xl mx-auto w-full pb-20 md:pb-8">
+      {/* ── CONTENU DÉFILANT — PLEINE LARGEUR ── */}
+      <div className="flex-1 overflow-y-auto w-full px-3 sm:px-4 lg:px-6 py-3 pb-20 md:pb-8">
         
         {/* ================================================================ */}
-        {/* CONTENU ONGLET 1 : FIL RÉEL DES VIDÉOS                           */}
+        {/* CONTENU ONGLET 1 : FIL RÉEL DES VIDÉOS (Style YouTube)           */}
         {/* ================================================================ */}
         {activeTab === 'feed' && (
           <div className="space-y-4">
-            {/* Filtre par Catégorie / Métier */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-zinc-400 pl-1 pr-1">
-                <Filter size={12} />
+
+            {/* ── Carrousel YouTube-style : Avatars ronds des créateurs ── */}
+            {subscriptions.length > 0 && (
+              <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-1" style={{ scrollbarWidth: 'none' }}>
+                {/* Bouton "Tous" */}
+                <div
+                  onClick={() => setSelectedCreatorId('all')}
+                  className="flex-shrink-0 flex flex-col items-center gap-1 cursor-pointer group"
+                >
+                  <div className={`w-14 h-14 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
+                    selectedCreatorId === 'all'
+                      ? 'border-[#FF6B00] ring-2 ring-[#FF6B00]/30'
+                      : isDark ? 'border-zinc-700' : 'border-gray-200'
+                  } ${isDark ? 'bg-zinc-800' : 'bg-gray-100'}`}>
+                    <Heart size={18} className={selectedCreatorId === 'all' ? 'text-[#FF6B00] fill-[#FF6B00]' : 'text-zinc-400'} />
+                  </div>
+                  <span className={`text-[10px] font-semibold whitespace-nowrap ${
+                    selectedCreatorId === 'all' ? 'text-[#FF6B00]' : isDark ? 'text-zinc-400' : 'text-slate-500'
+                  }`}>{t('common.all', 'Tous')}</span>
+                </div>
+
+                {/* Avatars des créateurs abonnés */}
+                {subscriptions.map(sub => (
+                  <div
+                    key={sub.id}
+                    onClick={() => setSelectedCreatorId(sub.id)}
+                    className="flex-shrink-0 flex flex-col items-center gap-1 cursor-pointer group"
+                  >
+                    <div className={`w-14 h-14 rounded-full overflow-hidden border-2 transition-all ${
+                      selectedCreatorId === sub.id
+                        ? 'border-[#FF6B00] ring-2 ring-[#FF6B00]/30 scale-105'
+                        : isDark ? 'border-zinc-700 hover:border-zinc-500' : 'border-gray-200 hover:border-gray-400'
+                    } bg-zinc-700 flex items-center justify-center`}>
+                      {sub.avatar
+                        ? <img src={sub.avatar} alt={sub.name} className="w-full h-full object-cover" />
+                        : <span className="text-white font-bold text-sm">{sub.name[0]?.toUpperCase()}</span>
+                      }
+                    </div>
+                    <span className={`text-[10px] font-semibold whitespace-nowrap max-w-[56px] truncate text-center ${
+                      selectedCreatorId === sub.id ? 'text-[#FF6B00]' : isDark ? 'text-zinc-400' : 'text-slate-500'
+                    }`}>
+                      {sub.username ? `@${sub.username.replace('@', '')}` : sub.name}
+                      {sub.isVip && <Crown size={8} className="inline text-amber-400 ml-0.5" />}
+                    </span>
+                  </div>
+                ))}
               </div>
+            )}
+
+            {/* ── Pills de filtre style YouTube ── */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
               {CATEGORIES.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
                     selectedCategory === cat
-                      ? 'bg-zinc-800 text-white border border-zinc-700 shadow-sm'
-                      : isDark ? 'bg-zinc-900/60 text-zinc-400 hover:text-zinc-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? isDark ? 'bg-white text-black border-transparent shadow' : 'bg-gray-900 text-white border-transparent shadow'
+                      : isDark ? 'bg-zinc-900/60 border-zinc-700/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'bg-white border-gray-200 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
                   {cat}
@@ -665,44 +615,11 @@ export const Subscriptions = (): JSX.Element => {
               ))}
             </div>
 
-            {/* Filtre par Créateur abonné */}
-            {subscriptions.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-                <button
-                  onClick={() => setSelectedCreatorId('all')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                    selectedCreatorId === 'all'
-                      ? 'bg-[#FF6B00] text-white shadow-md shadow-[#FF6B00]/20'
-                      : isDark ? 'bg-zinc-900 border border-zinc-800 text-zinc-300' : 'bg-white border border-slate-200 text-slate-700'
-                  }`}
-                >
-                  {t('common.all', 'Tous')}
-                </button>
-                {subscriptions.map(sub => (
-                  <button
-                    key={sub.id}
-                    onClick={() => setSelectedCreatorId(sub.id)}
-                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                      selectedCreatorId === sub.id
-                        ? 'bg-[#FF6B00] text-white shadow-md shadow-[#FF6B00]/20'
-                        : isDark ? 'bg-zinc-900 border border-zinc-800 text-zinc-300' : 'bg-white border border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <div className="w-5 h-5 rounded-full bg-zinc-700 overflow-hidden">
-                      {sub.avatar ? <img src={sub.avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white">{sub.name[0]}</div>}
-                    </div>
-                    <span>{sub.name}</span>
-                    {sub.isVip && <Crown size={11} className="text-amber-400 fill-amber-400" />}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {/* État de chargement */}
             {loadingFeed ? (
               <div className="py-20 flex flex-col items-center justify-center gap-2 text-zinc-500">
                 <Loader2 className="w-6 h-6 animate-spin text-[#FF6B00]" />
-                <p className="text-xs">Chargement des vidéos de vos abonnements...</p>
+                <p className="text-xs">{t('pro.subscriptions.loadingVideos', 'Chargement des vidéos de vos abonnements...')}</p>
               </div>
             ) : displayedVideos.length === 0 ? (
               <div className="py-16 text-center space-y-4">
@@ -710,11 +627,11 @@ export const Subscriptions = (): JSX.Element => {
                   <Play className="w-8 h-8 ml-1" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm sm:text-base">Aucune vidéo pour le moment</h3>
+                  <h3 className="font-bold text-sm sm:text-base">{t('pro.subscriptions.noVideos', 'Aucune vidéo pour le moment')}</h3>
                   <p className={`text-xs mt-1 max-w-md mx-auto ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                     {subscriptions.length === 0
-                      ? "Vous n'êtes abonné à aucun professionnel. Découvrez les suggestions ci-dessous pour commencer !"
-                      : "Les créateurs que vous suivez n'ont pas encore publié de vidéo dans cette catégorie."}
+                      ? t('pro.subscriptions.noSubs', "Vous n'êtes abonné à aucun professionnel. Découvrez les suggestions ci-dessous pour commencer !")
+                      : t('pro.subscriptions.noVideosCategory', "Les créateurs que vous suivez n'ont pas encore publié de vidéo dans cette catégorie.")}
                   </p>
                 </div>
 
@@ -723,7 +640,7 @@ export const Subscriptions = (): JSX.Element => {
                   <div className="mt-8 pt-6 border-t border-zinc-800/40 text-left">
                     <div className="flex items-center gap-2 mb-3">
                       <Sparkles size={16} className="text-amber-400" />
-                      <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-400">Professionnels recommandés</h4>
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-400">{t('pro.subscriptions.recommended', 'Professionnels recommandés')}</h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {suggestions.slice(0, 4).map(sugg => (
@@ -735,7 +652,7 @@ export const Subscriptions = (): JSX.Element => {
                             <div className="min-w-0">
                               <p className="font-bold text-xs truncate">{sugg.name}</p>
                               <p className="text-[11px] text-[#FF6B00] truncate">{sugg.profession}</p>
-                              <p className="text-[10px] text-zinc-500">{sugg.videos_count} vidéos</p>
+                              <p className="text-[10px] text-zinc-500">{sugg.videos_count} {t('pro.video.videos', 'vidéos')}</p>
                             </div>
                           </div>
                           <button
@@ -744,7 +661,7 @@ export const Subscriptions = (): JSX.Element => {
                             className="w-full py-1.5 rounded-xl text-xs font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                           >
                             {actionLoading === `sub_sugg_${sugg.id}` ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
-                            <span>S'abonner</span>
+                            <span>{t('pro.subscriptions.subscribe', "S'abonner")}</span>
                           </button>
                         </div>
                       ))}
@@ -753,171 +670,98 @@ export const Subscriptions = (): JSX.Element => {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayedVideos.map(video => (
-                  <div
-                    key={video.id}
-                    onClick={() => navigate(`/pro/video/${video.id}`)}
-                    className={`${isDark ? 'bg-zinc-900/60 border-zinc-800/80' : 'bg-white border-slate-200'} rounded-2xl overflow-hidden border shadow-sm cursor-pointer group hover:border-[#FF6B00]/50 transition-all`}
-                  >
-                    <div className="relative aspect-video bg-zinc-800">
-                      <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-2 right-2 bg-black/80 text-white px-2 py-0.5 rounded text-[10px] font-bold">{video.duration}</span>
-                    </div>
-                    <div className="p-3">
-                      <div className="flex gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-zinc-700 flex-shrink-0 overflow-hidden">
-                          {video.author?.avatar ? <img src={video.author.avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">{video.author?.name[0]}</div>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 leading-snug">{video.title}</h3>
-                          <p className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{video.author?.name}</p>
-                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/40">
-                            <span className="text-[10px] text-zinc-500">{video.viewsCount} {t('pro.video.views', 'vues')} • {video.createdAt}</span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleToggleFavorite(video); }}
-                                className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-[#FF6B00]"
-                                title={t('common.save', 'Enregistrer')}
-                              >
-                                <Bookmark size={13} className={favorites.some(f => String(f.videoId) === String(video.id)) ? 'fill-[#FF6B00] text-[#FF6B00]' : ''} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleShare(video); }}
-                                className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white"
-                                title={t('common.share', 'Partager')}
-                              >
-                                <Share2 size={13} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+              /* ── Grille 5 colonnes — Cartes YouTube compactes ── */
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+                {displayedVideos.map(video => {
+                  const dur = String(video.duration || '')
+                  const fmtViews = (n: number) => n >= 1e6 ? `${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}K` : String(n)
+                  const fmtAgo = (d?: string) => {
+                    if (!d) return ''
+                    const ms = Date.now() - new Date(d).getTime()
+                    if (isNaN(ms) || ms < 0) return ''
+                    const m = Math.floor(ms / 60000)
+                    if (m < 60) return `${Math.max(1,m)}min`
+                    const h = Math.floor(m / 60)
+                    if (h < 24) return `${h}h`
+                    const day = Math.floor(h / 24)
+                    if (day < 7) return `${day}j`
+                    if (day < 30) return `${Math.floor(day/7)}sem`
+                    return `${Math.floor(day/30)}mois`
+                  }
+                  const thumbSrc = video.thumbnail || ''
+                  const avatarSrc = video.author?.avatar || ''
+                  const initials = (video.author?.name || 'P').charAt(0).toUpperCase()
 
-        {/* ================================================================ */}
-        {/* CONTENU ONGLET 2 : MES CHAÎNES (ABONNEMENTS ACTIFS)              */}
-        {/* ================================================================ */}
-        {activeTab === 'following' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {filteredSubscriptions.length === 0 ? (
-                <div className="col-span-full py-16 text-center text-zinc-500 text-xs">
-                  {t('pro.subscribers.noChannels', 'Aucune chaîne trouvée')}
-                </div>
-              ) : (
-                filteredSubscriptions.map(sub => (
-                  <div
-                    key={sub.id}
-                    className={`${isDark ? 'bg-zinc-900/60 border-zinc-800/80' : 'bg-white border-slate-200'} rounded-2xl p-3.5 border shadow-sm flex items-center justify-between gap-3`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => navigate(`/pro/profile/${sub.id}`)}>
-                      <div className="w-12 h-12 rounded-full bg-zinc-700 overflow-hidden flex-shrink-0 relative">
-                        {sub.avatar ? <img src={sub.avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-white">{sub.name[0]}</div>}
-                        {sub.isVip && (
-                          <div className="absolute -bottom-1 -right-1 p-0.5 bg-amber-500 rounded-full text-white shadow">
-                            <Crown size={10} />
+                  return (
+                    <div
+                      key={video.id}
+                      onClick={() => handleOpenVideo(video)}
+                      className={`cursor-pointer rounded-xl overflow-hidden group transition-all hover:scale-[1.02] ${
+                        isDark ? 'bg-zinc-900/80 hover:bg-zinc-900' : 'bg-white hover:shadow-md border border-slate-100'
+                      }`}
+                    >
+                      {/* Miniature 16:9 */}
+                      <div className="relative w-full aspect-video bg-zinc-800 overflow-hidden">
+                        {thumbSrc ? (
+                          <img
+                            src={thumbSrc}
+                            alt={video.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={e => (e.currentTarget.style.display = 'none')}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Play size={24} className="text-zinc-500" />
                           </div>
                         )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-bold text-sm truncate">{sub.name}</h3>
-                          {sub.isVip && (
-                            <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded uppercase">
-                              {sub.vipTier || 'VIP'}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-[#FF6B00] font-medium">{sub.profession}</p>
-                        <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
-                          {sub.subscribersCount || 0} abonnés • {sub.specialty}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {/* Bouton VIP */}
-                      <button
-                        type="button"
-                        onClick={() => toggleVip(sub.id)}
-                        disabled={actionLoading === `vip_${sub.id}`}
-                        className={`p-2 rounded-xl transition-colors ${sub.isVip ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : isDark ? 'bg-zinc-800 text-zinc-400 hover:text-amber-400' : 'bg-slate-100 text-slate-500'}`}
-                        title="Abonnement VIP / Soutien"
-                      >
-                        <Crown size={15} className={sub.isVip ? 'fill-amber-400' : ''} />
-                      </button>
-
-                      {/* Bouton Cloche Notifs */}
-                      <button
-                        type="button"
-                        onClick={() => toggleNotifications(sub.id)}
-                        disabled={actionLoading === `notif_${sub.id}`}
-                        className={`p-2 rounded-xl transition-colors ${sub.notificationsEnabled ? 'bg-[#FF6B00]/15 text-[#FF6B00]' : isDark ? 'bg-zinc-800 text-zinc-500' : 'bg-slate-100 text-slate-400'}`}
-                        title={sub.notificationsEnabled ? 'Notifications activées' : 'Notifications désactivées'}
-                      >
-                        {sub.notificationsEnabled ? <Bell size={15} /> : <BellOff size={15} />}
-                      </button>
-
-                      {/* Bouton Abonné / Se désabonner */}
-                      <button
-                        type="button"
-                        onClick={() => setUnsubscribeConfirm(sub.id)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-800/80 hover:bg-red-500/20 text-zinc-300 hover:text-red-400 transition-colors"
-                      >
-                        {t('pro.subscribers.subscribed', 'Abonné')}
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Suggestions de nouveaux professionnels */}
-            {suggestions.length > 0 && (
-              <div className="pt-6 border-t border-zinc-800/50">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles size={16} className="text-amber-400" />
-                  <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-400">Découvrir d'autres experts</h4>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {suggestions.map(sugg => (
-                    <div key={sugg.id} className={`${isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'} p-3 rounded-2xl border shadow-sm flex items-center justify-between gap-3`}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-zinc-700 overflow-hidden flex-shrink-0">
-                          {sugg.avatar ? <img src={sugg.avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-white text-xs">{sugg.name[0]}</div>}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-xs truncate">{sugg.name}</p>
-                          <p className="text-[11px] text-[#FF6B00] truncate">{sugg.profession}</p>
-                          <p className="text-[10px] text-zinc-500">{sugg.subscribers_count} abonnés</p>
+                        {/* Durée */}
+                        {dur && (
+                          <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] font-bold px-1 py-0.5 rounded-sm">
+                            {dur}
+                          </span>
+                        )}
+                        {/* Overlay play */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                            <Play size={14} className="text-white fill-white ml-0.5" />
+                          </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => subscribeToSuggested(sugg.id)}
-                        disabled={actionLoading === `sub_sugg_${sugg.id}`}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white flex items-center gap-1.5 transition-colors shadow-sm flex-shrink-0"
-                      >
-                        {actionLoading === `sub_sugg_${sugg.id}` ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
-                        <span>Suivre</span>
-                      </button>
+
+                      {/* Métadonnées compactes */}
+                      <div className="p-1.5 flex gap-1.5">
+                        {/* Avatar auteur */}
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-6 h-6 rounded-full bg-[#FF6B00] flex items-center justify-center overflow-hidden">
+                            {avatarSrc ? (
+                              <img src={avatarSrc} alt="" className="w-full h-full object-cover" onError={e => (e.currentTarget.style.display='none')} />
+                            ) : (
+                              <span className="text-white font-bold text-[9px]">{initials}</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Titre + auteur + vues/date */}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[11px] font-semibold leading-tight line-clamp-2 mb-0.5 ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+                            {video.title}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 truncate">{video.author?.name || 'Créateur'}</p>
+                          <p className="text-[9px] text-zinc-600 mt-0.5 flex items-center gap-1">
+                            <span>{fmtViews(video.viewsCount)} vues</span>
+                            {video.createdAt && <><span>•</span><span>{fmtAgo(video.createdAt)}</span></>}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             )}
           </div>
         )}
 
         {/* ================================================================ */}
-        {/* CONTENU ONGLET 3 : MES ABONNÉS (CEUX QUI ME SUIVENT)            */}
+        {/* CONTENU ONGLET 2 : MES ABONNÉS (CEUX QUI ME SUIVENT)            */}
         {/* ================================================================ */}
         {activeTab === 'subscribers' && (
           <div className="space-y-3">

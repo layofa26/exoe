@@ -85,10 +85,27 @@ export const Header = (): JSX.Element => {
     }
   }, [lastScrollY])
 
-  // Toujours afficher le username (jamais le nom complet)
+  // Toujours afficher le username (jamais le nom complet ni l'adresse email complète)
   const getDisplayName = () => {
-    if (user?.username) return user.username.replace('@', '')
-    if (user?.email) return user.email.split('@')[0]
+    // 1. Si username valide et ce n'est pas une adresse email
+    if (user?.username && !user.username.includes('@') && !user.username.includes('.')) {
+      return user.username.replace(/^@/, '')
+    }
+    // 2. Si le username a la forme @pseudo
+    if (user?.username && user.username.startsWith('@') && !user.username.includes('.')) {
+      return user.username.slice(1)
+    }
+    // 3. Si fullName est disponible, formater en pseudo (ex: RodrigeBerlin)
+    if (user?.fullName && user.fullName.trim()) {
+      return user.fullName.trim().replace(/\s+/g, '')
+    }
+    // 4. Si c'est un email, n'afficher que la partie locale avant le @ (ex: layofa86)
+    if (user?.email && user.email.includes('@')) {
+      return user.email.split('@')[0]
+    }
+    if (user?.username && user.username.includes('@')) {
+      return user.username.split('@')[0].replace(/^@/, '')
+    }
     return 'Utilisateur'
   }
 
@@ -514,14 +531,14 @@ export const Header = (): JSX.Element => {
             </Link>
           </div>
 
-          {/* Navigation - Parfaitement centrée sur desktop, positionnée en bas du header sur mobile et tablette sans toucher les icônes */}
-          <nav className="absolute left-1/2 -translate-x-1/2 bottom-1 sm:bottom-1 md:bottom-1 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto flex items-center space-x-2 sm:space-x-4 md:space-x-8 z-10 pointer-events-auto">
+          {/* Navigation - Parfaitement positionnée et aérée pour éviter toute collision avec la recherche sur mobile */}
+          <nav className="absolute left-1/2 -translate-x-1/2 bottom-1.5 sm:bottom-1 md:bottom-1 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto flex items-center space-x-2.5 sm:space-x-4 md:space-x-8 z-10 pointer-events-auto max-w-[calc(100%-140px)] sm:max-w-none">
             {navLinks.map((link) => (
               link.show && (
                 <div key={link.to} className="relative group">
                   <Link
                     to={link.disabled ? '#' : link.to}
-                    className={`relative text-[12px] sm:text-[13px] md:text-sm lg:text-base font-extrabold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-1.5 ${
+                    className={`relative text-[12px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-2 py-0.5 ${
                       isActive(link.to)
                         ? 'text-[#FF6B00]'
                         : link.disabled
@@ -549,102 +566,104 @@ export const Header = (): JSX.Element => {
           </nav>
 
           {/* Droite : Recherche & Boutons d'action (Compact sur mobile et tablette) */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 z-10 ml-auto pl-2">
-            {/* Bouton + Publier (Visible toujours, connecté ou pas, sur desktop et tablette) */}
-            <div className="relative hidden md:block" ref={publishRef}>
-              <button
-                onClick={() => {
-                  if (!isAuthenticated) {
-                    navigate('/login')
-                    return
-                  }
-                  setShowPublishMenu(!showPublishMenu)
-                }}
-                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl shadow-md font-semibold text-xs sm:text-sm transition-all duration-200 hover:shadow-orange-500/25 active:scale-95 flex-shrink-0"
-                title={t('header.publishMenu.title', "Publier du contenu ou créer un événement")}
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span className="hidden sm:inline font-bold">{t('common.publish', 'Publier')}</span>
-              </button>
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 z-10 ml-auto pl-2 sm:pl-3">
+            {/* Bouton + Publier (Caché sur la page de connexion /login et autres pages d'authentification) */}
+            {!['/login', '/register', '/forgot-password', '/reset-password', '/forgot-email', '/confirm-email'].includes(location.pathname) && (
+              <div className="relative hidden md:block" ref={publishRef}>
+                <button
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      navigate('/login')
+                      return
+                    }
+                    setShowPublishMenu(!showPublishMenu)
+                  }}
+                  className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl shadow-md font-semibold text-xs sm:text-sm transition-all duration-200 hover:shadow-orange-500/25 active:scale-95 flex-shrink-0"
+                  title={t('header.publishMenu.title', "Publier du contenu ou créer un événement")}
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span className="hidden sm:inline font-bold">{t('common.publish', 'Publier')}</span>
+                </button>
 
-              {/* Publish Menu Dropdown */}
-              {showPublishMenu && (
-                <div className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-2xl py-2 z-50 border ${
-                  resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
-                } animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}>
-                  <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800">
-                    <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">{t('header.publishMenu.expertiseCreation', "Création d'expertise")}</p>
-                  </div>
+                {/* Publish Menu Dropdown */}
+                {showPublishMenu && (
+                  <div className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-2xl py-2 z-50 border ${
+                    resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
+                  } animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}>
+                    <div className="px-3.5 py-2 border-b border-gray-100 dark:border-zinc-800">
+                      <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">{t('header.publishMenu.expertiseCreation', "Création d'expertise")}</p>
+                    </div>
 
-                  <button
-                    onClick={() => {
-                      setIsUploadModalOpen(true)
-                      setShowPublishMenu(false)
-                    }}
-                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-orange-500/10 hover:text-orange-500 dark:hover:bg-orange-500/10 dark:hover:text-orange-400 flex items-center gap-3 transition-colors group"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <VideoIcon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">{t('header.publishMenu.expertiseVideo', "Vidéo d'expertise")}</p>
-                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.expertiseVideoDesc', "Tutoriel, conseil, projet")}</p>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      navigate('/pro/events?create=true')
-                      setShowPublishMenu(false)
-                    }}
-                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-purple-500/10 hover:text-purple-500 dark:hover:bg-purple-500/10 dark:hover:text-purple-400 flex items-center gap-3 transition-colors group"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <CalendarIcon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">{t('header.publishMenu.eventWebinar', "Événement & Webinaire")}</p>
-                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.eventWebinarDesc', "Conférence, atelier, masterclass")}</p>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      navigate('/pro/events?create=true&live=true')
-                      setShowPublishMenu(false)
-                    }}
-                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-red-500/10 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 flex items-center gap-3 transition-colors group"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Radio className="w-4 h-4 animate-pulse" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-semibold">{t('header.publishMenu.launchLive', "Lancer un Live")}</p>
-                        <span className="px-1.5 py-0.2 bg-red-600 text-white text-[8px] font-bold rounded">{t('common.live', "DIRECT")}</span>
+                    <button
+                      onClick={() => {
+                        setIsUploadModalOpen(true)
+                        setShowPublishMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-orange-500/10 hover:text-orange-500 dark:hover:bg-orange-500/10 dark:hover:text-orange-400 flex items-center gap-3 transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <VideoIcon className="w-4 h-4" />
                       </div>
-                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.launchLiveDesc', "Diffusion en direct et chat live")}</p>
-                    </div>
-                  </button>
+                      <div>
+                        <p className="font-semibold">{t('header.publishMenu.expertiseVideo', "Vidéo d'expertise")}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.expertiseVideoDesc', "Tutoriel, conseil, projet")}</p>
+                      </div>
+                    </button>
 
-                  <button
-                    onClick={() => {
-                      navigate('/pub/demande')
-                      setShowPublishMenu(false)
-                    }}
-                    className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors group"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Megaphone className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">{t('header.publishMenu.adCampaign', "Campagne Publicitaire")}</p>
-                      <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.adCampaignDesc', "Promouvoir votre entreprise (PUB)")}</p>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
+                    <button
+                      onClick={() => {
+                        navigate('/pro/events?create=true')
+                        setShowPublishMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-purple-500/10 hover:text-purple-500 dark:hover:bg-purple-500/10 dark:hover:text-purple-400 flex items-center gap-3 transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <CalendarIcon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">{t('header.publishMenu.eventWebinar', "Événement & Webinaire")}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.eventWebinarDesc', "Conférence, atelier, masterclass")}</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        navigate('/pro/events?create=true&live=true')
+                        setShowPublishMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-red-500/10 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 flex items-center gap-3 transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Radio className="w-4 h-4 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold">{t('header.publishMenu.launchLive', "Lancer un Live")}</p>
+                          <span className="px-1.5 py-0.2 bg-red-600 text-white text-[8px] font-bold rounded">{t('common.live', "DIRECT")}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.launchLiveDesc', "Diffusion en direct et chat live")}</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        navigate('/pub/demande')
+                        setShowPublishMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-3 text-xs sm:text-sm text-gray-800 dark:text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Megaphone className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">{t('header.publishMenu.sponsoredAd', "Campagne Publicitaire")}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-zinc-400">{t('header.publishMenu.sponsoredAdDesc', "Bannière, vidéo, spot")}</p>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {!isAuthenticated ? (
               <div className="flex items-center space-x-2">
@@ -1486,16 +1505,6 @@ export const Header = (): JSX.Element => {
                       >
                         {t('pro.header.settings', 'Paramètres')}
                       </Link>
-                      <hr className="my-2 border-gray-200 dark:border-zinc-700" />
-                      <button
-                        onClick={() => {
-                          handleLogout()
-                          setShowProfileMenu(false)
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-zinc-700"
-                      >
-                        {t('pro.header.logout', 'Déconnexion')}
-                      </button>
                     </div>
                   )}
                 </div>

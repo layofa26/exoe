@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Users, MessageSquare, Send, Mic, MicOff, Video, VideoOff, PhoneOff, Maximize2, ArrowLeft,
-  Monitor, Hand, UserPlus, UserMinus, UserX, Star, Award, Download, Wifi, WifiOff, Loader2, Sparkles,
+  Monitor, Hand, UserPlus, UserMinus, UserX, Star, Wifi, WifiOff, Loader2, Sparkles,
   Crown, Eye, Lock, Volume2, ThumbsUp, Heart, Flame, PartyPopper
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -25,7 +25,7 @@ export default function LiveRoom() {
 
   const [eventData, setEventData] = useState<any>(null)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
-  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(true)
   const [showParticipantsTab, setShowParticipantsTab] = useState(false)
   const [newMessage, setNewMessage] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -40,7 +40,6 @@ export default function LiveRoom() {
 
   // Modals de fin de live
   const [showRatingModal, setShowRatingModal] = useState(false)
-  const [showCertificateModal, setShowCertificateModal] = useState(false)
   const [rating, setRating] = useState(5)
   const [feedback, setFeedback] = useState('')
   const [isSubmittingRating, setIsSubmittingRating] = useState(false)
@@ -310,68 +309,8 @@ export default function LiveRoom() {
     } finally {
       setIsSubmittingRating(false)
       setShowRatingModal(false)
-      setShowCertificateModal(true)
+      navigate('/pro/events')
     }
-  }
-
-  const downloadCertificate = () => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 1200
-    canvas.height = 800
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const grad = ctx.createLinearGradient(0, 0, 1200, 800)
-    grad.addColorStop(0, '#0f172a')
-    grad.addColorStop(1, '#1e1b4b')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, 1200, 800)
-
-    ctx.strokeStyle = '#f59e0b'
-    ctx.lineWidth = 12
-    ctx.strokeRect(40, 40, 1120, 720)
-
-    ctx.strokeStyle = '#d97706'
-    ctx.lineWidth = 2
-    ctx.strokeRect(55, 55, 1090, 690)
-
-    ctx.fillStyle = '#f59e0b'
-    ctx.font = 'bold 44px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('CERTIFICAT DE PARTICIPATION', 600, 160)
-
-    ctx.fillStyle = '#94a3b8'
-    ctx.font = '20px sans-serif'
-    ctx.fillText('Délivré par EXILE Professional Platform', 600, 210)
-
-    ctx.fillStyle = '#cbd5e1'
-    ctx.font = '24px sans-serif'
-    ctx.fillText('Ce certificat atteste que', 600, 310)
-
-    const participantName = user?.fullName || user?.username || 'Participant EXILE'
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 48px sans-serif'
-    ctx.fillText(participantName, 600, 380)
-
-    ctx.fillStyle = '#cbd5e1'
-    ctx.font = '24px sans-serif'
-    ctx.fillText('a assisté et participé activement à l’événement en direct :', 600, 450)
-
-    const eventTitle = eventData?.title || eventData?.name || roomNameParam || `Salon Live #${eventId}`
-    ctx.fillStyle = '#38bdf8'
-    ctx.font = 'bold 34px sans-serif'
-    ctx.fillText(`"${eventTitle}"`, 600, 520)
-
-    ctx.fillStyle = '#94a3b8'
-    ctx.font = '18px sans-serif'
-    ctx.fillText(`Délivré le ${new Date().toLocaleDateString('fr-FR')} • Session WebRTC Live HD`, 600, 610)
-
-    const link = document.createElement('a')
-    link.download = `Certificat_EXILE_${participantName.replace(/\s+/g, '_')}.png`
-    link.href = canvas.toDataURL('image/png')
-    link.click()
-    showToast('Certificat téléchargé avec succès !')
-    setTimeout(() => navigate('/pro/events'), 1500)
   }
 
   const roomTitle = eventData?.title || eventData?.name || roomNameParam || `Direct #${eventId}`
@@ -434,7 +373,23 @@ export default function LiveRoom() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowParticipantsTab(!showParticipantsTab)}
+              onClick={() => {
+                setIsChatOpen(!isChatOpen)
+                if (!isChatOpen) setShowParticipantsTab(false)
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                isChatOpen && !showParticipantsTab ? 'bg-blue-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              <MessageSquare size={14} />
+              <span className="hidden sm:inline">{t('pro.live.liveChat', 'Chat Live')}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowParticipantsTab(!showParticipantsTab)
+                if (!showParticipantsTab) setIsChatOpen(false)
+              }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${
                 showParticipantsTab ? 'bg-purple-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'
               }`}
@@ -668,14 +623,32 @@ export default function LiveRoom() {
               })}
             </div>
 
-            <button
-              onClick={handleLeaveLive}
-              title={isHost ? t('pro.live.endLive', 'Terminer le direct') : t('pro.live.leaveLive', 'Quitter le direct')}
-              className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold text-xs flex items-center gap-2 transition-colors shadow-lg shadow-red-600/30"
-            >
-              <PhoneOff size={16} />
-              <span className="hidden sm:inline">{isHost ? t('pro.live.endLiveShort', 'Fin du direct') : t('common.leave', 'Quitter')}</span>
-            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => {
+                  setIsChatOpen(!isChatOpen)
+                  if (!isChatOpen) setShowParticipantsTab(false)
+                }}
+                title={t('pro.live.liveChat', 'Chat Live')}
+                className={`p-2.5 sm:px-3 sm:py-2.5 rounded-full font-bold text-xs flex items-center gap-1.5 transition-all ${
+                  isChatOpen && !showParticipantsTab
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                <MessageSquare size={16} />
+                <span className="hidden sm:inline">Chat</span>
+              </button>
+
+              <button
+                onClick={handleLeaveLive}
+                title={isHost ? t('pro.live.endLive', 'Terminer le direct') : t('pro.live.leaveLive', 'Quitter le direct')}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold text-xs flex items-center gap-2 transition-colors shadow-lg shadow-red-600/30"
+              >
+                <PhoneOff size={16} />
+                <span className="hidden sm:inline">{isHost ? t('pro.live.endLiveShort', 'Fin du direct') : t('common.leave', 'Quitter')}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -901,62 +874,14 @@ export default function LiveRoom() {
                 disabled={isSubmittingRating}
                 className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
               >
-                {isSubmittingRating ? <Loader2 size={14} className="animate-spin" /> : <Award size={14} />}
-                <span>{t('pro.live.viewCertificate', 'Valider & Certificat')}</span>
+                {isSubmittingRating ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
+                <span>{t('common.submit', 'Valider')}</span>
               </button>
               <button
                 onClick={() => navigate('/pro/events')}
                 className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 font-bold text-xs transition-colors"
               >
                 {t('common.finish', 'Terminer')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2 : CERTIFICAT */}
-      {showCertificateModal && (
-        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-amber-500/40 text-white rounded-3xl p-6 w-full max-w-lg space-y-5 shadow-2xl text-center">
-            <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-lg">
-              <Award size={28} />
-            </div>
-
-            <div>
-              <h3 className="text-xl font-extrabold text-amber-400">
-                {t('pro.live.certTitle', 'CERTIFICAT DE PARTICIPATION')}
-              </h3>
-              <p className="text-xs text-zinc-400 mt-1">
-                {t('pro.live.certDeliveredBy', 'Délivré par EXILE Professional Platform')}
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-black/50 border border-amber-500/30 text-left space-y-2">
-              <p className="text-xs text-zinc-300">
-                {t('pro.live.certAttests', 'Ce certificat atteste que')}{' '}
-                <strong className="text-white font-bold">{user?.fullName || user?.username || 'Participant'}</strong>{' '}
-                {t('pro.live.certParticipated', "a participé avec succès à l'événement en direct :")}
-              </p>
-              <p className="text-sm font-bold text-amber-300">"{roomTitle}"</p>
-              <p className="text-[10px] text-zinc-400">
-                {t('common.date', 'Date')} : {new Date().toLocaleDateString(i18n.language || 'fr-FR')} • Session WebRTC Live HD
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={downloadCertificate}
-                className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
-              >
-                <Download size={15} />
-                {t('pro.live.downloadCert', 'Télécharger le Certificat (PNG)')}
-              </button>
-              <button
-                onClick={() => navigate('/pro/events')}
-                className="px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition-colors"
-              >
-                {t('common.close', 'Fermer')}
               </button>
             </div>
           </div>

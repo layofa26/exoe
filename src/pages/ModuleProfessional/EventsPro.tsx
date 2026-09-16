@@ -8,7 +8,7 @@ import {
   Play, Download, Upload, RotateCcw, Laptop, Briefcase, Palette, HeartPulse,
   Scale, Megaphone, GraduationCap, Layers, PlayCircle, User, AlertCircle, Eye, Shield, DollarSign,
   ChevronLeft, ChevronRight, Info, Mic, MicOff, VideoOff, Settings2, Globe, Lock, MessageSquare, Bell,
-  Image as ImageIcon, ChevronDown, ChevronUp
+  Image as ImageIcon, ChevronDown, ChevronUp, MoreVertical
 } from 'lucide-react'
 import TicketModal from '../../components/modals/TicketModal'
 import EventStatsModal from '../../components/modals/EventStatsModal'
@@ -53,72 +53,7 @@ interface EventItem {
   autoStartOnSchedule?: boolean
 }
 
-// ============ DEMO EVENTS ============
-const DEMO_EVENTS: EventItem[] = [
-  {
-    id: 'evt_1',
-    title: 'Conférence : Développement Web Moderne & Sécurité',
-    description: 'Découvrez les dernières tendances en développement web avec React, TypeScript et Node.js',
-    startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
-    format: 'virtual',
-    status: 'published',
-    location: { city: 'En ligne', venue: 'Salon Live' },
-    coverImage: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600',
-    category: 'TECHNOLOGY',
-    capacity: 100,
-    stats: { views: 1250, registrations: 45, attendees: 0, revenue: 0 },
-    organizerName: 'Jean Dupont',
-    organizerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
-    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    publishedAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-    price: 0,
-    isLive: false,
-    isRegistered: false
-  },
-  {
-    id: 'evt_2',
-    title: 'Workshop : Design d’Interface UI/UX & Design Systems',
-    description: 'Apprenez à concevoir des parcours utilisateurs fluides et esthétiques',
-    startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000).toISOString(),
-    format: 'in-person',
-    status: 'published',
-    location: { city: 'Lyon', venue: 'Tech Hub' },
-    coverImage: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=600',
-    category: 'DESIGN',
-    capacity: 50,
-    stats: { views: 890, registrations: 32, attendees: 0, revenue: 0 },
-    organizerName: 'Marie Martin',
-    organizerAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100',
-    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-    publishedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    price: 50,
-    isLive: false,
-    isRegistered: false
-  },
-  {
-    id: 'evt_3',
-    title: 'Rencontre Networking : Dirigeants & Startups 2026',
-    description: 'Échangez avec des experts, investisseurs et développeurs',
-    startDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    endDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
-    format: 'hybrid',
-    status: 'completed',
-    location: { city: 'Marseille', venue: 'Business Center' },
-    coverImage: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=600',
-    category: 'BUSINESS',
-    capacity: 200,
-    stats: { views: 2100, registrations: 150, attendees: 120, revenue: 7500 },
-    organizerName: 'Pierre Durand',
-    organizerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    publishedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-    price: 50,
-    isLive: false,
-    isRegistered: false
-  }
-]
+
 
 // ============ P AJ EVENMAN ============
 export default function EventsPro() {
@@ -198,7 +133,7 @@ export default function EventsPro() {
       }
     },
     {
-      cacheKey: 'pro:events:list',
+      cacheKey: 'pro:events:real:v3',
       cacheTime: 5 * 60 * 1000,
       initialData: []
     }
@@ -213,8 +148,6 @@ export default function EventsPro() {
   
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'live' | 'past' | 'replays' | 'mine'>('all')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const categoryScrollRef = useRef<HTMLDivElement>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null)
   const [selectedDetailEvent, setSelectedDetailEvent] = useState<EventItem | null>(null)
@@ -228,6 +161,7 @@ export default function EventsPro() {
   const notifiedEventsRef = useRef<Set<string>>(new Set())
   const [toast, setToast] = useState<string | null>(null)
   const [showInstantLiveModal, setShowInstantLiveModal] = useState(false)
+  const [activeMenuEventId, setActiveMenuEventId] = useState<string | null>(null)
   const [instantLiveTitle, setInstantLiveTitle] = useState('')
   const [instantLiveCategory, setInstantLiveCategory] = useState('TECHNOLOGY')
   const [instantLiveAccessType, setInstantLiveAccessType] = useState<'free' | 'paid'>('free')
@@ -250,23 +184,22 @@ export default function EventsPro() {
   const preLiveStreamRef = useRef<MediaStream | null>(null)
 
   // Open create modal if create=true query param is present
+  // Open instant live modal if live=true query param is present
   useEffect(() => {
+    if (searchParams.get('live') === 'true') {
+      // "Lancer un Live" depuis le menu Publier du Header
+      if (isAuthenticated) {
+        setShowInstantLiveModal(true)
+      }
+      navigate('/pro/events', { replace: true })
+      return
+    }
     if (searchParams.get('create') === 'true') {
       setShowCreateModal(true)
       navigate('/pro/events', { replace: true })
     }
-  }, [searchParams, navigate])
+  }, [searchParams, navigate, isAuthenticated])
 
-  const CATEGORIES = [
-    { id: 'all', label: t('common.all', 'Toutes les catégories'), icon: Layers },
-    { id: 'TECHNOLOGY', label: t('pro.events.catTech', 'Technologie'), icon: Laptop },
-    { id: 'BUSINESS', label: t('pro.events.catBusiness', 'Business & Finance'), icon: Briefcase },
-    { id: 'DESIGN', label: t('pro.events.catDesign', 'Design & UI/UX'), icon: Palette },
-    { id: 'HEALTH', label: t('pro.events.catHealth', 'Santé & Bien-être'), icon: HeartPulse },
-    { id: 'LAW', label: t('pro.events.catLaw', 'Droit & Fiscalité'), icon: Scale },
-    { id: 'MARKETING', label: t('pro.events.catMarketing', 'Marketing'), icon: Megaphone },
-    { id: 'EDUCATION', label: t('pro.events.catEducation', 'Masterclass Pro'), icon: GraduationCap }
-  ]
 
   // Set active tab or open create from URL
   useEffect(() => {
@@ -401,13 +334,6 @@ export default function EventsPro() {
     }
   }, [showToastMsg])
 
-  // Défilement horizontal des catégories
-  const scrollCategories = useCallback((direction: 'left' | 'right') => {
-    if (categoryScrollRef.current) {
-      const scrollAmount = direction === 'left' ? -220 : 220
-      categoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
-    }
-  }, [])
 
   // Helper pour vérifier si l'utilisateur actuel est le créateur / propriétaire de l'événement
   const isEventOwner = useCallback((event: EventItem) => {
@@ -906,22 +832,6 @@ export default function EventsPro() {
   const activeLiveEvents = events.filter(e => e.isLive)
 
   const filtered = events.filter(e => {
-        // Catégorie
-    if (selectedCategory !== 'all') {
-      const cat = (e.category || '').toLowerCase()
-      const sel = selectedCategory.toLowerCase()
-      if (sel === 'technology' && !cat.includes('tech')) return false
-      else if (sel === 'business' && !cat.includes('bus') && !cat.includes('fin')) return false
-      else if (sel === 'design' && !cat.includes('des')) return false
-      else if (sel === 'health' && !cat.includes('sant') && !cat.includes('heal')) return false
-      else if (sel === 'law' && !cat.includes('droit') && !cat.includes('law')) return false
-      else if (sel === 'marketing' && !cat.includes('market')) return false
-      else if (sel === 'education' && !cat.includes('educ') && !cat.includes('master')) return false
-      else if (sel !== 'technology' && sel !== 'business' && sel !== 'design' && sel !== 'health' && sel !== 'law' && sel !== 'marketing' && sel !== 'education') {
-        if (!cat.includes(sel)) return false
-      }
-    }
-
     // Onglet horizontal
     if (activeTab === 'live') {
       if (!e.isLive) return false
@@ -966,30 +876,30 @@ export default function EventsPro() {
 
       {/* ── EN-TÊTE FULL-WIDTH FLUSH AU TOP (Même design que Demandes) ── */}
       <div className={`flex-shrink-0 p-3.5 border-b backdrop-blur-xl ${resolvedTheme === 'dark' ? 'border-white/5 bg-black/40' : 'border-slate-200 bg-white/80'}`}>
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={handleBack}
-              className={`p-2 rounded-xl transition-colors ${resolvedTheme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+              className={`p-2 rounded-xl transition-colors flex-shrink-0 ${resolvedTheme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
               title={t('common.back', 'Retour')}
             >
               <ArrowLeft size={18} />
             </button>
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF6B00] to-orange-400 flex items-center justify-center text-white shadow-sm">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF6B00] to-orange-400 flex items-center justify-center text-white shadow-sm flex-shrink-0">
               <Calendar size={18} />
             </div>
-            <div>
-              <h1 className="font-bold text-base leading-tight">
+            <div className="min-w-0">
+              <h1 className="font-bold text-sm sm:text-base leading-tight truncate">
                 {t('pro.events.title', 'Événements & Live')}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
             {/* Bouton 1 : Lancer un Live (Direct 1-clic) */}
             <button
               onClick={() => isAuthenticated ? setShowInstantLiveModal(true) : navigate('/login')}
-              className="group relative flex items-center gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl shadow-md shadow-red-600/30 text-xs font-bold transition-all active:scale-95 flex-shrink-0 border border-red-400/30"
+              className="group relative flex items-center gap-1.5 px-2.5 sm:px-4 py-2 bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl shadow-md shadow-red-600/30 text-xs font-bold transition-all active:scale-95 flex-shrink-0 border border-red-400/30"
               title="Démarrer un direct vidéo immédiatement en 1 clic"
             >
               <div className="relative flex items-center justify-center">
@@ -997,7 +907,7 @@ export default function EventsPro() {
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-white rounded-full animate-ping" />
               </div>
               <div className="text-left leading-none">
-                <span className="block font-bold">{t('pro.events.startLive', 'Lancer un Live')}</span>
+                <span className="block font-bold whitespace-nowrap">{t('pro.events.startLive', 'Lancer un Live')}</span>
                 <span className="text-[9px] font-medium opacity-80 hidden sm:block">1-Clic direct</span>
               </div>
             </button>
@@ -1005,37 +915,39 @@ export default function EventsPro() {
             {/* Bouton 2 : Créer un événement (Programmer) */}
             <button
               onClick={() => isAuthenticated ? setShowCreateModal(true) : navigate('/login')}
-              className="flex items-center gap-2 px-3.5 sm:px-4 py-2 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-2xl shadow-md shadow-orange-500/20 text-xs font-bold transition-all active:scale-95 flex-shrink-0 border border-orange-400/30"
+              className="flex items-center gap-1.5 px-2.5 sm:px-4 py-2 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-2xl shadow-md shadow-orange-500/20 text-xs font-bold transition-all active:scale-95 flex-shrink-0 border border-orange-400/30"
               title="Programmer un événement ou un Live futur"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <div className="text-left leading-none">
-                <span className="block font-bold">{t('pro.events.createEvent', 'Créer un événement')}</span>
+                <span className="block font-bold whitespace-nowrap">{t('pro.events.createEvent', 'Créer un événement')}</span>
                 <span className="text-[9px] font-medium opacity-80 hidden sm:block">Programmer</span>
               </div>
             </button>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border ${resolvedTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'}`}>
-          <Search size={15} className={resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder={t('pro.events.searchPlaceholder', 'Rechercher par titre, intervenant ou ville...')}
-            className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-200">
-              <X size={13} />
-            </button>
-          )}
+        {/* Search Bar (Largeur contrôlée pour éviter une barre trop longue) */}
+        <div className="flex items-center justify-start">
+          <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border w-full max-w-sm sm:max-w-md ${resolvedTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'}`}>
+            <Search size={15} className={resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={t('pro.events.searchPlaceholder', 'Rechercher par titre, intervenant ou ville...')}
+              className="flex-1 bg-transparent outline-none text-xs sm:text-sm"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-200">
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
 
-                {/* 1. STATUS TABS FILTER */}
-        <div className="flex gap-1.5 pt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+        {/* 1. STATUS TABS FILTER */}
+        <div className="flex gap-1.5 pt-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {[
             { id: 'all', label: t('common.all', 'Tous'), icon: Layers, count: events.length },
             { id: 'live', label: t('pro.events.live', 'En direct'), icon: Radio, count: activeLiveEvents.length },
@@ -1066,56 +978,6 @@ export default function EventsPro() {
               </button>
             )
           })}
-        </div>
-
-        {/* 2. CATEGORIES HORIZONTAL SCROLL CHIPS AVEC BOUTONS FLECHES */}
-        <div className="relative flex items-center pt-2 pb-0.5 group">
-          <button
-            onClick={() => scrollCategories('left')}
-            className={`hidden md:flex items-center justify-center w-7 h-7 rounded-full border shadow-sm flex-shrink-0 mr-1.5 transition-all z-10 ${
-              resolvedTheme === 'dark' ? 'bg-zinc-850 hover:bg-zinc-700 text-zinc-300 border-zinc-700' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
-            }`}
-            title="Précédent"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          <div
-            ref={categoryScrollRef}
-            className="flex-1 flex gap-1.5 overflow-x-auto scroll-smooth py-0.5"
-            style={{ scrollbarWidth: 'none' }}
-          >
-            {CATEGORIES.map(cat => {
-              const isSelected = selectedCategory === cat.id
-              const CatIcon = cat.icon
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
-                    isSelected
-                      ? 'bg-zinc-800 text-[#FF6B00] border border-[#FF6B00]/50 font-bold shadow-sm'
-                      : resolvedTheme === 'dark'
-                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-800/20 border border-zinc-800'
-                      : 'text-slate-600 hover:text-slate-900 bg-slate-100/80 border border-slate-200'
-                  }`}
-                >
-                  <CatIcon className="w-3 h-3" />
-                  <span>{cat.label}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          <button
-            onClick={() => scrollCategories('right')}
-            className={`hidden md:flex items-center justify-center w-7 h-7 rounded-full border shadow-sm flex-shrink-0 ml-1.5 transition-all z-10 ${
-              resolvedTheme === 'dark' ? 'bg-zinc-850 hover:bg-zinc-700 text-zinc-300 border-zinc-700' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
-            }`}
-            title="Suivant"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
@@ -1169,7 +1031,7 @@ export default function EventsPro() {
       )}
 
       {/* Contenu principal défilant */}
-      <div className="flex-1 overflow-y-auto w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 pb-20 md:pb-8">
+      <div className="flex-1 overflow-y-auto w-full px-3 sm:px-4 lg:px-6 py-4 pb-20 md:pb-8">
 
         {/* ─── 3. PRIORITY SECTION: LIVES EN DIRECT MAINTENANT ─── */}
         {activeLiveEvents.length > 0 && activeTab !== 'past' && (
@@ -1250,7 +1112,7 @@ export default function EventsPro() {
             <p className={`${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} text-xs sm:text-sm md:text-base`}>{t('pro.events.noEvents', 'Aucun événement')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {filtered.map(event => {
               const isOwner = isEventOwner(event)
               const isFinished = isPast(event.endDate || event.startDate) || event.status === 'completed' || event.status === 'termine'
@@ -1262,12 +1124,12 @@ export default function EventsPro() {
                     {/* KOUVRI */}
                     <div 
                       onClick={() => { setSelectedDetailEvent(event); setShowDetailModal(true) }}
-                      className={`relative h-40 sm:h-44 ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-slate-100'} overflow-hidden w-full cursor-pointer`}
+                      className={`relative h-28 sm:h-32 ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-slate-100'} overflow-hidden w-full cursor-pointer`}
                     >
                       {event.coverImage ? (
                         <img src={event.coverImage} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       ) : (
-                        <div className={`w-full h-full flex flex-col items-center justify-center p-4 text-center select-none ${
+                        <div className={`w-full h-full flex flex-col items-center justify-center p-3 text-center select-none ${
                           (event.category || '').toLowerCase().includes('tech') 
                             ? 'bg-gradient-to-br from-indigo-900/60 via-blue-900/40 to-zinc-950 text-indigo-200'
                             : (event.category || '').toLowerCase().includes('bus')
@@ -1278,10 +1140,10 @@ export default function EventsPro() {
                             ? 'bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-zinc-950 text-emerald-200'
                             : 'bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-zinc-300'
                         }`}>
-                          <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur border border-white/10 flex items-center justify-center mb-2 shadow-inner group-hover:scale-110 transition-transform">
-                            <Calendar className="w-6 h-6 opacity-80" />
+                          <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur border border-white/10 flex items-center justify-center mb-1 shadow-inner group-hover:scale-110 transition-transform">
+                            <Calendar className="w-4.5 h-4.5 opacity-80" />
                           </div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+                          <span className="text-[9.5px] font-bold uppercase tracking-wider opacity-70">
                             {event.category || 'EXILE LIVE'}
                           </span>
                         </div>
@@ -1289,7 +1151,7 @@ export default function EventsPro() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
                     {/* BADGES */}
-                    <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                    <div className="absolute top-2 left-2 flex flex-wrap gap-1">
                       {event.isLive && (
                         <span className="bg-red-600/90 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1">
                           <Radio className="w-2.5 h-2.5" />
@@ -1320,32 +1182,103 @@ export default function EventsPro() {
                       )}
                     </div>
 
+                    {/* MENU TROIS POINTS FLOTTANT SUR L'IMAGE */}
+                    <div className="absolute top-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveMenuEventId(activeMenuEventId === event.id ? null : event.id)}
+                        className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md flex items-center justify-center transition-all shadow-md active:scale-95"
+                        title={t('common.options', 'Options')}
+                      >
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {activeMenuEventId === event.id && (
+                        <div className={`absolute right-0 mt-1 w-44 rounded-2xl shadow-2xl py-1.5 z-50 border ${
+                          resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-white border-slate-200 text-slate-800'
+                        } text-xs font-medium animate-in fade-in zoom-in-95 duration-100`}>
+                          <button
+                            onClick={() => { setSelectedDetailEvent(event); setShowDetailModal(true); setActiveMenuEventId(null) }}
+                            className="w-full px-3 py-2 text-left hover:bg-[#FF6B00]/10 hover:text-[#FF6B00] flex items-center gap-2 transition-colors"
+                          >
+                            <Info className="w-3.5 h-3.5" />
+                            <span>{t('pro.events.details', "Détails de l'événement")}</span>
+                          </button>
+
+                          <button
+                            onClick={() => { handleShareEvent(event); setActiveMenuEventId(null) }}
+                            className="w-full px-3 py-2 text-left hover:bg-[#FF6B00]/10 hover:text-[#FF6B00] flex items-center gap-2 transition-colors"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                            <span>{t('common.share', 'Partager')}</span>
+                          </button>
+
+                          <button
+                            onClick={() => { addToGoogleCalendar(event); setActiveMenuEventId(null) }}
+                            className="w-full px-3 py-2 text-left hover:bg-[#FF6B00]/10 hover:text-[#FF6B00] flex items-center gap-2 transition-colors"
+                          >
+                            <CalendarPlus className="w-3.5 h-3.5" />
+                            <span>Google Calendar</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setSelectedEvent(event); setShowStatsModal(true); setActiveMenuEventId(null) }}
+                            className="w-full px-3 py-2 text-left hover:bg-[#FF6B00]/10 hover:text-[#FF6B00] flex items-center gap-2 transition-colors"
+                          >
+                            <BarChart3 className="w-3.5 h-3.5" />
+                            <span>{t('pro.events.stats', 'Statistiques')}</span>
+                          </button>
+
+                          {isOwner && (
+                            <>
+                              <button
+                                onClick={() => { setSelectedEvent(event); setShowTicketModal(true); setActiveMenuEventId(null) }}
+                                className="w-full px-3 py-2 text-left hover:bg-blue-500/10 text-blue-500 flex items-center gap-2 transition-colors"
+                              >
+                                <Ticket className="w-3.5 h-3.5" />
+                                <span>Billetterie</span>
+                              </button>
+
+                              <button
+                                onClick={() => { setDeleteConfirm(event.id); setActiveMenuEventId(null) }}
+                                className="w-full px-3 py-2 text-left hover:bg-red-500/10 text-red-500 flex items-center gap-2 transition-colors border-t border-zinc-800/40 mt-1 pt-1.5"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>{t('common.delete', 'Supprimer')}</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     {/* ACTION RAPIDE: LIVE */}
                     {event.isLive && (
                       <button
                         onClick={() => navigate(`/pro/events/${event.id}/preview`)}
-                        className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xl bg-red-600 hover:bg-red-700 text-white animate-pulse"
+                        className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 shadow-xl bg-red-600 hover:bg-red-700 text-white animate-pulse"
                       >
-                        <Video className="w-3.5 h-3.5" />
+                        <Video className="w-3 h-3" />
                         <span>{t('pro.events.join', 'Rejoindre')}</span>
                       </button>
                     )}
                   </div>
 
-                  {/* TITRE & DESCRIPTION */}
+                  {/* TITRE & INFOS COMPACTES */}
                   <div 
                     onClick={() => { setSelectedDetailEvent(event); setShowDetailModal(true) }}
-                    className="p-3.5 space-y-2 cursor-pointer"
+                    className="p-3 space-y-1.5 cursor-pointer"
                   >
-                    <h3 className={`text-xs sm:text-sm font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100 hover:text-[#FF6B00]' : 'text-slate-900 hover:text-[#FF6B00]'} leading-snug line-clamp-2 transition-colors`}>
+                    <h3 className={`text-xs sm:text-[13px] font-bold ${resolvedTheme === 'dark' ? 'text-zinc-100 hover:text-[#FF6B00]' : 'text-slate-900 hover:text-[#FF6B00]'} leading-snug line-clamp-1 transition-colors`}>
                       {event.title}
                     </h3>
-                    <p className={`text-[11px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'} line-clamp-2`}>
+                    <p className={`text-[10.5px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'} line-clamp-1 leading-tight`}>
                       {event.description}
                     </p>
 
-                    {/* META INFOS */}
-                    <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-medium pt-1 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    {/* META INFOS COMPACT */}
+                    <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-medium pt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-[#FF6B00]" />
                         {formatDate(event.startDate)}
@@ -1363,20 +1296,25 @@ export default function EventsPro() {
                       </span>
                     </div>
 
-                    {/* ORGANISATEUR */}
-                    <div className={`flex items-center gap-2 pt-2 border-t ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-slate-100'}`}>
-                      <div className="w-6 h-6 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-                        {event.organizerAvatar ? <img src={event.organizerAvatar} className="w-full h-full rounded-full object-cover" /> : event.organizerName.charAt(0)}
+                    {/* ORGANISATEUR & PRIX COMPACT */}
+                    <div className={`flex items-center justify-between pt-1.5 border-t ${resolvedTheme === 'dark' ? 'border-zinc-800/80' : 'border-slate-100'}`}>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-5 h-5 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
+                          {event.organizerAvatar ? <img src={event.organizerAvatar} className="w-full h-full rounded-full object-cover" /> : event.organizerName.charAt(0)}
+                        </div>
+                        <span className={`text-[10.5px] font-medium truncate max-w-[130px] sm:max-w-[160px] ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          {event.organizerName}
+                        </span>
                       </div>
-                      <span className={`text-[11px] font-medium truncate ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-slate-600'}`}>
-                        {event.organizerName}
+                      <span className={`text-[10.5px] font-bold ${event.price === 0 ? 'text-emerald-500' : 'text-[#FF6B00]'}`}>
+                        {event.price === 0 ? t('pro.events.free', 'Gratuit') : `${event.price}$`}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                                {/* BOUTONS D'ACTIONS EN BAS DE CARTE */}
-                <div className="p-3 pt-0 flex flex-col gap-2">
+                {/* BOUTONS D'ACTIONS EN BAS DE CARTE (COMPACT) */}
+                <div className="p-2.5 pt-0 flex flex-col gap-1.5">
                   {(() => {
                     const isOwner = isEventOwner(event)
                     const isFinished = isPast(event.endDate || event.startDate) || event.status === 'completed' || event.status === 'termine'
@@ -1386,10 +1324,10 @@ export default function EventsPro() {
                       return (
                         <button
                           onClick={() => startLive(event)}
-                          className="w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-red-600/30 active:scale-95 bg-red-600 hover:bg-red-700 text-white animate-pulse"
+                          className="w-full py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-red-600/30 active:scale-95 bg-red-600 hover:bg-red-700 text-white animate-pulse"
                         >
                           <Radio className="w-3.5 h-3.5 animate-pulse" />
-                          <span>{isOwner ? "Gérer mon Direct en cours" : "Rejoindre le Direct"}</span>
+                          <span>{isOwner ? "Gérer mon Direct" : "Rejoindre le Direct"}</span>
                         </button>
                       )
                     }
@@ -1397,21 +1335,21 @@ export default function EventsPro() {
                     if (isFinished) {
                       if (isOwner) {
                         return (
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-2 gap-1.5">
                             <button
                               onClick={() => restartLive(event)}
-                              className="py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
+                              className="py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-sm active:scale-95 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
                               title="Relancer ce même direct en tant qu'organisateur"
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
+                              <RotateCcw className="w-3 h-3" />
                               <span>Relancer</span>
                             </button>
                             <button
                               onClick={() => { setSelectedReplayEvent(event); setShowReplayModal(true) }}
-                              className="py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-blue-600 hover:bg-blue-700 text-white"
+                              className="py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-sm active:scale-95 bg-blue-600 hover:bg-blue-700 text-white"
                               title="Visionner ou gérer la rediffusion"
                             >
-                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <Play className="w-3 h-3 fill-current" />
                               <span>Rediffusion</span>
                             </button>
                           </div>
@@ -1420,16 +1358,16 @@ export default function EventsPro() {
                         return (event.recordingUrl || event.replayUrl) ? (
                           <button
                             onClick={() => { setSelectedReplayEvent(event); setShowReplayModal(true) }}
-                            className="w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-blue-600 hover:bg-blue-700 text-white"
+                            className="w-full py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-blue-600 hover:bg-blue-700 text-white"
                           >
-                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <Play className="w-3 h-3 fill-current" />
                             <span>Visionner la Rediffusion</span>
                           </button>
                         ) : (
-                          <div className={`w-full py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 border ${
+                          <div className={`w-full py-1.5 px-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 border ${
                             resolvedTheme === 'dark' ? 'bg-zinc-800/40 text-zinc-400 border-zinc-800' : 'bg-slate-100 text-slate-500 border-slate-200'
                           }`}>
-                            <CheckCircle className="w-3.5 h-3.5 text-zinc-400" />
+                            <CheckCircle className="w-3 h-3 text-zinc-400" />
                             <span>Session Terminée</span>
                           </div>
                         )
@@ -1441,7 +1379,7 @@ export default function EventsPro() {
                       return (
                         <button
                           onClick={() => startLive(event)}
-                          className="w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white border border-red-500/30"
+                          className="w-full py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white border border-red-500/30"
                         >
                           <Video className="w-3.5 h-3.5" />
                           <span>Démarrer le Direct</span>
@@ -1449,11 +1387,11 @@ export default function EventsPro() {
                       )
                     } else {
                       return (
-                        <div className={`w-full py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 border ${
+                        <div className={`w-full py-1.5 px-2 rounded-xl text-[11px] font-medium flex items-center justify-center gap-1.5 border ${
                           resolvedTheme === 'dark' ? 'bg-zinc-900/60 text-zinc-400 border-zinc-800' : 'bg-slate-100 text-slate-600 border-slate-200'
                         }`}>
-                          <Clock className="w-3.5 h-3.5 text-amber-500" />
-                          <span>{isDueNow ? "En attente du lancement par l'organisateur" : "Direct programmé"}</span>
+                          <Clock className="w-3 h-3 text-amber-500" />
+                          <span className="truncate">{isDueNow ? "En attente du lancement" : "Direct programmé"}</span>
                         </div>
                       )
                     }
@@ -1465,7 +1403,7 @@ export default function EventsPro() {
                       {!isOwner ? (
                         <button
                           onClick={() => handleToggleRegister(event)}
-                          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                          className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-sm active:scale-95 ${
                             event.isRegistered
                               ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                               : 'bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-[#FF6B00]/25'
@@ -1473,21 +1411,21 @@ export default function EventsPro() {
                         >
                           {event.isRegistered ? (
                             <>
-                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <Check className="w-3 h-3 stroke-[3]" />
                               <span>{t('pro.events.registered', 'Inscrit')} ✓</span>
                             </>
                           ) : (
                             <>
-                              <Ticket className="w-3.5 h-3.5" />
-                              <span>{t('pro.events.register', "S'inscrire")} ({event.price === 0 ? t('pro.events.free', 'Gratuit') : `${event.price}$`})</span>
+                              <Ticket className="w-3 h-3" />
+                              <span>{t('pro.events.register', "S'inscrire")}</span>
                             </>
                           )}
                         </button>
                       ) : (
-                        <div className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border ${
+                        <div className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border ${
                           resolvedTheme === 'dark' ? 'bg-indigo-950/40 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                         }`}>
-                          <Shield className="w-3.5 h-3.5" />
+                          <Shield className="w-3 h-3" />
                           <span>{t('pro.events.organizer', 'Organisateur')}</span>
                         </div>
                       )}
@@ -1495,7 +1433,7 @@ export default function EventsPro() {
                       {/* Partager */}
                       <button
                         onClick={() => handleShareEvent(event)}
-                        className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
+                        className={`p-1.5 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
                           resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                         }`}
                         title={t('common.share', "Partager l'événement")}
@@ -1506,7 +1444,7 @@ export default function EventsPro() {
                       {/* Google Calendar */}
                       <button
                         onClick={() => addToGoogleCalendar(event)}
-                        className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
+                        className={`p-1.5 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center ${
                           resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                         }`}
                         title={t('pro.events.addToGoogleCalendar', 'Ajouter au calendrier Google')}
@@ -1518,42 +1456,42 @@ export default function EventsPro() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => handleShareEvent(event)}
-                        className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                        className={`flex-1 py-1.5 px-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center gap-1 ${
                           resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                         }`}
                       >
-                        <Share2 className="w-3.5 h-3.5" />
+                        <Share2 className="w-3 h-3" />
                         <span>{t('common.share', 'Partager')}</span>
                       </button>
                       <button
                         onClick={() => { setSelectedDetailEvent(event); setShowDetailModal(true) }}
-                        className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                        className={`flex-1 py-1.5 px-2 rounded-xl border text-xs font-semibold transition-colors flex items-center justify-center gap-1 ${
                           resolvedTheme === 'dark' ? 'bg-zinc-800/60 border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                         }`}
                       >
-                        <Info className="w-3.5 h-3.5" />
+                        <Info className="w-3 h-3" />
                         <span>Détails</span>
                       </button>
                     </div>
                   )}
 
                   {/* Boutons secondaires (Billetterie / Stats / Supprimer si organisateur) */}
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <div className="flex items-center gap-2.5">
                       <button
                         onClick={() => { setSelectedEvent(event); setShowStatsModal(true) }}
-                        className={`font-semibold transition-colors flex items-center gap-1 ${
+                        className={`font-medium transition-colors flex items-center gap-1 ${
                           resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-800'
                         }`}
                       >
                         <BarChart3 className="w-3 h-3" />
-                        <span>{t('pro.events.stats', 'Statistiques')}</span>
+                        <span>{t('pro.events.stats', 'Stats')}</span>
                       </button>
 
                       {isEventOwner(event) && (
                         <button
                           onClick={() => { setSelectedEvent(event); setShowTicketModal(true) }}
-                          className={`font-semibold transition-colors flex items-center gap-1 ${
+                          className={`font-medium transition-colors flex items-center gap-1 ${
                             resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-blue-400' : 'text-slate-500 hover:text-blue-600'
                           }`}
                         >

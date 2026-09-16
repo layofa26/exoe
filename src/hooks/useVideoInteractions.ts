@@ -235,13 +235,52 @@ export const useVideoInteractions = ({
     }
   }, [isAuthenticated, authorId, broadcastUpdate, showSuccess, showError])
 
-  // 5. VUE PROTÉGÉE CONTRE LES DOUBLONS
+  // 5. VUE PROTÉGÉE CONTRE LES DOUBLONS AVEC VÉRIFICATION STRICTE DE L'UUID UTILISATEUR
   const recordView = useCallback(async () => {
     if (viewCountedRef.current || !videoIdNum || Number.isNaN(videoIdNum)) return
     viewCountedRef.current = true
 
+    // Identifier l'UUID réel de l'utilisateur (authentifié ou device unique persistant)
+    const getViewerUuid = (): string => {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          const uid = payload.user_id || payload.id || payload.uuid
+          if (uid) return `user_${uid}`
+        } catch {}
+      }
+      const storedId = localStorage.getItem('user_id') || localStorage.getItem('exile_user_id')
+      if (storedId) return `user_${storedId}`
+
+      let guestUuid = localStorage.getItem('exile_device_uuid')
+      if (!guestUuid) {
+        guestUuid = 'guest_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now())
+        localStorage.setItem('exile_device_uuid', guestUuid)
+      }
+      return guestUuid
+    }
+
+    const viewerUuid = getViewerUuid()
+    const viewStorageKey = `exile_viewed_${viewerUuid}`
+
     try {
-      const res = await videoApi.incrementView(videoIdNum)
+      const rawViewed = localStorage.getItem(viewStorageKey)
+      const viewedList: string[] = rawViewed ? JSON.parse(rawViewed) : []
+      if (viewedList.includes(String(videoIdNum))) {
+        // Cette vidéo a déjà été comptabilisée pour cet utilisateur
+        return
+      }
+
+      // Enregistrer l'identifiant pour empêcher toute nouvelle vue par ce même utilisateur
+      viewedList.push(String(videoIdNum))
+      if (viewedList.length > 1000) viewedList.shift()
+      localStorage.setItem(viewStorageKey, JSON.stringify(viewedList))
+    } catch {}
+
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || undefined
+      const res = await videoApi.incrementView(videoIdNum, token)
       if (res.success && typeof res.views === 'number') {
         setViewsCount(res.views)
         broadcastUpdate({ views_count: res.views })

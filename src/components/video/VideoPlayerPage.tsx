@@ -766,125 +766,129 @@ export function VideoPlayerPage({ video, related, onBack, onSelect }: VideoPlaye
               <span>{formatYouTubeDate(video.postedAt || video.createdAt || '')}</span>
             </div>
 
-            {/* ── 5. CRÉATEUR (Avatar + Nom + Abonnés + Bouton S'abonner) ── */}
-            <div className="flex items-center justify-between gap-2 py-0.5">
-              <div
-                className="flex items-center gap-2 min-w-0 cursor-pointer"
-                onClick={() => navigate(`/pro/profile/${video.author.id}`)}
-              >
+            {/* ── 5. CRÉATEUR & ACTIONS (Alinye sou yon sèl liy pou evite gaspiye espas) ── */}
+            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 py-1.5 border-y border-zinc-800/40 my-1">
+              {/* Créateur (Avatar + Nom + Abonnés + Bouton S'abonner) */}
+              <div className="flex items-center gap-2 min-w-0">
                 <div
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-sm"
-                  style={{ backgroundColor: video.author?.avatarColor || '#FF6B00' }}
+                  className="flex items-center gap-2 min-w-0 cursor-pointer"
+                  onClick={() => navigate(`/pro/profile/${video.author.id}`)}
                 >
-                  {video.author?.avatarUrl && (typeof navigator === 'undefined' || navigator.onLine) ? (
-                    <img
-                      src={video.author.avatarUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <span className="text-white font-bold text-[10px] sm:text-xs">{video.author?.initials || 'U'}</span>
-                  )}
+                  <div
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden shadow-sm"
+                    style={{ backgroundColor: video.author?.avatarColor || '#FF6B00' }}
+                  >
+                    {video.author?.avatarUrl && (typeof navigator === 'undefined' || navigator.onLine) ? (
+                      <img
+                        src={video.author.avatarUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <span className="text-white font-bold text-xs">{video.author?.initials || 'U'}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className={`text-xs sm:text-sm font-bold truncate leading-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      @{cleanUsername(video.author?.username || video.author?.name)}
+                    </h3>
+                    <p className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      {fmtNum(subscribersCount)} abonnés
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h3 className={`text-[12px] sm:text-xs font-bold truncate leading-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    @{cleanUsername(video.author?.username || video.author?.name)}
-                  </h3>
-                  <p className={`text-[9px] sm:text-[10px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
-                    {fmtNum(subscribersCount)} abonnés
-                  </p>
-                </div>
+
+                {/* Bouton S'abonner Ultra-Lisible */}
+                {!isOwnVideo && (
+                  <button
+                    onClick={handleToggleSubscribe}
+                    disabled={isPending}
+                    className={`px-3 py-1 rounded-full text-xs font-black tracking-wide transition-all active:scale-95 disabled:opacity-50 flex-shrink-0 cursor-pointer shadow-sm ml-1 ${
+                      isSubscribed
+                        ? isDark ? 'bg-zinc-800 text-zinc-200 border border-zinc-700' : 'bg-slate-200 text-slate-800 border border-slate-300'
+                        : 'bg-white text-zinc-950 hover:bg-zinc-100'
+                    }`}
+                    style={{
+                      color: isSubscribed ? (isDark ? '#e4e4e7' : '#1e293b') : '#09090b',
+                      backgroundColor: isSubscribed ? (isDark ? '#27272a' : '#e2e8f0') : '#ffffff',
+                    }}
+                  >
+                    {isSubscribed ? 'Abonné' : "S'abonner"}
+                  </button>
+                )}
               </div>
 
-              {/* Bouton S'abonner Ultra-Lisible */}
-              {!isOwnVideo && (
+              {/* Actions (Contacter, Partager, Like/Dislike, Favori, Menu) */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-0.5 ml-auto">
+                {/* Contacter */}
                 <button
-                  onClick={handleToggleSubscribe}
-                  disabled={isPending}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-black tracking-wide transition-all active:scale-95 disabled:opacity-50 flex-shrink-0 cursor-pointer shadow-md ${
-                    isSubscribed
-                      ? isDark ? 'bg-zinc-800 text-zinc-200 border border-zinc-700' : 'bg-slate-200 text-slate-800 border border-slate-300'
-                      : 'bg-white text-zinc-950 hover:bg-zinc-100'
-                  }`}
-                  style={{
-                    color: isSubscribed ? (isDark ? '#e4e4e7' : '#1e293b') : '#09090b',
-                    backgroundColor: isSubscribed ? (isDark ? '#27272a' : '#e2e8f0') : '#ffffff',
-                  }}
+                  onClick={() => setShowContactModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-sm flex-shrink-0 transition-transform active:scale-95"
                 >
-                  {isSubscribed ? 'Abonné' : "S'abonner"}
+                  <MessageCircle size={13} />
+                  <span>Contacter</span>
                 </button>
-              )}
-            </div>
 
-            {/* ── 6. ACTIONS (Like, Dislike, Partager, Favori, Contacter, Menu) ── */}
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-1 border-y border-zinc-800/40 my-0.5">
-              {/* Like / Dislike */}
-              <div className={`flex items-center rounded-full flex-shrink-0 ${isDark ? 'bg-zinc-800/80 border border-zinc-700/50' : 'bg-gray-100 border border-gray-200'}`}>
+                {/* Like / Dislike */}
+                <div className={`flex items-center rounded-full flex-shrink-0 ${isDark ? 'bg-zinc-800/80 border border-zinc-700/50' : 'bg-gray-100 border border-gray-200'}`}>
+                  <button
+                    onClick={handleLike}
+                    disabled={isPending}
+                    className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-l-full transition-colors disabled:opacity-50 ${
+                      isLiked ? 'text-[#FF6B00] bg-[#FF6B00]/10' : isDark ? 'text-white' : 'text-gray-900'
+                    }`}
+                  >
+                    <ThumbsUp size={12} className={isLiked ? 'fill-[#FF6B00]' : ''} />
+                    <span>{fmtNum(likesCount)}</span>
+                  </button>
+                  <div className="w-[1px] h-3 bg-zinc-700/50" />
+                  <button
+                    onClick={handleDislike}
+                    disabled={isPending}
+                    className={`px-2 py-1 rounded-r-full transition-colors disabled:opacity-50 ${
+                      isDisliked ? 'text-red-400 bg-red-500/10' : isDark ? 'text-white' : 'text-gray-900'
+                    }`}
+                  >
+                    <ThumbsDown size={12} className={isDisliked ? 'fill-red-400' : ''} />
+                  </button>
+                </div>
+
+                {/* Partager */}
                 <button
-                  onClick={handleLike}
-                  disabled={isPending}
-                  className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-l-full transition-colors disabled:opacity-50 ${
-                    isLiked ? 'text-[#FF6B00] bg-[#FF6B00]/10' : isDark ? 'text-white' : 'text-gray-900'
+                  onClick={handleShare}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium flex-shrink-0 transition-colors ${
+                    isDark ? 'bg-zinc-800/80 hover:bg-zinc-700 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
                   }`}
                 >
-                  <ThumbsUp size={12} className={isLiked ? 'fill-[#FF6B00]' : ''} />
-                  <span>{fmtNum(likesCount)}</span>
+                  <Share2 size={12} />
+                  <span>Partager</span>
                 </button>
-                <div className="w-[1px] h-3 bg-zinc-700/50" />
+
+                {/* Favoris */}
                 <button
-                  onClick={handleDislike}
+                  onClick={handleFavorite}
                   disabled={isPending}
-                  className={`px-2 py-1 rounded-r-full transition-colors disabled:opacity-50 ${
-                    isDisliked ? 'text-red-400 bg-red-500/10' : isDark ? 'text-white' : 'text-gray-900'
+                  className={`p-1.5 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${
+                    isFavorite ? 'bg-yellow-500/20 text-yellow-400' : isDark ? 'bg-zinc-800/80 text-white' : 'bg-gray-100 text-gray-900'
                   }`}
                 >
-                  <ThumbsDown size={12} className={isDisliked ? 'fill-red-400' : ''} />
+                  <Bookmark size={12} className={isFavorite ? 'fill-yellow-400' : ''} />
                 </button>
+
+                {/* DotsMenu */}
+                <DotsMenu
+                  videoId={video.id}
+                  authorId={video.author?.id || ''}
+                  show={show}
+                  saved={isFavorite}
+                  onSave={handleFavorite}
+                  onShare={handleShare}
+                  onContact={() => setShowContactModal(true)}
+                />
               </div>
-
-              {/* Partager */}
-              <button
-                onClick={handleShare}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium flex-shrink-0 ${
-                  isDark ? 'bg-zinc-800/80 hover:bg-zinc-700 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                }`}
-              >
-                <Share2 size={12} />
-                <span>Partager</span>
-              </button>
-
-              {/* Favoris */}
-              <button
-                onClick={handleFavorite}
-                disabled={isPending}
-                className={`p-1.5 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${
-                  isFavorite ? 'bg-yellow-500/20 text-yellow-400' : isDark ? 'bg-zinc-800/80 text-white' : 'bg-gray-100 text-gray-900'
-                }`}
-              >
-                <Bookmark size={12} className={isFavorite ? 'fill-yellow-400' : ''} />
-              </button>
-
-              {/* Contacter */}
-              <button
-                onClick={() => setShowContactModal(true)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#FF6B00] hover:bg-[#e05e00] text-white shadow-sm flex-shrink-0"
-              >
-                <MessageCircle size={12} />
-                <span>Contacter</span>
-              </button>
-
-              <DotsMenu
-                videoId={video.id}
-                authorId={video.author?.id || ''}
-                show={show}
-                saved={isFavorite}
-                onSave={handleFavorite}
-                onShare={handleShare}
-                onContact={() => setShowContactModal(true)}
-              />
             </div>
 
             {/* ── 7. DESCRIPTION COMPACTE (S'ouvre en panneau sur mobile) ── */}

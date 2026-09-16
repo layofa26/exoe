@@ -105,8 +105,11 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({
   useEffect(() => {
     if (anchorRef.current) {
       const rect = anchorRef.current.getBoundingClientRect()
+      const menuHeight = 160
+      const spaceBelow = window.innerHeight - rect.bottom
+      const showAbove = spaceBelow < menuHeight && rect.top > menuHeight
       setPos({
-        top: rect.bottom + 4,
+        top: showAbove ? Math.max(8, rect.top - menuHeight - 4) : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4),
         right: Math.max(8, window.innerWidth - rect.right),
       })
     }
