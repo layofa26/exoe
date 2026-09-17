@@ -23,9 +23,9 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useQuery } from '../../hooks/useQuery'
-import { cacheService } from '../../services/cacheService'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import { UploadVideo } from '../../components/video/UploadVideo'
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
@@ -56,6 +56,7 @@ export const MyVideos = (): JSX.Element => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
 
   // SWR query avec chargement instantané (0ms) depuis le cache
   const {
@@ -177,7 +178,7 @@ export const MyVideos = (): JSX.Element => {
 
   return (
     <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-gray-50 text-gray-900'} pb-24`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-5">
         
         {/* Pro Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -196,7 +197,7 @@ export const MyVideos = (): JSX.Element => {
             <div>
               <div className="flex items-center gap-2">
                 <Film className="w-6 h-6 text-blue-500" />
-                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">{t('pro.myVideos.manageTitle', 'Mes vidéos')}</h1>
+                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">{t('pro.myVideos.manageTitle', 'Gestion de mes Vidéos')}</h1>
               </div>
               <p className={`text-xs sm:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                 {t('pro.myVideos.subtitle', 'Gérez, organisez et suivez la performance de vos publications')}
@@ -204,151 +205,164 @@ export const MyVideos = (): JSX.Element => {
             </div>
           </div>
 
-          <Link
-            to="/pro"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
+          <button
+            onClick={() => setIsUploadOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>{t('pro.myVideos.uploadNew', 'Nouvelle vidéo')}</span>
-          </Link>
+            <span>{t('pro.myVideos.uploadNew', 'Mettre en ligne une vidéo')}</span>
+          </button>
         </div>
 
-        {/* Stats Dashboard Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className={`p-4 rounded-2xl border ${
+        {/* Controls & Stats Unified Section: Search placed to the LEFT of the 4 stats sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-stretch">
+          {/* Left: Search bar & Filter controls */}
+          <div className={`lg:col-span-5 xl:col-span-5 p-3 sm:p-4 rounded-2xl border ${
             resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
-          } shadow-sm`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.allVideos', 'Total Vidéos')}</span>
-              <Film className="w-4 h-4 text-blue-500" />
+          } shadow-sm flex flex-col justify-between gap-3`}>
+            {/* Search input */}
+            <div className="relative w-full">
+              <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
+              <input
+                type="text"
+                placeholder={t('pro.myVideos.searchPlaceholder', 'Rechercher dans mes vidéos...')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-full pl-10 pr-9 py-2 rounded-xl text-sm border transition-colors ${
+                  resolvedTheme === 'dark'
+                    ? 'bg-zinc-800/80 border-zinc-700 text-white placeholder-zinc-500 focus:border-blue-500'
+                    : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <p className="text-2xl font-extrabold">{stats.total}</p>
-          </div>
 
-          <div className={`p-4 rounded-2xl border ${
-            resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
-          } shadow-sm`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.publishedVideos', 'Publiées')}</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            {/* Filter tabs & View Mode */}
+            <div className="flex items-center justify-between gap-2 overflow-x-auto">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                {[
+                  { id: 'all', label: t('common.all', 'Tout'), count: stats.total },
+                  { id: 'published', label: t('pro.myVideos.published', 'Publiées'), count: stats.published },
+                  { id: 'draft', label: t('pro.myVideos.drafts', 'Brouillons'), count: stats.draft }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setFilter(f.id as any)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                      filter === f.id
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : resolvedTheme === 'dark'
+                        ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span>{f.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                      filter === f.id
+                        ? 'bg-white/20 text-white'
+                        : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-400' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {f.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className={`flex items-center p-1 rounded-xl border flex-shrink-0 ${
+                resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-gray-100 border-gray-200'
+              }`}>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300'
+                  }`}
+                  title={t('common.grid', 'Vue grille')}
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300'
+                  }`}
+                  title={t('common.list', 'Vue liste')}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <p className="text-2xl font-extrabold text-emerald-500">{stats.published}</p>
           </div>
 
-          <div className={`p-4 rounded-2xl border ${
-            resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
-          } shadow-sm`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.draftVideos', 'Brouillons')}</span>
-              <FileEdit className="w-4 h-4 text-amber-500" />
-            </div>
-            <p className="text-2xl font-extrabold text-amber-500">{stats.draft}</p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border ${
-            resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
-          } shadow-sm`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.myVideos.totalViews', 'Vues Totales')}</span>
-              <Eye className="w-4 h-4 text-purple-500" />
-            </div>
-            <p className="text-2xl font-extrabold text-purple-500">
-              {stats.totalViews >= 1000 ? `${(stats.totalViews / 1000).toFixed(1)}k` : stats.totalViews}
-            </p>
-          </div>
-        </div>
-
-        {/* Filter Controls & Search */}
-        <div className={`p-3 sm:p-4 rounded-2xl border ${
-          resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
-        } shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3`}>
-          {/* Search bar */}
-          <div className="relative flex-1">
-            <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-            <input
-              type="text"
-              placeholder={t('pro.myVideos.searchPlaceholder', 'Rechercher par titre...')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-10 pr-9 py-2 rounded-xl text-sm border transition-colors ${
-                resolvedTheme === 'dark'
-                  ? 'bg-zinc-800/80 border-zinc-700 text-white placeholder-zinc-500 focus:border-blue-500'
-                  : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {[
-              { id: 'all', label: t('common.all', 'Toutes'), count: stats.total },
-              { id: 'published', label: t('pro.myVideos.published', 'Publiées'), count: stats.published },
-              { id: 'draft', label: t('pro.myVideos.drafts', 'Brouillons'), count: stats.draft }
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id as any)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
-                  filter === f.id
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : resolvedTheme === 'dark'
-                    ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <span>{f.label}</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] ${
-                  filter === f.id
-                    ? 'bg-white/20 text-white'
-                    : resolvedTheme === 'dark' ? 'bg-zinc-700 text-zinc-400' : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {f.count}
+          {/* Right: Stats Dashboard Grid (Toutes mes vidéos, Publiées, Brouillons, Vues Totales) */}
+          <div className="lg:col-span-7 xl:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className={`p-3.5 rounded-2xl border ${
+              resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+            } shadow-sm flex flex-col justify-between`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-xs font-semibold truncate ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                  {t('pro.myVideos.allVideos', 'Toutes mes vidéos')}
                 </span>
-              </button>
-            ))}
+                <Film className="w-4 h-4 text-blue-500 flex-shrink-0" />
+              </div>
+              <p className="text-xl sm:text-2xl font-extrabold">{stats.total}</p>
+            </div>
 
-            {/* View Mode Toggle */}
-            <div className={`ml-2 flex items-center p-1 rounded-xl border ${
-              resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-gray-100 border-gray-200'
-            }`}>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300'
-                }`}
-                title={t('common.grid', 'Vue grille')}
-              >
-                <Grid3X3 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300'
-                }`}
-                title={t('common.list', 'Vue liste')}
-              >
-                <List className="w-4 h-4" />
-              </button>
+            <div className={`p-3.5 rounded-2xl border ${
+              resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+            } shadow-sm flex flex-col justify-between`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-xs font-semibold truncate ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                  {t('pro.myVideos.publishedVideos', 'Publiées')}
+                </span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              </div>
+              <p className="text-xl sm:text-2xl font-extrabold text-emerald-500">{stats.published}</p>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${
+              resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+            } shadow-sm flex flex-col justify-between`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-xs font-semibold truncate ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                  {t('pro.myVideos.draftVideos', 'Brouillons')}
+                </span>
+                <FileEdit className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              </div>
+              <p className="text-xl sm:text-2xl font-extrabold text-amber-500">{stats.draft}</p>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${
+              resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-gray-200'
+            } shadow-sm flex flex-col justify-between`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-xs font-semibold truncate ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                  {t('pro.myVideos.totalViews', 'Vues Totales')}
+                </span>
+                <Eye className="w-4 h-4 text-purple-500 flex-shrink-0" />
+              </div>
+              <p className="text-xl sm:text-2xl font-extrabold text-purple-500">
+                {stats.totalViews >= 1000 ? `${(stats.totalViews / 1000).toFixed(1)}k` : stats.totalViews}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Video Content Grid / List */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[1, 2, 3, 4, 5, 6].map(i => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
               <div key={i} className={`rounded-2xl border p-3 animate-pulse ${
                 resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
               }`}>
@@ -378,17 +392,17 @@ export const MyVideos = (): JSX.Element => {
               {searchQuery ? t('pro.myVideos.noResultsDesc', 'Modifiez vos termes de recherche pour trouver du contenu.') : t('pro.myVideos.noVideosDesc', "Partagez votre première création avec votre communauté dès aujourd'hui.")}
             </p>
             {!searchQuery && (
-              <Link
-                to="/pro"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md transition-all active:scale-95"
+              <button
+                onClick={() => setIsUploadOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>{t('pro.feed.publishVideo', 'Publier une vidéo')}</span>
-              </Link>
+              </button>
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
             {filteredVideos.map((video) => (
               <div
                 key={video.id}
@@ -409,14 +423,14 @@ export const MyVideos = (): JSX.Element => {
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500">
-                        <Play className="w-10 h-10 mb-1 opacity-40" />
-                        <span className="text-[11px] font-medium">{t('pro.myVideos.noThumbnail', 'Aperçu indisponible')}</span>
+                        <Play className="w-8 h-8 mb-1 opacity-40" />
+                        <span className="text-[10px] font-medium">{t('pro.myVideos.noThumbnail', 'Aperçu indisponible')}</span>
                       </div>
                     )}
 
                     {/* Status Pill */}
-                    <div className="absolute top-2.5 left-2.5">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-md ${
+                    <div className="absolute top-2 left-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md ${
                         video.status === 'PUBLISHED'
                           ? 'bg-emerald-600 text-white'
                           : 'bg-amber-600 text-white'
@@ -427,7 +441,7 @@ export const MyVideos = (): JSX.Element => {
 
                     {/* Duration badge */}
                     {video.duration && (
-                      <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-[11px] font-bold backdrop-blur-xs">
+                      <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-black/80 text-white text-[10px] font-bold backdrop-blur-xs">
                         {formatDuration(video.duration)}
                       </div>
                     )}
@@ -436,14 +450,14 @@ export const MyVideos = (): JSX.Element => {
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
                       <button
                         onClick={() => navigate(`/pro/video/${video.id}`)}
-                        className="p-2.5 rounded-full bg-white/90 hover:bg-white text-gray-900 shadow-lg transition-transform hover:scale-110"
+                        className="p-2 rounded-full bg-white/90 hover:bg-white text-gray-900 shadow-lg transition-transform hover:scale-110 cursor-pointer"
                         title={t('common.view', 'Regarder')}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(video.id)}
-                        className="p-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-transform hover:scale-110"
+                        className="p-2 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-transform hover:scale-110 cursor-pointer"
                         title={t('common.delete', 'Supprimer')}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -452,10 +466,10 @@ export const MyVideos = (): JSX.Element => {
                   </div>
 
                   {/* Info area */}
-                  <div className="p-4 space-y-2">
+                  <div className="p-3 space-y-1.5">
                     <h3
                       onClick={() => navigate(`/pro/video/${video.id}`)}
-                      className="font-bold text-sm sm:text-base line-clamp-2 hover:text-blue-500 cursor-pointer transition-colors"
+                      className="font-bold text-xs sm:text-sm line-clamp-2 hover:text-blue-500 cursor-pointer transition-colors leading-snug"
                       title={video.title}
                     >
                       {video.title}
@@ -464,26 +478,26 @@ export const MyVideos = (): JSX.Element => {
                 </div>
 
                 {/* Footer Metrics */}
-                <div className={`p-4 pt-0 border-t ${
+                <div className={`p-3 pt-0 border-t ${
                   resolvedTheme === 'dark' ? 'border-zinc-800/80' : 'border-gray-100'
-                } flex items-center justify-between text-xs ${
+                } flex items-center justify-between text-[11px] ${
                   resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'
                 } mt-2`}>
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 font-medium">
-                      <Eye className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex items-center gap-1 font-medium" title="Vues">
+                      <Eye className="w-3 h-3 text-zinc-400" />
                       {video.viewsCount}
                     </span>
-                    <span className="flex items-center gap-1 font-medium">
-                      <ThumbsUp className="w-3.5 h-3.5" />
+                    <span className="flex items-center gap-1 font-medium" title="Likes">
+                      <ThumbsUp className="w-3 h-3 text-zinc-400" />
                       {video.likesCount}
                     </span>
-                    <span className="flex items-center gap-1 font-medium">
-                      <MessageSquare className="w-3.5 h-3.5" />
+                    <span className="flex items-center gap-1 font-medium" title="Commentaires">
+                      <MessageSquare className="w-3 h-3 text-zinc-400" />
                       {video.commentsCount}
                     </span>
                   </div>
-                  <span className="text-[11px]">
+                  <span className="text-[10px] text-zinc-400 truncate">
                     {new Date(video.createdAt).toLocaleDateString(i18n.language || 'fr-FR')}
                   </span>
                 </div>
@@ -565,6 +579,16 @@ export const MyVideos = (): JSX.Element => {
           </div>
         )}
       </div>
+
+      {/* UPLOAD VIDEO MODAL */}
+      <UploadVideo
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        onSuccess={() => {
+          setIsUploadOpen(false)
+          loadVideos()
+        }}
+      />
 
       {/* CONFIRM MODAL: SUPPRIMER VIDÉO */}
       <ConfirmModal

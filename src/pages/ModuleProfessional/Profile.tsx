@@ -818,7 +818,7 @@ const Profile = () => {
 
   // Accès rapide
   const quickAccess = [
-    { label: t('pro.events.myEvents', 'Mes événements'), path: '/pro/events', icon: Calendar },
+    { label: t('pro.events.myEvents', 'Mes événements'), path: '/pro/events?tab=mine', icon: Calendar },
     { label: t('pro.requests.hubTitle', 'Mes demandes'), path: '/pro/requests', icon: MessageSquare },
     { label: t('pro.subscribers.title', 'Mes abonnés'), path: '/pro/subscribers', icon: Users },
     { label: t('pro.myVideos.allVideos', 'Mes vidéos'), path: '/pro/my-videos', icon: Video }
