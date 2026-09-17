@@ -141,6 +141,12 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
           const cleanUser = (rawUsername && !rawUsername.includes('@')) 
             ? rawUsername 
             : (decoded.email ? decoded.email.split('@')[0] : (storedProfile.email ? storedProfile.email.split('@')[0] : ''))
+          const isVerified = Boolean(
+            storedProfile.is_verified ||
+            storedProfile.isVerified ||
+            (storedProfile.birth_date && storedProfile.profession) ||
+            (storedProfile.birthDate && storedProfile.profession)
+          )
           const userData: User = {
             id: userId,
             email: decoded.email || storedProfile.email || '',
@@ -150,7 +156,12 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
             roles: [],
             type: (decoded.type || 'PROFESSIONAL').toLowerCase() as 'professional' | 'institution',
             legacyPro: false,
-            institutionPlan: undefined
+            institutionPlan: undefined,
+            isVerified: isVerified,
+            birthDate: storedProfile.birth_date || storedProfile.birthDate,
+            gender: storedProfile.gender,
+            profession: storedProfile.profession,
+            speciality: storedProfile.speciality || storedProfile.specialty
           }
           setUser(userData)
           setIsAuthenticated(true)
@@ -167,27 +178,38 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     setLoading(false)
   }, [])
 
-  const completeLoginSession = (access: string, refresh: string, usernameFallback: string): LoginResult => {
+  const completeLoginSession = (access: string, refresh: string, usernameFallback: string, extraUserData?: any): LoginResult => {
     localStorage.setItem('accessToken', access)
     localStorage.setItem('refreshToken', refresh)
     
     try {
       const decoded = jwtDecode<any>(access)
-      const userId = decoded.user_id || decoded.id || decoded.sub || 0
-      const rawUser = decoded.username || usernameFallback
+      const userId = decoded.user_id || decoded.id || decoded.sub || extraUserData?.id || 0
+      const rawUser = decoded.username || extraUserData?.username || usernameFallback
       const cleanUser = (rawUser && !rawUser.includes('@'))
         ? rawUser
         : (decoded.email ? decoded.email.split('@')[0] : (rawUser ? rawUser.split('@')[0] : 'Utilisateur'))
+      
+      const isVerified = Boolean(
+        extraUserData?.is_verified ??
+        ((extraUserData?.birth_date || extraUserData?.birthDate) && extraUserData?.profession)
+      )
+
       const userData: User = {
         id: userId,
-        email: decoded.email || '',
+        email: decoded.email || extraUserData?.email || '',
         username: cleanUser,
-        fullName: decoded.full_name || '',
-        avatarUrl: undefined,
+        fullName: decoded.full_name || extraUserData?.full_name || extraUserData?.name || '',
+        avatarUrl: extraUserData?.avatar_url || extraUserData?.photo,
         roles: [],
         type: (decoded.type || 'PROFESSIONAL').toLowerCase() as 'professional' | 'institution',
         legacyPro: false,
-        institutionPlan: undefined
+        institutionPlan: undefined,
+        isVerified: isVerified,
+        birthDate: extraUserData?.birth_date || extraUserData?.birthDate || '',
+        gender: extraUserData?.gender || '',
+        profession: extraUserData?.profession || '',
+        speciality: extraUserData?.speciality || extraUserData?.specialty || ''
       }
       setUser(userData)
       setIsAuthenticated(true)
@@ -200,9 +222,12 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
         name: userData.fullName || '',
         username: userData.username,
         email: userData.email,
-        profession: '',
-        speciality: '',
-        photo: null
+        profession: userData.profession || '',
+        speciality: userData.speciality || '',
+        photo: userData.avatarUrl || null,
+        is_verified: isVerified,
+        birth_date: userData.birthDate,
+        gender: userData.gender
       }
       localStorage.setItem('exile_user_profile', JSON.stringify(userProfileData))
       navigate('/pro')
@@ -218,7 +243,8 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
         roles: [],
         type: 'professional',
         legacyPro: false,
-        institutionPlan: undefined
+        institutionPlan: undefined,
+        isVerified: false
       }
       setUser(userData)
       setIsAuthenticated(true)
@@ -477,7 +503,11 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
       const loginRes = await completeLoginSession(
         result.data.access,
         result.data.refresh,
-        result.data.user?.username || result.data.user?.email || 'GoogleUser'
+        result.data.user?.username || result.data.user?.email || 'GoogleUser',
+        {
+          ...result.data.user,
+          is_verified: result.is_verified ?? result.data.user?.is_verified
+        }
       )
       return {
         success: loginRes.success,
@@ -488,6 +518,59 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     }
 
     return { success: true }
+  }
+
+  const completeProfile = async (payload: {
+    birth_date: string
+    gender: string
+    profession: string
+    speciality?: string
+  }): Promise<{ success: boolean; is_verified?: boolean; message?: string; error?: string }> => {
+    try {
+      const result = await authApi.completeProfile(payload)
+      if (!result.success) {
+        return { success: false, error: result.error }
+      }
+
+      setUser(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          isVerified: true,
+          birthDate: payload.birth_date,
+          gender: payload.gender,
+          profession: payload.profession,
+          speciality: payload.speciality
+        }
+      })
+
+      // Mettre à jour exile_user_profile dans localStorage
+      try {
+        const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+        const updatedProfile = {
+          ...storedProfile,
+          is_verified: true,
+          birth_date: payload.birth_date,
+          gender: payload.gender,
+          profession: payload.profession,
+          speciality: payload.speciality
+        }
+        localStorage.setItem('exile_user_profile', JSON.stringify(updatedProfile))
+      } catch (err) {
+        console.warn('Erreur mise à jour exile_user_profile:', err)
+      }
+
+      return {
+        success: true,
+        is_verified: true,
+        message: result.message
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Erreur lors de la vérification'
+      }
+    }
   }
 
   const hasModuleAccess = (module: 'pro' | 'social' | 'funny'): boolean => {
@@ -516,6 +599,7 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
     registerPro,
     registerInstitution,
     loginWithGoogle,
+    completeProfile,
     logout,
     hasRole,
     hasModuleAccess,

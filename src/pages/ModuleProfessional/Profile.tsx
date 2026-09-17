@@ -6,7 +6,7 @@ import {
   Briefcase, Plus, Edit2, Lock, X,
   Users, Video, MessageSquare,
   TrendingUp, Settings, Camera, Heart, ArrowLeft,
-  ChevronDown, Award, Sparkles, Menu
+  ChevronDown, Award, Sparkles, Menu, ShieldCheck, ShieldAlert
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -22,6 +22,7 @@ import {
   getDaysUntilPhotoModification
 } from '../../hooks/useProfileUtils'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import { VerificationModal } from '../../components/modals/VerificationModal'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
@@ -199,6 +200,7 @@ const Profile = () => {
   const [showBioModal, setShowBioModal] = useState(false)
   const [showLocationModal, setShowLocationModal] = useState(false)
   const [showWebsitesModal, setShowWebsitesModal] = useState(false)
+  const [showVerificationModal, setShowVerificationModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ type: 'website' | 'skill', item: string } | null>(null)
   const [profileAlert, setProfileAlert] = useState<{ title?: string; message: string; type?: 'info' | 'warning' | 'danger' | 'success' } | null>(null)
   const [showSkillsDropdown, setShowSkillsDropdown] = useState(false)
@@ -1028,6 +1030,34 @@ const Profile = () => {
                   <h2 className={`text-lg sm:text-xl md:text-2xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {profile?.username?.startsWith('@') ? profile.username : `@${profile?.username || 'Utilisateur'}`}
                   </h2>
+                </div>
+
+                {/* Verification Badge */}
+                <div className="flex items-center justify-center">
+                  {(user?.isVerified || (profile?.profession && (user?.birthDate || (user as any)?.birth_date))) ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>{t('profile.accountVerified', 'Compte vérifié')}</span>
+                    </span>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs bg-amber-500/10 border border-amber-500/20">
+                      <span className="inline-flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <span>{t('profile.accountUnverified', 'Non vérifié')}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowVerificationModal(true)}
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                          resolvedTheme === 'dark' 
+                            ? 'bg-zinc-700 hover:bg-zinc-600 text-white' 
+                            : 'bg-zinc-200 hover:bg-zinc-300 text-zinc-900'
+                        }`}
+                      >
+                        {t('profile.verifyNow', 'Vérifier')}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Profession */}
@@ -2111,6 +2141,17 @@ const Profile = () => {
         isAlert={true}
         type={profileAlert?.type || 'info'}
         onConfirm={() => setProfileAlert(null)}
+      />
+
+      {/* VERIFICATION MODAL */}
+      <VerificationModal
+        isOpen={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onSuccess={() => {
+          setShowVerificationModal(false)
+          const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
+          if (token) refreshProfile(token)
+        }}
       />
     </div>
   )

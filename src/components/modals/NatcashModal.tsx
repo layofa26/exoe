@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  X, Smartphone, Copy, Check, Clock, 
+  X, Copy, Check, Clock, 
   AlertCircle, Loader2, ArrowRight, CheckCircle2, ArrowRightLeft 
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { API_BASE_URL } from '../../config/api';
+import { NatcashLogo } from '../common/NatcashLogo';
 
 interface NatcashModalProps {
   isOpen: boolean;
@@ -123,11 +124,9 @@ export const NatcashModal: React.FC<NatcashModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-bold">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base">
+            <NatcashLogo size="md" />
+            <div className="border-l border-zinc-200 dark:border-zinc-700 pl-3">
+              <h3 className="font-bold text-sm sm:text-base">
                 {t('natcash.title', 'Peman Manyèl Natcash')}
               </h3>
               <p className="text-xs text-gray-500 dark:text-zinc-400">

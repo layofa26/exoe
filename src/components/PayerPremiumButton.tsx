@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  Loader2, CreditCard, ShieldCheck, Smartphone, 
+  Loader2, CreditCard, ShieldCheck, 
   ArrowRight, X, Clock, Sparkles, CheckCircle2 
 } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import NatcashModal from './modals/NatcashModal';
+import { VerificationModal } from './modals/VerificationModal';
+import { NatcashIcon } from './common/NatcashLogo';
 
 interface PayerPremiumButtonProps {
   onSuccess?: () => void;
@@ -22,11 +25,14 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const { user } = useAuth();
 
   const [loadingPgecom, setLoadingPgecom] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showChoiceModal, setShowChoiceModal] = useState<boolean>(false);
   const [showNatcashModal, setShowNatcashModal] = useState<boolean>(false);
+  const [showVerificationModal, setShowVerificationModal] = useState<boolean>(false);
+  const [pendingAction, setPendingAction] = useState<'natcash' | 'pgecom' | null>(null);
 
   const getAuthToken = (): string | null => {
     return (
@@ -83,6 +89,31 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
     }
   };
 
+  const proceedWithPayment = (action: 'natcash' | 'pgecom') => {
+    setShowChoiceModal(false);
+    if (!user?.isVerified) {
+      setPendingAction(action);
+      setShowVerificationModal(true);
+      return;
+    }
+
+    if (action === 'natcash') {
+      setShowNatcashModal(true);
+    } else {
+      handlePgecomPayment();
+    }
+  };
+
+  const handleVerificationSuccess = () => {
+    setShowVerificationModal(false);
+    if (pendingAction === 'natcash') {
+      setShowNatcashModal(true);
+    } else if (pendingAction === 'pgecom') {
+      handlePgecomPayment();
+    }
+    setPendingAction(null);
+  };
+
   return (
     <>
       <div className="flex flex-col items-center gap-2 w-full">
@@ -134,18 +165,15 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
             <div className="p-5 space-y-3">
               {/* Opsyon 1 : Natcash Manyèl (EXILE PLATEFORME) */}
               <div 
-                onClick={() => {
-                  setShowChoiceModal(false);
-                  setShowNatcashModal(true);
-                }}
+                onClick={() => proceedWithPayment('natcash')}
                 className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-4 hover:scale-[1.01] ${
                   isDark 
                     ? 'border-orange-500/40 bg-orange-500/5 hover:border-orange-500 hover:bg-orange-500/10' 
                     : 'border-orange-400 bg-orange-50/50 hover:border-orange-500 hover:bg-orange-50'
                 }`}
               >
-                <div className="w-12 h-12 rounded-xl bg-orange-500 text-white flex items-center justify-center flex-shrink-0 shadow-md">
-                  <Smartphone className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
+                  <NatcashIcon className="w-12 h-12" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -169,10 +197,7 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
 
               {/* Opsyon 2 : Kat Kredi / MonCash (PGecom Otomatik) */}
               <div 
-                onClick={() => {
-                  setShowChoiceModal(false);
-                  handlePgecomPayment();
-                }}
+                onClick={() => proceedWithPayment('pgecom')}
                 className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center gap-4 hover:scale-[1.01] ${
                   isDark 
                     ? 'border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800' 
@@ -210,6 +235,17 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Vérification Obligatoire avant Achat Premium */}
+      <VerificationModal
+        isOpen={showVerificationModal}
+        onClose={() => {
+          setShowVerificationModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={handleVerificationSuccess}
+        reasonMessage={t('verification.requiredForPremium', 'Pou sekirite tranzaksyon ou yo, ou dwe verifye kont ou anvan ou achte yon plan Premium.')}
+      />
 
       {/* Modal Peman Natcash Manyèl */}
       <NatcashModal

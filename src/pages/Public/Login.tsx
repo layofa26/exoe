@@ -348,18 +348,7 @@ export const Login = (): JSX.Element => {
                         try {
                           const authResult = await loginWithGoogle({ access_token: tokenResponse.access_token })
                           if (authResult.success) {
-                            if (authResult.needs_profile_completion) {
-                              setSocialUser({
-                                provider: 'google',
-                                fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
-                                email: authResult.google_profile?.email || '',
-                                avatarUrl: authResult.google_profile?.avatar_url,
-                                idToken: tokenResponse.access_token
-                              })
-                              setShowSocialModal(true)
-                            } else {
-                              navigate('/pro')
-                            }
+                            navigate('/pro')
                             return
                           } else {
                             setError(authResult.error || "Erreur d'authentification Google")
@@ -387,18 +376,7 @@ export const Login = (): JSX.Element => {
                         try {
                           const authResult = await loginWithGoogle({ id_token: response.credential })
                           if (authResult.success) {
-                            if (authResult.needs_profile_completion) {
-                              setSocialUser({
-                                provider: 'google',
-                                fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
-                                email: authResult.google_profile?.email || '',
-                                avatarUrl: authResult.google_profile?.avatar_url,
-                                idToken: response.credential
-                              })
-                              setShowSocialModal(true)
-                            } else {
-                              navigate('/pro')
-                            }
+                            navigate('/pro')
                             return
                           } else {
                             setError(authResult.error || "Erreur d'authentification Google")

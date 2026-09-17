@@ -514,6 +514,7 @@ export const authApi = {
       return {
         success: true,
         is_new_user: data.is_new_user,
+        is_verified: data.is_verified,
         needs_profile_completion: data.needs_profile_completion,
         google_profile: data.google_profile,
         data: data.access ? { access: data.access, refresh: data.refresh, user: data.user } : undefined
@@ -522,6 +523,47 @@ export const authApi = {
       return {
         success: false,
         error: 'Erreur de communication avec le serveur Exile.'
+      }
+    }
+  },
+
+  /**
+   * Compléter et vérifier les informations du profil utilisateur
+   * Endpoint: POST /api/v1/users/complete-profile/
+   */
+  async completeProfile(payload: {
+    birth_date: string
+    gender: string
+    profession: string
+    speciality?: string
+  }): Promise<{ success: boolean; is_verified?: boolean; message?: string; user?: any; error?: string }> {
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+    try {
+      const response = await fetch(`${FINAL_API_BASE_URL}/users/complete-profile/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || 'Erreur lors de la vérification du profil.'
+        }
+      }
+      return {
+        success: true,
+        is_verified: true,
+        message: data.message,
+        user: data.user
+      }
+    } catch (err) {
+      return {
+        success: false,
+        error: 'Erreur de connexion au serveur Exile.'
       }
     }
   }

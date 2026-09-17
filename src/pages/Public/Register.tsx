@@ -85,23 +85,16 @@ export const Register = (): JSX.Element => {
             callback: async (tokenResponse: any) => {
               if (tokenResponse?.access_token) {
                 // Tenter la connexion/enregistrement sécurisé auprès du backend Django
-                const authResult = await loginWithGoogle({ access_token: tokenResponse.access_token })
-                if (authResult.success) {
-                  if (authResult.needs_profile_completion) {
-                    // Nouvel utilisateur : ouvrir le modal pour recueillir les 3 champs
-                    setSocialUser({
-                      provider: 'google',
-                      fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
-                      email: authResult.google_profile?.email || '',
-                      avatarUrl: authResult.google_profile?.avatar_url,
-                      idToken: tokenResponse.access_token
-                    })
-                    setShowSocialModal(true)
+                try {
+                  const authResult = await loginWithGoogle({ access_token: tokenResponse.access_token })
+                  if (authResult.success) {
+                    navigate('/pro')
+                    return
+                  } else {
+                    setError(authResult.error || "Erreur d'authentification Google")
                   }
-                  // Si déjà existant, loginWithGoogle a déjà connecté l'utilisateur et redirigé vers /pro !
-                  return
-                } else {
-                  setError(authResult.error || "Erreur d'authentification Google")
+                } catch (e) {
+                  console.error('Erreur loginWithGoogle:', e)
                 }
               }
             }
@@ -122,16 +115,7 @@ export const Register = (): JSX.Element => {
               if (response?.credential) {
                 const authResult = await loginWithGoogle({ id_token: response.credential })
                 if (authResult.success) {
-                  if (authResult.needs_profile_completion) {
-                    setSocialUser({
-                      provider: 'google',
-                      fullName: authResult.google_profile?.full_name || 'Utilisateur Google',
-                      email: authResult.google_profile?.email || '',
-                      avatarUrl: authResult.google_profile?.avatar_url,
-                      idToken: response.credential
-                    })
-                    setShowSocialModal(true)
-                  }
+                  navigate('/pro')
                   return
                 } else {
                   setError(authResult.error || "Erreur d'authentification Google")

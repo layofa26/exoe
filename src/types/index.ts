@@ -10,6 +10,11 @@ export interface User {
   legacyPro?: boolean;
   funnyAccessDate?: string | null;
   institutionPlan?: InstitutionPlan;
+  isVerified?: boolean;
+  birthDate?: string;
+  gender?: string;
+  profession?: string;
+  speciality?: string;
 }
 
 export type InstitutionPlan = 'verified' | 'starter' | 'standard' | 'premium';
@@ -41,6 +46,12 @@ export interface AuthContextType {
     }
     error?: string
   }>;
+  completeProfile: (payload: {
+    birth_date: string
+    gender: string
+    profession: string
+    speciality?: string
+  }) => Promise<{ success: boolean; is_verified?: boolean; message?: string; error?: string }>;
   logout: () => void;
   hasRole: (role: string) => boolean;
   hasModuleAccess: (module: 'pro' | 'social' | 'funny') => boolean;
