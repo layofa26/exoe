@@ -900,5 +900,37 @@
     },
     "exchangeRateTitle": "Tasso di cambio",
     "rateCalculation": "Tasso ufficiale: 1 USD = 144.75 HTG"
+  },
+  "verification": {
+    "title": "Verifica dell Account",
+    "subtitle": "Conformità legale e sicurezza della piattaforma EXILE",
+    "badgeUnverified": "Non verificato",
+    "badgeVerified": "Account verificato",
+    "verifyNow": "Verifica",
+    "legalNotice": "In conformità con le normative internazionali vigenti in materia di protezione dei minori e sicurezza delle transazioni, ogni utente deve certificare di avere almeno 18 anni e il proprio status professionale.",
+    "birthDateLabel": "Data di nascita * (Almeno 18 anni)",
+    "genderLabel": "Genere *",
+    "genderMale": "Maschile",
+    "genderFemale": "Femminile",
+    "genderOther": "Altro",
+    "professionLabel": "Professione *",
+    "professionPlaceholder": "Digita o seleziona una professione...",
+    "noProfessionMatch": "Nessuna professione corrispondente. Puoi convalidare",
+    "specialityLabel": "Specializzazione (Opzionale)",
+    "specialityPlaceholder": "es: Diritto Commerciale, Fullstack...",
+    "submit": "Convalida e Verifica Account",
+    "saving": "Verifica in corso...",
+    "success": "Il tuo account è stato verificato con successo!",
+    "requiredForPremium": "Per la sicurezza delle transazioni, devi verificare il tuo account (18+) prima di acquistare un piano Premium.",
+    "notificationTitle": "Azione richiesta: Verifica dell Account",
+    "notificationMessage": "Benvenuto su EXILE! Certifica la tua età (18+) e la professione per sbloccare tutte le funzionalità.",
+    "errors": {
+      "birthDate": "Inserisci la tua data di nascita completa.",
+      "underage": "Devi avere almeno 18 anni per verificare il tuo account professionale.",
+      "gender": "Seleziona il tuo genere.",
+      "profession": "Seleziona una professione valida.",
+      "generic": "Errore durante la verifica dell account.",
+      "network": "Errore di connessione al server."
+    }
   }
 }

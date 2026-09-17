@@ -9,6 +9,10 @@ import ProSidebar from './components/common/ProSidebar'
 import ProtectedRoute from './components/common/ProtectedRoute'
 import { DraftDetectionModal } from './components/common/DraftDetectionModal'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { useAuth } from './contexts/AuthContext'
+import { useNotifications } from './contexts/NotificationContext'
+import { useTranslation } from 'react-i18next'
+import { VerificationModal } from './components/modals/VerificationModal'
 
 // Public Pages
 import Landing from './pages/Public/Landing'
@@ -87,9 +91,40 @@ import { useUserPresence } from './hooks/useUserPresence'
 function App(): JSX.Element {
   const location = useLocation()
   useUserPresence()
+  const { user, isAuthenticated } = useAuth()
+  const { showWarning } = useNotifications()
+  const { t } = useTranslation()
+
   const [isUploadingVideo, setIsUploadingVideo] = useState(false)
   const [isVideoPlayerActive, setIsVideoPlayerActive] = useState(false)
   const [showDraftModal, setShowDraftModal] = useState(false)
+  const [showGlobalVerificationModal, setShowGlobalVerificationModal] = useState(false)
+
+  // Ekoute si yon konpozant mande pou louvri modal verifikasyon an
+  useEffect(() => {
+    const handleOpenVerification = () => {
+      setShowGlobalVerificationModal(true)
+    }
+    window.addEventListener('exile_open_verification_modal', handleOpenVerification)
+    return () => window.removeEventListener('exile_open_verification_modal', handleOpenVerification)
+  }, [])
+
+  // Notifikasyon pou itilizatè Google ki fenk konekte men ki poko verifye kont yo
+  useEffect(() => {
+    if (isAuthenticated && user && !user.isVerified) {
+      const alreadyNotified = sessionStorage.getItem(`exile_verification_notified_${user.id}`)
+      if (!alreadyNotified) {
+        sessionStorage.setItem(`exile_verification_notified_${user.id}`, 'true')
+        // Voye notifikasyon an tou swit avèk klik pou louvri fòmilè a dirèkteman
+        showWarning(
+          t('verification.notificationTitle', 'Action requise : Vérification du Compte'),
+          t('verification.notificationMessage', 'Bienvenue sur EXILE ! Veuillez certifier votre âge (18+) et profession pour débloquer toutes les fonctionnalités et sécuriser votre compte.'),
+          10000,
+          () => setShowGlobalVerificationModal(true)
+        )
+      }
+    }
+  }, [isAuthenticated, user, showWarning, t])
   
   // Detekte si nou nan modil Pro
   const isProRoute = location.pathname.startsWith('/pro')
@@ -305,6 +340,13 @@ function App(): JSX.Element {
     <DraftDetectionModal
       isOpen={showDraftModal}
       onClose={() => setShowDraftModal(false)}
+    />
+
+    {/* Global Verification Modal */}
+    <VerificationModal
+      isOpen={showGlobalVerificationModal}
+      onClose={() => setShowGlobalVerificationModal(false)}
+      onSuccess={() => setShowGlobalVerificationModal(false)}
     />
   </ThemeProvider>
   )

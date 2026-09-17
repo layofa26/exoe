@@ -900,5 +900,37 @@
     },
     "exchangeRateTitle": "Taux de change",
     "rateCalculation": "Taux officiel : 1 USD = 144.75 HTG"
+  },
+  "verification": {
+    "title": "Vérification du Compte",
+    "subtitle": "Conformité légale & Sécurité de la plateforme EXILE",
+    "badgeUnverified": "Non vérifié",
+    "badgeVerified": "Compte vérifié",
+    "verifyNow": "Vérifier",
+    "legalNotice": "Conformément aux réglementations internationales en vigueur relatives à la protection des mineurs et à la sécurité des transactions sur les plateformes professionnelles, tout utilisateur doit obligatoirement attester avoir 18 ans révolus et certifier son statut professionnel avant de pouvoir activer des abonnements ou publier des transactions financières.",
+    "birthDateLabel": "Date de naissance * (Vous devez avoir au moins 18 ans)",
+    "genderLabel": "Genre *",
+    "genderMale": "Masculin",
+    "genderFemale": "Féminin",
+    "genderOther": "Autre",
+    "professionLabel": "Profession *",
+    "professionPlaceholder": "Tapez ou cliquez pour choisir une profession...",
+    "noProfessionMatch": "Aucune profession correspondante. Vous pouvez valider",
+    "specialityLabel": "Spécialité (Optionnel)",
+    "specialityPlaceholder": "ex: Droit des Affaires, Fullstack, Cardiologie...",
+    "submit": "Valider et Vérifier mon Compte",
+    "saving": "Vérification en cours...",
+    "success": "Votre compte a été vérifié avec succès !",
+    "requiredForPremium": "Pour la sécurité des transactions financières, vous devez obligatoirement certifier votre compte (18 ans et plus) avant de souscrire un plan Premium.",
+    "notificationTitle": "Action requise : Vérification du Compte",
+    "notificationMessage": "Bienvenue sur EXILE ! Veuillez certifier votre âge (18+) et profession pour débloquer toutes les fonctionnalités et sécuriser votre compte.",
+    "errors": {
+      "birthDate": "Veuillez renseigner votre date de naissance complète (Jour, Mois, Année).",
+      "underage": "Vous devez obligatoirement avoir au moins 18 ans pour certifier et utiliser un compte professionnel EXILE.",
+      "gender": "Veuillez sélectionner votre genre.",
+      "profession": "Veuillez sélectionner ou renseigner une profession valide.",
+      "generic": "Erreur lors de la vérification du compte.",
+      "network": "Erreur de connexion au serveur. Veuillez vérifier votre réseau."
+    }
   }
 }

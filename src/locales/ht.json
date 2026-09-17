@@ -900,5 +900,37 @@
     },
     "exchangeRateTitle": "To Echanj",
     "rateCalculation": "To ofisyèl : 1 USD = 144.75 HTG"
+  },
+  "verification": {
+    "title": "Verifikasyon Kont lan",
+    "subtitle": "Konfòmite legal ak Sekirite platfòm EXILE",
+    "badgeUnverified": "Non vérifié",
+    "badgeVerified": "Kont vérifié",
+    "verifyNow": "Vérifier",
+    "legalNotice": "Dapre règleman entènasyonal ki an vigè sou pwoteksyon minè ak sekirite tranzaksyon sou platfòm pwofesyonèl, tout itilizatè dwe genyen omwen 18 an konplè epi sètifye estati pwofesyonèl li anvan li ka pibliye oubyen achte abònman finansye.",
+    "birthDateLabel": "Dat nesans * (Ou dwe genyen omwen 18 an)",
+    "genderLabel": "Sèks *",
+    "genderMale": "Maskilen",
+    "genderFemale": "Feminen",
+    "genderOther": "Lòt",
+    "professionLabel": "Pwofesyon *",
+    "professionPlaceholder": "Tape oswa klike pou w chwazi yon pwofesyon...",
+    "noProfessionMatch": "Pa gen okenn pwofesyon ki koresponn. Ou mèt valide",
+    "specialityLabel": "Spesyalite (Opsyonèl)",
+    "specialityPlaceholder": "egz: Dwa Biznis, Fullstack, Kadyoloji...",
+    "submit": "Valide epi Verifye Kont Mwen",
+    "saving": "Verifikasyon ap fèt...",
+    "success": "Kont ou an verifye avèk siksè !",
+    "requiredForPremium": "Pou sekirite tranzaksyon finansye yo, ou dwe sètifye kont ou (18 an oswa plis) anvan ou achte yon plan Premium.",
+    "notificationTitle": "Aksyon obligatwa : Verifikasyon Kont",
+    "notificationMessage": "Byenvini sou EXILE ! Tanpri sètifye laj ou (18+) ak pwofesyon ou pou w ka debloke tout opsyon yo epi sekirize kont ou.",
+    "errors": {
+      "birthDate": "Tanpri mete dat nesans ou konplè (Jou, Mwa, Ane).",
+      "underage": "Ou dwe genyen omwen 18 an pou w sètifye epi itilize yon kont pwofesyonèl sou EXILE.",
+      "gender": "Tanpri chwazi sèks ou.",
+      "profession": "Tanpri chwazi oswa mete yon pwofesyon ki valab.",
+      "generic": "Erè pandan verifikasyon kont lan.",
+      "network": "Erè koneksyon ak sèvè a. Tanpri verifye entènèt ou."
+    }
   }
 }

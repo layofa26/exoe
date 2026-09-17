@@ -900,5 +900,37 @@
     },
     "exchangeRateTitle": "Wechselkurs",
     "rateCalculation": "Offizieller Kurs: 1 USD = 144.75 HTG"
+  },
+  "verification": {
+    "title": "Kontoverifizierung",
+    "subtitle": "Gesetzliche Konformität & Sicherheit der EXILE-Plattform",
+    "badgeUnverified": "Nicht verifiziert",
+    "badgeVerified": "Verifiziertes Konto",
+    "verifyNow": "Verifizieren",
+    "legalNotice": "Gemäß den internationalen Vorschriften zum Schutz von Minderjährigen und zur Gewährleistung sicherer Finanztransaktionen müssen alle Nutzer bestätigen, mindestens 18 Jahre alt zu sein und ihren Berufsstatus nachweisen.",
+    "birthDateLabel": "Geburtsdatum * (Mindestens 18 Jahre alt)",
+    "genderLabel": "Geschlecht *",
+    "genderMale": "Männlich",
+    "genderFemale": "Weiblich",
+    "genderOther": "Andere",
+    "professionLabel": "Beruf *",
+    "professionPlaceholder": "Tippen oder klicken Sie, um einen Beruf zu wählen...",
+    "noProfessionMatch": "Kein passender Beruf gefunden. Sie können bestätigen",
+    "specialityLabel": "Fachgebiet (Optional)",
+    "specialityPlaceholder": "z.B. Wirtschaftsrecht, Fullstack...",
+    "submit": "Konto bestätigen und verifizieren",
+    "saving": "Verifizierung läuft...",
+    "success": "Ihr Konto wurde erfolgreich verifiziert!",
+    "requiredForPremium": "Aus Sicherheitsgründen müssen Sie Ihr Konto (18+) verifizieren, bevor Sie ein Premium-Abonnement abschließen.",
+    "notificationTitle": "Erforderliche Aktion: Kontoverifizierung",
+    "notificationMessage": "Willkommen bei EXILE! Bitte verifizieren Sie Ihr Alter (18+) und Ihren Beruf, um alle Funktionen freizuschalten.",
+    "errors": {
+      "birthDate": "Bitte geben Sie Ihr vollständiges Geburtsdatum ein.",
+      "underage": "Sie müssen mindestens 18 Jahre alt sein, um ein professionelles Konto zu führen.",
+      "gender": "Bitte wählen Sie Ihr Geschlecht.",
+      "profession": "Bitte wählen Sie einen gültigen Beruf.",
+      "generic": "Fehler bei der Kontoverifizierung.",
+      "network": "Verbindungsfehler zum Server."
+    }
   }
 }

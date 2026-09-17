@@ -900,5 +900,37 @@
     },
     "exchangeRateTitle": "汇率",
     "rateCalculation": "官方汇率: 1 USD = 144.75 HTG"
+  },
+  "verification": {
+    "title": "账户认证",
+    "subtitle": "法规合规与 EXILE 平台安全保障",
+    "badgeUnverified": "未认证",
+    "badgeVerified": "已认证账户",
+    "verifyNow": "认证",
+    "legalNotice": "根据保护未成年人以及专业商务平台交易安全的国际法规，所有用户在开通付费订阅或发布前，必须确认已满18周岁并认证其专业身份。",
+    "birthDateLabel": "出生日期 * (须年满18周岁)",
+    "genderLabel": "性别 *",
+    "genderMale": "男",
+    "genderFemale": "女",
+    "genderOther": "其他",
+    "professionLabel": "职业 *",
+    "professionPlaceholder": "输入或选择您的职业...",
+    "noProfessionMatch": "未在数据库中找到匹配项。您可以确认",
+    "specialityLabel": "专业特长 (选填)",
+    "specialityPlaceholder": "例如: 商业法, 全栈开发...",
+    "submit": "确认并完成账户认证",
+    "saving": "正在认证中...",
+    "success": "您的账户已成功通过认证！",
+    "requiredForPremium": "为了保障资金交易安全，购买 Premium 会员前必须先完成身份认证（年满18周岁）。",
+    "notificationTitle": "需要操作: 账户认证",
+    "notificationMessage": "欢迎来到 EXILE！请认证您的年龄(18+)与职业，以解锁全部功能并保障账户安全。",
+    "errors": {
+      "birthDate": "请输入完整的出生日期。",
+      "underage": "您必须年满18周岁才能认证并使用 EXILE 专业账户。",
+      "gender": "请选择您的性别。",
+      "profession": "请填写或选择有效的职业。",
+      "generic": "账户认证失败。",
+      "network": "服务器连接错误，请检查网络。"
+    }
   }
 }

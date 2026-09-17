@@ -900,5 +900,37 @@
     },
     "exchangeRateTitle": "Exchange Rate",
     "rateCalculation": "Official rate: 1 USD = 144.75 HTG"
+  },
+  "verification": {
+    "title": "Account Verification",
+    "subtitle": "Legal Compliance & EXILE Platform Safety",
+    "badgeUnverified": "Unverified",
+    "badgeVerified": "Verified Account",
+    "verifyNow": "Verify",
+    "legalNotice": "In accordance with applicable international regulations protecting minors and ensuring transactional integrity on professional networks, all users must certify that they are at least 18 years old and declare their professional status before accessing financial subscriptions.",
+    "birthDateLabel": "Date of Birth * (Must be 18 or older)",
+    "genderLabel": "Gender *",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "genderOther": "Other",
+    "professionLabel": "Profession *",
+    "professionPlaceholder": "Type or click to choose a profession...",
+    "noProfessionMatch": "No matching profession found. You can validate",
+    "specialityLabel": "Specialty (Optional)",
+    "specialityPlaceholder": "e.g. Corporate Law, Fullstack, Cardiology...",
+    "submit": "Validate and Verify My Account",
+    "saving": "Verifying account...",
+    "success": "Your account has been verified successfully!",
+    "requiredForPremium": "For the security of financial transactions, you must verify your account (18+ years old) before purchasing a Premium plan.",
+    "notificationTitle": "Action Required: Account Verification",
+    "notificationMessage": "Welcome to EXILE! Please verify your age (18+) and profession to unlock all features and secure your account.",
+    "errors": {
+      "birthDate": "Please enter your complete date of birth (Day, Month, Year).",
+      "underage": "You must be at least 18 years old to verify and operate a professional account on EXILE.",
+      "gender": "Please select your gender.",
+      "profession": "Please select or provide a valid profession.",
+      "generic": "Error during account verification.",
+      "network": "Server connection error. Please check your network connection."
+    }
   }
 }

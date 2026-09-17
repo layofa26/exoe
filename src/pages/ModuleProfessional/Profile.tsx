@@ -1037,13 +1037,13 @@ const Profile = () => {
                   {(user?.isVerified || (profile?.profession && (user?.birthDate || (user as any)?.birth_date))) ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>{t('profile.accountVerified', 'Compte vérifié')}</span>
+                      <span>{t('verification.badgeVerified', 'Compte vérifié')}</span>
                     </span>
                   ) : (
                     <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs bg-amber-500/10 border border-amber-500/20">
                       <span className="inline-flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
                         <ShieldAlert className="w-3.5 h-3.5" />
-                        <span>{t('profile.accountUnverified', 'Non vérifié')}</span>
+                        <span>{t('verification.badgeUnverified', 'Non vérifié')}</span>
                       </span>
                       <button
                         type="button"
@@ -1054,7 +1054,7 @@ const Profile = () => {
                             : 'bg-zinc-200 hover:bg-zinc-300 text-zinc-900'
                         }`}
                       >
-                        {t('profile.verifyNow', 'Vérifier')}
+                        {t('verification.verifyNow', 'Vérifier')}
                       </button>
                     </div>
                   )}

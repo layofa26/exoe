@@ -900,5 +900,37 @@
     },
     "exchangeRateTitle": "Tipo de cambio",
     "rateCalculation": "Tipo oficial: 1 USD = 144.75 HTG"
+  },
+  "verification": {
+    "title": "Verificación de Cuenta",
+    "subtitle": "Cumplimiento legal y Seguridad en EXILE",
+    "badgeUnverified": "No verificado",
+    "badgeVerified": "Cuenta verificada",
+    "verifyNow": "Verificar",
+    "legalNotice": "De conformidad con las regulaciones internacionales vigentes sobre protección de menores y seguridad de transacciones en plataformas profesionales, todo usuario debe certificar tener al menos 18 años y su profesión antes de realizar suscripciones financieras.",
+    "birthDateLabel": "Fecha de nacimiento * (Debe ser mayor de 18 años)",
+    "genderLabel": "Género *",
+    "genderMale": "Masculino",
+    "genderFemale": "Femenino",
+    "genderOther": "Otro",
+    "professionLabel": "Profesión *",
+    "professionPlaceholder": "Escriba o seleccione una profesión...",
+    "noProfessionMatch": "Ninguna profesión encontrada. Puede validar",
+    "specialityLabel": "Especialidad (Opcional)",
+    "specialityPlaceholder": "ej: Derecho Corporativo, Fullstack...",
+    "submit": "Validar y Verificar Cuenta",
+    "saving": "Verificando...",
+    "success": "¡Su cuenta ha sido verificada con éxito!",
+    "requiredForPremium": "Por seguridad en las transacciones, debe verificar su cuenta (18 años o más) antes de adquirir un plan Premium.",
+    "notificationTitle": "Acción Requerida: Verificación de Cuenta",
+    "notificationMessage": "¡Bienvenido a EXILE! Por favor certifique su edad (18+) y profesión para desbloquear todas las funciones.",
+    "errors": {
+      "birthDate": "Por favor ingrese su fecha de nacimiento completa.",
+      "underage": "Debe tener al menos 18 años para verificar su cuenta profesional.",
+      "gender": "Por favor seleccione su género.",
+      "profession": "Por favor indique una profesión válida.",
+      "generic": "Error al verificar la cuenta.",
+      "network": "Error de conexión con el servidor."
+    }
   }
 }

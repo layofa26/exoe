@@ -10,6 +10,7 @@ export interface Notification {
   message: string
   duration?: number
   icon?: ReactNode
+  onClick?: () => void
 }
 
 interface NotificationContextType {
@@ -18,10 +19,10 @@ interface NotificationContextType {
   removeNotification: (id: string) => void
   clearAll: () => void
   // Convenience methods
-  showSuccess: (title: string, message: string, duration?: number) => void
-  showError: (title: string, message: string, duration?: number) => void
-  showWarning: (title: string, message: string, duration?: number) => void
-  showInfo: (title: string, message: string, duration?: number) => void
+  showSuccess: (title: string, message: string, duration?: number, onClick?: () => void) => void
+  showError: (title: string, message: string, duration?: number, onClick?: () => void) => void
+  showWarning: (title: string, message: string, duration?: number, onClick?: () => void) => void
+  showInfo: (title: string, message: string, duration?: number, onClick?: () => void) => void
   // Upload-specific notifications
   showUploadResumed: () => void
   showUploadCompleted: () => void
@@ -66,43 +67,47 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     setNotifications([])
   }, [])
 
-  const showSuccess = useCallback((title: string, message: string, duration?: number) => {
+  const showSuccess = useCallback((title: string, message: string, duration?: number, onClick?: () => void) => {
     addNotification({
       type: 'success',
       title,
       message,
       duration,
-      icon: <CheckCircle className="w-5 h-5" />
+      icon: <CheckCircle className="w-5 h-5" />,
+      onClick
     })
   }, [addNotification])
 
-  const showError = useCallback((title: string, message: string, duration?: number) => {
+  const showError = useCallback((title: string, message: string, duration?: number, onClick?: () => void) => {
     addNotification({
       type: 'error',
       title,
       message,
       duration,
-      icon: <AlertCircle className="w-5 h-5" />
+      icon: <AlertCircle className="w-5 h-5" />,
+      onClick
     })
   }, [addNotification])
 
-  const showWarning = useCallback((title: string, message: string, duration?: number) => {
+  const showWarning = useCallback((title: string, message: string, duration?: number, onClick?: () => void) => {
     addNotification({
       type: 'warning',
       title,
       message,
       duration,
-      icon: <AlertCircle className="w-5 h-5" />
+      icon: <AlertCircle className="w-5 h-5" />,
+      onClick
     })
   }, [addNotification])
 
-  const showInfo = useCallback((title: string, message: string, duration?: number) => {
+  const showInfo = useCallback((title: string, message: string, duration?: number, onClick?: () => void) => {
     addNotification({
       type: 'info',
       title,
       message,
       duration,
-      icon: <Info className="w-5 h-5" />
+      icon: <Info className="w-5 h-5" />,
+      onClick
     })
   }, [addNotification])
 
@@ -141,7 +146,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     addNotification({
       type: 'success',
       title: 'Connexion rétablie',
-      message: 'L\'upload va reprendre automatiquement.',
+      message: 'Votre connexion Internet est de retour.',
       duration: 4000,
       icon: <Wifi className="w-5 h-5" />
     })
@@ -158,8 +163,14 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   }, [addNotification])
 
   const showLogoutSuccess = useCallback(() => {
-    // Intentionnellement vide pour ne pas afficher de notification intrusive
-  }, [])
+    addNotification({
+      type: 'info',
+      title: 'Déconnexion réussie',
+      message: 'Vous avez été déconnecté avec succès.',
+      duration: 3000,
+      icon: <Info className="w-5 h-5" />
+    })
+  }, [addNotification])
 
   const value: NotificationContextType = {
     notifications,
@@ -220,11 +231,17 @@ const NotificationContainer = ({
   }
 
   return (
-    <div className="fixed top-4 right-4 z-[50000] space-y-2 max-w-sm w-full">
+    <div className="fixed top-4 right-4 sm:top-5 sm:right-5 left-4 sm:left-auto z-[50000] space-y-2.5 max-w-sm w-auto sm:w-full pointer-events-none">
       {notifications.map((notification) => (
         <div
           key={notification.id}
-          className={`p-4 rounded-lg border shadow-lg transition-all duration-300 animate-in slide-in-from-right ${getTypeStyles(notification.type)}`}
+          onClick={() => {
+            if (notification.onClick) {
+              notification.onClick()
+              onRemove(notification.id)
+            }
+          }}
+          className={`pointer-events-auto p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border shadow-xl backdrop-blur-md transition-all duration-300 animate-in slide-in-from-top-2 sm:slide-in-from-right ${getTypeStyles(notification.type)} ${notification.onClick ? 'cursor-pointer hover:opacity-95 hover:scale-[1.01]' : ''}`}
         >
           <div className="flex items-start gap-3">
             <div className={`flex-shrink-0 ${getIconColor(notification.type)}`}>
@@ -237,9 +254,17 @@ const NotificationContainer = ({
               <p className={`text-sm mt-1 ${notification.type === 'error' ? 'text-red-700 dark:text-red-300' : notification.type === 'warning' ? 'text-yellow-700 dark:text-yellow-300' : notification.type === 'success' ? 'text-green-700 dark:text-green-300' : 'text-blue-700 dark:text-blue-300'}`}>
                 {notification.message}
               </p>
+              {notification.onClick && (
+                <div className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                  <span>Cliquer pour vérifier maintenant →</span>
+                </div>
+              )}
             </div>
             <button
-              onClick={() => onRemove(notification.id)}
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemove(notification.id)
+              }}
               className="flex-shrink-0 p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded transition-colors"
             >
               <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
