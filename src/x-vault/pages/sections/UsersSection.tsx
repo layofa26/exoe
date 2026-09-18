@@ -185,24 +185,26 @@ export const UsersSection: React.FC = () => {
     }
   });
 
-  // Polling de secours très léger (5 minutes) au cas où le WebSocket se déconnecterait
+  // Polling de secours actif (15 secondes) si WebSocket déconnecté pour garantir des données en direct
   useEffect(() => {
     const timer = setInterval(() => {
       if (!isWsConnected) {
         fetchRealUsers(true);
       }
-    }, 300000);
+    }, 15000);
     return () => clearInterval(timer);
   }, [fetchRealUsers, isWsConnected]);
 
 
   const getVaultHeaders = (): Record<string, string> => {
     const token = sessionStorage.getItem('vault_token') || localStorage.getItem('vault_token') || '';
+    const authToken = localStorage.getItem('accessToken') || localStorage.getItem('access_token') || '';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Vault-Request': '1',
     };
     if (token) headers['x-vault-token'] = token;
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     return headers;
   };
 
@@ -616,7 +618,15 @@ export const UsersSection: React.FC = () => {
         </div>
 
         {/* 10. En direct / En ligne */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+        <div 
+          onClick={() => setStatusFilter(statusFilter === 'online' ? 'all' : 'online')}
+          className={`border rounded-2xl p-5 shadow-sm relative overflow-hidden cursor-pointer transition-all ${
+            statusFilter === 'online'
+              ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500'
+              : 'bg-slate-900/90 border-slate-800 hover:border-emerald-500/40'
+          }`}
+          title="Cliquez pour filtrer les utilisateurs actuellement en ligne"
+        >
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">En direct maintenant</span>
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
@@ -630,7 +640,7 @@ export const UsersSection: React.FC = () => {
           <div className="flex items-center gap-1.5 mt-2 text-xs">
             <span className={`w-1.5 h-1.5 rounded-full ${isWsConnected ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
             <span className={isWsConnected ? 'text-emerald-400/90 font-medium' : 'text-slate-400'}>
-              {isWsConnected ? 'Flux WebSocket en direct' : 'Reconnexion au flux...'}
+              {statusFilter === 'online' ? '✓ Filtre en ligne actif' : (isWsConnected ? 'Flux WebSocket en direct' : 'Reconnexion au flux...')}
             </span>
           </div>
         </div>
@@ -697,6 +707,7 @@ export const UsersSection: React.FC = () => {
               className="bg-transparent text-xs text-slate-300 font-medium focus:outline-none cursor-pointer"
             >
               <option value="all" className="bg-slate-900">Tous les statuts</option>
+              <option value="online" className="bg-slate-900">🟢 En ligne ({onlineCount})</option>
               <option value="active" className="bg-slate-900">Actif</option>
               <option value="pending" className="bg-slate-900">En attente (Pending)</option>
               <option value="suspended" className="bg-slate-900">Suspendu</option>

@@ -38,10 +38,17 @@ export function useVaultWebSocket({
 
     setConnectionState('connecting')
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
+    const backendUrl = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com' : 'http://localhost:8000')).replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '')
+    let wsBase = ''
+    try {
+      const parsed = new URL(backendUrl, window.location.origin)
+      const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
+      wsBase = `${wsProto}//${parsed.host}`
+    } catch {
+      wsBase = window.location.protocol === 'https:' ? 'wss://exile-backend-9q6o.onrender.com' : 'ws://localhost:8000'
+    }
     const vaultToken = sessionStorage.getItem('vault_token') || localStorage.getItem('vault_token') || ''
-    const wsUrl = `${protocol}//${host}/ws/vault/live-events/?token=${encodeURIComponent(vaultToken)}`
+    const wsUrl = `${wsBase}/ws/vault/live-events/?token=${encodeURIComponent(vaultToken)}`
 
     try {
       const socket = new WebSocket(wsUrl)

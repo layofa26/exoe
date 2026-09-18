@@ -286,8 +286,9 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
     try {
       let fileToUpload = videoFile
 
-      // Si la vidéo dépasse 8MB, on la compresse côté client pour économiser le quota Supabase et accélérer le téléversement
-      if (videoFile && videoFile.size > 8 * 1024 * 1024) {
+      // Préserver impérativement l'intégrité de la piste audio et du conteneur MP4/MOV natif
+      // Les fichiers natifs jusqu'à 50MB sont téléversés directement avec une qualité audio et vidéo 100% pure
+      if (videoFile && videoFile.size > 50 * 1024 * 1024) {
         setCurrentStep('compressing')
         try {
           const compResult = await compressVideo(videoFile, {
@@ -295,12 +296,14 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
             videoBitrate: 1800000,
             onProgress: (p) => setCompressionProgress(p)
           })
-          fileToUpload = compResult.compressedFile
-          if (compResult.savedPercent > 0) {
+          if (compResult.compressedFile && compResult.savedPercent > 10) {
+            fileToUpload = compResult.compressedFile
             setCompressionSavings(compResult.savedPercent)
+          } else {
+            fileToUpload = videoFile
           }
         } catch (compErr) {
-          console.warn('Compression client échouée ou ignorée, utilisation fichier original:', compErr)
+          console.warn('Compression client ignorée, utilisation du fichier original avec audio intact:', compErr)
           fileToUpload = videoFile
         }
       }

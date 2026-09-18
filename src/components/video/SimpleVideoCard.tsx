@@ -125,6 +125,7 @@ export function SimpleVideoCard({ video, onClick, onDelete, autoplay = false }: 
             muted
             playsInline
             loop
+            preload="metadata"
           />
         ) : (
           <>

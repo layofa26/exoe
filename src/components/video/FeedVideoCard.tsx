@@ -422,6 +422,16 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
     }
   }
 
+  const [videoSettingsVersion, setVideoSettingsVersion] = useState(0)
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setVideoSettingsVersion((prev) => prev + 1)
+    }
+    window.addEventListener('exile_video_settings_updated', handleSettingsUpdate)
+    return () => window.removeEventListener('exile_video_settings_updated', handleSettingsUpdate)
+  }, [])
+
   // IntersectionObserver pour autoplay selon les paramètres choisis par l'utilisateur
   useEffect(() => {
     const el = containerRef.current
@@ -436,7 +446,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
         let dataSaver = false
         let networkMode = 'all'
         try {
-          previewEnabled = localStorage.getItem('exile_video_preview_enabled') === 'true'
+          previewEnabled = localStorage.getItem('exile_video_preview_enabled') !== 'false'
           dataSaver = localStorage.getItem('exile_video_data_saver') === 'true'
           networkMode = JSON.parse(localStorage.getItem('exile_video_network_mode') || '"all"')
         } catch {}
@@ -465,7 +475,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [video.id, videoUrl])
+  }, [video.id, videoUrl, videoSettingsVersion])
 
   // Clic sur la zone vidéo -> Navigation vers VideoPlayerPage ou lecture locale sur interaction explicite
   const handleVideoClick = useCallback((e: React.MouseEvent) => {
@@ -494,7 +504,10 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
     const next = !v.muted
     v.muted = next
     setIsMuted(next)
-    if (!next && v.volume === 0) v.volume = 1
+    if (!next) {
+      if (v.volume === 0) v.volume = 1
+      v.play().catch(() => {})
+    }
   }, [])
 
   const [isPlaying, setIsPlaying] = useState(false)
@@ -632,7 +645,7 @@ export const FeedVideoCard: React.FC<FeedVideoCardProps> = ({
             width="100%"
             muted={isMuted}
             loop
-            preload="none"
+            preload="metadata"
             onLoadedMetadata={handleLoadedMetadata}
             onWaiting={() => setIsBuffering(true)}
             onPlaying={handlePlaying}

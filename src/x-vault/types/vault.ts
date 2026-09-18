@@ -2,7 +2,7 @@
 
 export type ActiveModule = 'pro' | 'social' | 'monetization';
 
-export type UserStatus = 'active' | 'inactive' | 'suspended' | 'banned' | 'pending';
+export type UserStatus = 'active' | 'inactive' | 'suspended' | 'banned' | 'pending' | 'online';
 
 export interface AdminUser {
   id: string;

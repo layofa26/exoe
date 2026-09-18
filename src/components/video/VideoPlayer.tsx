@@ -189,7 +189,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const player = videojs(videoElement, {
       controls: false,
       autoplay,
-      preload: 'none',
+      preload: 'metadata',
       poster,
       fluid: true,
       responsive: true,

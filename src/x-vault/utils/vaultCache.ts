@@ -1,4 +1,4 @@
-﻿/**
+/**
  * vaultCache:
  * Système de mise en cache en mémoire ultra-rapide pour X-Vault.
  * Permet à toutes les sections (overview, users, analytics, content, moderation, settings, trash)
@@ -52,6 +52,23 @@ class VaultCache {
         this.cache.delete(key);
       }
     }
+  }
+
+  /**
+   * Retourne les statistiques d'utilisation du cache
+   */
+  getStats(): { count: number; keys: string[] } {
+    const validKeys: string[] = [];
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp <= entry.ttl) {
+        validKeys.push(key);
+      }
+    }
+    return {
+      count: validKeys.length,
+      keys: validKeys
+    };
   }
 
   /**

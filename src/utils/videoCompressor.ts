@@ -48,7 +48,8 @@ export async function compressVideo(
     const videoUrl = URL.createObjectURL(file)
     const videoEl = document.createElement('video')
     videoEl.src = videoUrl
-    videoEl.muted = true
+    videoEl.muted = false
+    videoEl.volume = 1
     videoEl.playsInline = true
     videoEl.preload = 'auto'
 
@@ -116,7 +117,6 @@ export async function compressVideo(
           const source = audioCtx.createMediaElementSource(videoEl)
           const dest = audioCtx.createMediaStreamDestination()
           source.connect(dest)
-          source.connect(audioCtx.destination)
           dest.stream.getAudioTracks().forEach(track => stream.addTrack(track))
         } catch {
           // Si pa ka kaptire odyo a dirèkteman, kontinye ak video stream la

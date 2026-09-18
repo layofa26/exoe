@@ -188,26 +188,46 @@ const Settings = () => {
     dateFormat: 'DD/MM/YYYY'
   })
 
-  // Lecture vidéo
-  const [videoPreviewEnabled, setVideoPreviewEnabled] = useState(false)
+  // Lecture vidéo avec chargement initial instantané depuis le localStorage
+  const [videoPreviewEnabled, setVideoPreviewEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('exile_video_preview_enabled')
+      return saved !== null ? JSON.parse(saved) : true
+    } catch {
+      return true
+    }
+  })
   const [previewVideos, setPreviewVideos] = useState<any[]>([])
-  const [autoplayInterval, setAutoplayInterval] = useState(5)
-  const [videoDataSaver, setVideoDataSaver] = useState<boolean>(false)
-  const [videoNetworkMode, setVideoNetworkMode] = useState<'all' | 'wifi_only'>('all')
+  const [autoplayInterval, setAutoplayInterval] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('exile_autoplay_interval')
+      return saved ? JSON.parse(saved) : 5
+    } catch {
+      return 5
+    }
+  })
+  const [videoDataSaver, setVideoDataSaver] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('exile_video_data_saver')
+      return saved ? JSON.parse(saved) : false
+    } catch {
+      return false
+    }
+  })
+  const [videoNetworkMode, setVideoNetworkMode] = useState<'all' | 'wifi_only'>(() => {
+    try {
+      const saved = localStorage.getItem('exile_video_network_mode')
+      return saved ? JSON.parse(saved) : 'all'
+    } catch {
+      return 'all'
+    }
+  })
 
   // Charger les vidéos et paramètres locaux
   useEffect(() => {
     try {
       const stored = localStorage.getItem('exile_videos')
       if (stored) setPreviewVideos(JSON.parse(stored))
-      const savedEnabled = localStorage.getItem('exile_video_preview_enabled')
-      const savedInterval = localStorage.getItem('exile_autoplay_interval')
-      if (savedEnabled) setVideoPreviewEnabled(JSON.parse(savedEnabled))
-      if (savedInterval) setAutoplayInterval(JSON.parse(savedInterval))
-      const savedDataSaver = localStorage.getItem('exile_video_data_saver')
-      if (savedDataSaver) setVideoDataSaver(JSON.parse(savedDataSaver))
-      const savedNetworkMode = localStorage.getItem('exile_video_network_mode')
-      if (savedNetworkMode) setVideoNetworkMode(JSON.parse(savedNetworkMode))
       const savedNotifs = localStorage.getItem('exile_notification_settings')
       if (savedNotifs) setNotificationSettings(JSON.parse(savedNotifs))
       const savedApp = localStorage.getItem('exile_app_settings')
@@ -220,15 +240,17 @@ const Settings = () => {
   useEffect(() => {
     localStorage.setItem('exile_video_preview_enabled', JSON.stringify(videoPreviewEnabled))
     localStorage.setItem('exile_autoplay_interval', JSON.stringify(autoplayInterval))
-  }, [videoPreviewEnabled, autoplayInterval])
-
-  useEffect(() => {
     localStorage.setItem('exile_video_data_saver', JSON.stringify(videoDataSaver))
-  }, [videoDataSaver])
-
-  useEffect(() => {
     localStorage.setItem('exile_video_network_mode', JSON.stringify(videoNetworkMode))
-  }, [videoNetworkMode])
+    window.dispatchEvent(new CustomEvent('exile_video_settings_updated', {
+      detail: {
+        videoPreviewEnabled,
+        autoplayInterval,
+        videoDataSaver,
+        videoNetworkMode
+      }
+    }))
+  }, [videoPreviewEnabled, autoplayInterval, videoDataSaver, videoNetworkMode])
 
   useEffect(() => {
     localStorage.setItem('exile_notification_settings', JSON.stringify(notificationSettings))
@@ -2125,7 +2147,12 @@ const Settings = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => setVideoPreviewEnabled(!videoPreviewEnabled)}
+                    onClick={() => {
+                      const updated = !videoPreviewEnabled
+                      setVideoPreviewEnabled(updated)
+                      setPrivacyFeedback(updated ? 'Lecture automatique des vidéos activée' : 'Lecture automatique des vidéos désactivée')
+                      setTimeout(() => setPrivacyFeedback(null), 3000)
+                    }}
                     className={`w-12 h-6 rounded-full p-1 transition-colors flex-shrink-0 ${videoPreviewEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-zinc-700'}`}
                   >
                     <div className={`w-4 h-4 bg-white rounded-full transition-transform ${videoPreviewEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
