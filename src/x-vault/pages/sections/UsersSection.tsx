@@ -122,7 +122,7 @@ export const UsersSection: React.FC = () => {
       if (searchQuery.trim()) url.searchParams.set('search', searchQuery.trim());
       if (statusFilter !== 'all') url.searchParams.set('status', statusFilter);
       if (badgeFilter !== 'all') url.searchParams.set('badge', badgeFilter);
-      if (activeModule !== 'monetization') url.searchParams.set('module', activeModule);
+      url.searchParams.set('module', 'all');
       url.searchParams.set('page', String(currentPage));
       url.searchParams.set('page_size', String(pageSize));
 
@@ -613,7 +613,7 @@ export const UsersSection: React.FC = () => {
           <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
             <span className="text-indigo-400 font-semibold">{proCount} Pros</span>
             <span>•</span>
-            <span className="text-slate-400">{Math.max(0, totalUsersCount - proCount)} Social</span>
+            <span className="text-amber-400 font-semibold">{Math.max(0, totalUsersCount - proCount)} En attente</span>
           </div>
         </div>
 
@@ -916,24 +916,31 @@ export const UsersSection: React.FC = () => {
                       <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-0.5 ${
                         u.module === 'pro' 
                           ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
-                          : 'bg-slate-800 text-slate-400'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                       }`}>
-                        {u.module}
+                        {u.module === 'pro' ? 'PRO' : 'EN ATTENTE'}
                       </span>
                     </td>
 
                     {/* Status */}
                     <td className="px-4 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        u.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        u.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                        u.status === 'suspended' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
-                        'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                      }`}>
-                        {u.status === 'active' ? 'Actif' :
-                         u.status === 'pending' ? 'En attente' :
-                         u.status === 'suspended' ? 'Suspendu' : 'Banni'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {u.isOnline && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="En ligne en ce moment" />
+                        )}
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          u.isOnline ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 ring-1 ring-emerald-500/30' :
+                          u.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                          u.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                          u.status === 'suspended' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                          'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        }`}>
+                          {u.isOnline ? 'En ligne' :
+                           u.status === 'active' ? 'Actif' :
+                           u.status === 'pending' ? 'En attente' :
+                           u.status === 'suspended' ? 'Suspendu' : 'Banni'}
+                        </span>
+                      </div>
                     </td>
 
                     {/* Activity Stats */}
