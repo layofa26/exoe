@@ -99,7 +99,7 @@ export const UsersSection: React.FC = () => {
 
   // 1., 2., 3., 10., 14. Chaje vrè itilizatè yo depi baz done Django ak vrè paginasyon SQL
   const fetchRealUsers = useCallback(async (isSilent = false) => {
-    const cacheKey = `vault_users_${activeModule}_${statusFilter}_${badgeFilter}_${searchQuery}_${currentPage}_${pageSize}`;
+    const cacheKey = `vault_users_v2_${statusFilter}_${badgeFilter}_${searchQuery}_${currentPage}_${pageSize}`;
     const cached = vaultCache.get<any>(cacheKey);
     if (cached && !isSilent) {
       setUsers(cached.users || []);
@@ -731,7 +731,10 @@ export const UsersSection: React.FC = () => {
 
           {/* Refresh Button */}
           <button
-            onClick={() => fetchRealUsers()}
+            onClick={() => {
+              vaultCache.invalidate('vault_users');
+              fetchRealUsers(false);
+            }}
             disabled={isLoading || isRefreshing}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all disabled:opacity-50"
             title="Rafraîchir les données en direct"
@@ -883,7 +886,7 @@ export const UsersSection: React.FC = () => {
                           <div 
                             className={`avatar-letter-fb w-10 h-10 rounded-full bg-slate-800 border border-slate-700 items-center justify-center font-bold text-white text-sm ${u.avatarUrl ? 'hidden' : 'flex'}`}
                           >
-                            {u.name?.charAt(0).toUpperCase() || 'U'}
+                            {((u.name || u.username || 'U').replace('@', '').charAt(0) || 'U').toUpperCase()}
                           </div>
                           {u.isOnline && (
                             <span 
@@ -894,7 +897,7 @@ export const UsersSection: React.FC = () => {
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-white flex items-center gap-1.5 truncate">
-                            <span className="truncate">{u.name}</span>
+                            <span className="truncate">{u.name || (u.username ? (u.username.startsWith('@') ? u.username.slice(1) : u.username) : `Utilisateur #${u.id}`)}</span>
                             {u.isVerified && (
                               <Award className="w-4 h-4 text-amber-400 flex-shrink-0" title="Badge Vérifié Officiel" />
                             )}
