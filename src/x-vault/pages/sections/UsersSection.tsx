@@ -31,7 +31,11 @@ import {
   Shield,
   ShieldAlert,
   Activity,
-  Trash2
+  Trash2,
+  CheckSquare,
+  Square,
+  MailCheck,
+  BellRing
 } from 'lucide-react';
 import { AdminUser, UserStatus } from '../../types/vault';
 import { useVaultModule } from '../../context/VaultModuleContext';
@@ -74,6 +78,13 @@ export const UsersSection: React.FC = () => {
   const [showBanModal, setShowBanModal] = useState<AdminUser | null>(null);
   const [generatedPasswordModal, setGeneratedPasswordModal] = useState<{ user: AdminUser; tempPass: string } | null>(null);
   const [copiedPassword, setCopiedPassword] = useState(false);
+
+  // Selection state for single / bulk verification reminders
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [isSendingReminder, setIsSendingReminder] = useState<boolean>(false);
+  const [showVerifyReminderModal, setShowVerifyReminderModal] = useState<{ userIds: string[]; userNames: string[] } | null>(null);
+  const [reminderCustomTitle, setReminderCustomTitle] = useState('Action requise : Vérification du Compte');
+  const [reminderCustomMessage, setReminderCustomMessage] = useState('Bienvenue sur EXILE ! Veuillez certifier votre âge (18+) et profession pour débloquer toutes les fonctionnalités et sécuriser votre compte.');
 
   // Form states
   const [suspensionDuration, setSuspensionDuration] = useState<'24h' | '7d' | '30d' | 'permanent'>('7d');
@@ -475,6 +486,93 @@ export const UsersSection: React.FC = () => {
     }
   };
 
+  // Handlers pour la sélection des utilisateurs non vérifiés
+  const unverifiedUsersOnPage = users.filter(u => !u.isVerified);
+  const allUnverifiedSelected = unverifiedUsersOnPage.length > 0 && unverifiedUsersOnPage.every(u => selectedUserIds.has(u.id));
+
+  const handleToggleSelectAllUnverified = () => {
+    const next = new Set(selectedUserIds);
+    if (allUnverifiedSelected) {
+      unverifiedUsersOnPage.forEach(u => next.delete(u.id));
+    } else {
+      unverifiedUsersOnPage.forEach(u => next.add(u.id));
+    }
+    setSelectedUserIds(next);
+  };
+
+  const handleToggleSelectUser = (userId: string) => {
+    const next = new Set(selectedUserIds);
+    if (next.has(userId)) {
+      next.delete(userId);
+    } else {
+      next.add(userId);
+    }
+    setSelectedUserIds(next);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedUserIds(new Set());
+  };
+
+  // Ouvrir modal de confirmation d'envoi de rappel pour un ou plusieurs utilisateurs
+  const handleOpenReminderModal = (targets?: AdminUser[]) => {
+    let ids: string[] = [];
+    let names: string[] = [];
+
+    if (targets && targets.length > 0) {
+      ids = targets.map(u => u.id);
+      names = targets.map(u => u.name || u.username || `@user_${u.id}`);
+    } else if (selectedUserIds.size > 0) {
+      ids = Array.from(selectedUserIds);
+      names = ids.map(id => {
+        const found = users.find(u => u.id === id);
+        return found ? (found.name || found.username || `@user_${found.id}`) : `ID #${id}`;
+      });
+    }
+
+    if (ids.length === 0) {
+      triggerNotice('Veuillez sélectionner au moins un utilisateur non vérifié.', 'info');
+      return;
+    }
+
+    setShowVerifyReminderModal({ userIds: ids, userNames: names });
+    setReminderCustomTitle('Action requise : Vérification du Compte');
+    setReminderCustomMessage('Bienvenue sur EXILE ! Veuillez certifier votre âge (18+) et profession pour débloquer toutes les fonctionnalités et sécuriser votre compte.');
+  };
+
+  // Envoyer le rappel de vérification (unique ou en masse) via l'API backend
+  const handleSendVerificationReminderConfirm = async () => {
+    if (!showVerifyReminderModal || showVerifyReminderModal.userIds.length === 0) return;
+    setIsSendingReminder(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/vault/users/notify-unverified`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: getVaultHeaders(),
+        body: JSON.stringify({
+          user_ids: showVerifyReminderModal.userIds,
+          title: reminderCustomTitle.trim(),
+          message: reminderCustomMessage.trim()
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        triggerNotice(data.message || `Rappels de vérification envoyés avec succès (${showVerifyReminderModal.userIds.length} destinataire(s)).`, 'success');
+        // Retirer les IDs traités de la sélection
+        const next = new Set(selectedUserIds);
+        showVerifyReminderModal.userIds.forEach(id => next.delete(id));
+        setSelectedUserIds(next);
+        setShowVerifyReminderModal(null);
+      } else {
+        triggerNotice(data.error || 'Erreur lors de l\'envoi du rappel.', 'error');
+      }
+    } catch {
+      triggerNotice('Erreur de connexion au serveur backend.', 'error');
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Notice Banner */}
@@ -642,13 +740,64 @@ export const UsersSection: React.FC = () => {
         </div>
       </div>
 
+      {/* Floating Bulk Action Bar for Selected Users */}
+      {selectedUserIds.size > 0 && (
+        <div className="bg-gradient-to-r from-blue-900/90 via-slate-900/95 to-indigo-900/90 border border-blue-500/40 rounded-2xl p-3.5 px-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-white flex items-center gap-2">
+                <span>{selectedUserIds.size} utilisateur{selectedUserIds.size > 1 ? 's' : ''} sélectionné{selectedUserIds.size > 1 ? 's' : ''}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold uppercase tracking-wider">Non vérifié{selectedUserIds.size > 1 ? 's' : ''}</span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Envoyez une relance officielle invitant à compléter la vérification (18+ & profession).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              onClick={handleClearSelection}
+              className="px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all"
+            >
+              Désélectionner tout
+            </button>
+            <button
+              onClick={() => handleOpenReminderModal()}
+              disabled={isSendingReminder}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all"
+            >
+              <BellRing className="w-4 h-4" />
+              <span>Envoyer rappel de vérification ({selectedUserIds.size})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. Main Users Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-950/70 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
               <tr>
-                <th className="px-5 py-3.5">Utilisateur</th>
+                <th className="px-3 py-3.5 w-10 text-center">
+                  <button
+                    onClick={handleToggleSelectAllUnverified}
+                    disabled={unverifiedUsersOnPage.length === 0}
+                    className="text-slate-400 hover:text-white disabled:opacity-30 transition-colors p-1"
+                    title={allUnverifiedSelected ? "Désélectionner tous les non vérifiés" : "Sélectionner tous les non vérifiés de la page"}
+                  >
+                    {allUnverifiedSelected ? (
+                      <CheckSquare className="w-4 h-4 text-blue-400" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                </th>
+                <th className="px-4 py-3.5">Utilisateur</th>
                 <th className="px-4 py-3.5">Profession / Module</th>
                 <th className="px-4 py-3.5">Statut</th>
                 <th className="px-4 py-3.5">Vidéos / Abonnés</th>
@@ -660,7 +809,7 @@ export const UsersSection: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-slate-400">
+                  <td colSpan={8} className="text-center py-16 text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <RefreshCw className="w-7 h-7 animate-spin text-blue-500" />
                       <span className="text-sm font-medium">Chargement des utilisateurs en direct depuis la base de données...</span>
@@ -669,7 +818,7 @@ export const UsersSection: React.FC = () => {
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-14 text-slate-500">
+                  <td colSpan={8} className="text-center py-14 text-slate-500">
                     <div className="flex flex-col items-center gap-2">
                       <Users className="w-8 h-8 text-slate-600" />
                       <span>Aucun utilisateur trouvé correspondant à ces filtres.</span>
@@ -678,9 +827,34 @@ export const UsersSection: React.FC = () => {
                 </tr>
               ) : (
                 users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-800/40 transition-colors group">
+                  <tr 
+                    key={u.id} 
+                    className={`hover:bg-slate-800/40 transition-colors group ${
+                      selectedUserIds.has(u.id) ? 'bg-blue-950/20' : ''
+                    }`}
+                  >
+                    {/* Checkbox Column */}
+                    <td className="px-3 py-4 text-center">
+                      {!u.isVerified ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSelectUser(u.id)}
+                          className="text-slate-400 hover:text-white transition-colors p-1"
+                          title={selectedUserIds.has(u.id) ? "Désélectionner" : "Sélectionner pour rappel de vérification"}
+                        >
+                          {selectedUserIds.has(u.id) ? (
+                            <CheckSquare className="w-4 h-4 text-blue-400" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-600 hover:text-slate-400" />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="inline-block w-4 h-4 text-slate-700" title="Utilisateur déjà vérifié">•</span>
+                      )}
+                    </td>
+
                     {/* User Identity */}
-                    <td className="px-5 py-4">
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className="relative flex-shrink-0">
                           {u.avatarUrl ? (
@@ -806,6 +980,17 @@ export const UsersSection: React.FC = () => {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+
+                        {/* Relance Vérification Individuelle (si non vérifié) */}
+                        {!u.isVerified && (
+                          <button
+                            onClick={() => handleOpenReminderModal([u])}
+                            title="Envoyer un rappel de vérification à cet utilisateur"
+                            className="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 transition-colors"
+                          >
+                            <BellRing className="w-4 h-4" />
+                          </button>
+                        )}
 
                         {/* 5. Valider / Rejeter si pending */}
                         {u.status === 'pending' && (
@@ -1432,59 +1617,97 @@ export const UsersSection: React.FC = () => {
         </div>
       )}
 
-      {/* 9. MODAL AFFICHAGE MOT DE PASSE TEMPORAIRE RÉINITIALISÉ */}
-      {generatedPasswordModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl w-full max-w-md p-6 shadow-2xl">
+      {/* MODAL CONFIRMATION ENVOI RAPPEL DE VÉRIFICATION DU COMPTE */}
+      {showVerifyReminderModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl animate-scale-in">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400">
-                <KeyRound className="w-6 h-6" />
+              <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400">
+                <BellRing className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Nouveau Mot de Passe Généré</h3>
-                <p className="text-xs text-slate-400">Pour : <strong className="text-emerald-400">{generatedPasswordModal.user.name}</strong></p>
+                <h3 className="text-base font-bold text-white">Rappel de Vérification du Compte</h3>
+                <p className="text-xs text-slate-400">
+                  {showVerifyReminderModal.userIds.length === 1 
+                    ? `Destinataire : ${showVerifyReminderModal.userNames[0] || '1 utilisateur'}`
+                    : `Envoi groupé : ${showVerifyReminderModal.userIds.length} utilisateurs sélectionnés`}
+                </p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-400 mb-4">
-              Le mot de passe a été mis à jour avec succès et envoyé par email sécurisé si le compte possède une adresse valide.
-            </p>
-
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5">
-              <label className="block text-[10px] font-bold tracking-wider text-slate-500 uppercase mb-1">Mot de passe temporaire à usage unique :</label>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-base font-bold text-emerald-400 select-all tracking-wider">
-                  {generatedPasswordModal.tempPass}
-                </span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedPasswordModal.tempPass);
-                    setCopiedPassword(true);
-                    setTimeout(() => setCopiedPassword(false), 3000);
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
-                >
-                  {copiedPassword ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Copié !</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copier</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            <div className="p-3.5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 mb-4 text-xs text-indigo-200">
+              <p className="font-semibold mb-1">Interaction directe avec l'application :</p>
+              <p className="text-indigo-300/80">
+                Dès réception, un clic sur la notification ouvrira automatiquement le formulaire de vérification d'âge (18+) et profession sur l'écran du client.
+              </p>
             </div>
 
-            <div className="flex justify-end">
+            <div className="space-y-3.5 my-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Titre de la notification :</label>
+                <input
+                  type="text"
+                  value={reminderCustomTitle}
+                  onChange={(e) => setReminderCustomTitle(e.target.value)}
+                  placeholder="Action requise : Vérification du Compte"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Message d'explication légale :</label>
+                <textarea
+                  rows={3}
+                  value={reminderCustomMessage}
+                  onChange={(e) => setReminderCustomMessage(e.target.value)}
+                  placeholder="Bienvenue sur EXILE ! Veuillez certifier votre âge (18+) et profession..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-all"
+                />
+              </div>
+
+              {showVerifyReminderModal.userIds.length > 1 && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                    Destinataires ciblés ({showVerifyReminderModal.userIds.length}) :
+                  </label>
+                  <div className="max-h-24 overflow-y-auto bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5 space-y-1">
+                    {showVerifyReminderModal.userNames.map((name, i) => (
+                      <div key={i} className="text-[11px] text-slate-300 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
+                        <span>{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-slate-800">
               <button
-                onClick={() => setGeneratedPasswordModal(null)}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all"
+                type="button"
+                onClick={() => setShowVerifyReminderModal(null)}
+                disabled={isSendingReminder}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition-all"
               >
-                Fermer
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSendVerificationReminderConfirm}
+                disabled={isSendingReminder || !reminderCustomTitle.trim() || !reminderCustomMessage.trim()}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center gap-1.5 transition-all"
+              >
+                {isSendingReminder ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Envoi en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Envoyer le rappel {showVerifyReminderModal.userIds.length > 1 ? `(${showVerifyReminderModal.userIds.length})` : ''}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

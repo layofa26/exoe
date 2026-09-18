@@ -228,6 +228,18 @@ export const Header = (): JSX.Element => {
     setNotifications(notificationService.getNotifications())
     setShowNotifications(false)
 
+    // 0. Vérification du compte (Rappel Admin ou Système) -> Ouvrir le modal de vérification
+    if (
+      notif.type === 'verification_reminder' || 
+      notif.data?.action === 'verify_profile' || 
+      notif.actionButton?.actionUrl === '#verify' ||
+      (notif.title && notif.title.toLowerCase().includes('vérification du compte')) ||
+      (notif.title && notif.title.toLowerCase().includes('verifikasyon kont'))
+    ) {
+      window.dispatchEvent(new CustomEvent('exile_open_verification_modal'))
+      return
+    }
+
     // 1. Bouton d'action avec URL explicite
     if (notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl) {
       navigate(notif.actionButton?.actionUrl || notif.data?.actionButton?.actionUrl)
