@@ -139,7 +139,39 @@ export const SocialEvents = (): JSX.Element => {
           const data = await response.json()
           const raw = Array.isArray(data) ? data : (data.results || [])
           if (raw.length > 0) {
-            setEvents(raw)
+            const mapped: SocialEventItem[] = raw.map((item: any) => ({
+              id: String(item.id),
+              title: item.title || item.titre || 'Événement Officiel',
+              description: item.description || '',
+              startDate: item.startDate || item.start_date || item.date_debut || new Date().toISOString(),
+              endDate: item.endDate || item.end_date || item.date_fin || new Date().toISOString(),
+              format: item.format || 'hybrid',
+              status: item.status || 'published',
+              location: item.location || { city: item.ville || item.location_name || 'En ligne', venue: '' },
+              coverImage: item.coverImage || item.cover_url || item.banner_url || '',
+              category: item.category || item.categorie || 'Institutionnel',
+              capacity: item.capacity || item.capacite_max || 500,
+              stats: {
+                views: item.stats?.views ?? item.vues ?? 0,
+                registrations: item.stats?.registrations ?? item.participantsCount ?? item.inscrits_count ?? 0,
+                attendees: item.stats?.attendees ?? 0,
+                shares: item.stats?.shares ?? 0
+              },
+              institution: {
+                id: String(item.institution?.id || item.organisateur?.id || 'inst-gen'),
+                name: item.institution?.name || item.organisateur?.nom_complet || item.organisateur_name || 'Institution EXILE',
+                verified: Boolean(item.institution?.verified ?? true),
+                avatar: item.institution?.avatar || ''
+              },
+              createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+              price: item.price || item.prix || 0,
+              isFree: item.isFree ?? (item.price === 0 || !item.price),
+              isBoosted: Boolean(item.isBoosted || item.is_boosted),
+              liveStatus: item.liveStatus || item.live_status || 'at_coming',
+              participantsCount: item.participantsCount ?? item.participants_count ?? 0,
+              reactions: item.reactions || { thumbs_up: 10, clap: 5, bulb: 2, heart: 8 }
+            }))
+            setEvents(mapped)
             return
           }
         }
@@ -245,9 +277,9 @@ export const SocialEvents = (): JSX.Element => {
           {/* STATS - Mobile */}
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
             {[
-              { icon: Calendar, value: events.filter(e => e.status === 'published').length, label: 'Publiés', color: resolvedTheme === 'dark' ? 'text-emerald-400' : 'text-emerald-600', bg: resolvedTheme === 'dark' ? 'bg-emerald-900/30' : 'bg-emerald-100' },
-              { icon: Users, value: events.reduce((s, e) => s + e.stats.registrations, 0), label: 'Inscrits', color: resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600', bg: resolvedTheme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100' },
-              { icon: Radio, value: events.filter(e => isUpcoming(e.startDate)).length, label: 'À venir', color: resolvedTheme === 'dark' ? 'text-orange-400' : 'text-orange-600', bg: resolvedTheme === 'dark' ? 'bg-orange-900/30' : 'bg-orange-100' },
+              { icon: Calendar, value: events.filter(e => e?.status === 'published').length, label: 'Publiés', color: resolvedTheme === 'dark' ? 'text-emerald-400' : 'text-emerald-600', bg: resolvedTheme === 'dark' ? 'bg-emerald-900/30' : 'bg-emerald-100' },
+              { icon: Users, value: events.reduce((s, e) => s + (e?.stats?.registrations ?? e?.participantsCount ?? 0), 0), label: 'Inscrits', color: resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600', bg: resolvedTheme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100' },
+              { icon: Radio, value: events.filter(e => e?.startDate && isUpcoming(e.startDate)).length, label: 'À venir', color: resolvedTheme === 'dark' ? 'text-orange-400' : 'text-orange-600', bg: resolvedTheme === 'dark' ? 'bg-orange-900/30' : 'bg-orange-100' },
             ].map((s, i) => (
               <div key={i} className={`flex-shrink-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl border px-3 py-2 flex items-center gap-2.5 min-w-[80px]`}>
                 <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center`}>
@@ -309,9 +341,9 @@ export const SocialEvents = (): JSX.Element => {
           {/* STATS - Desktop */}
           <div className="flex gap-2 mp-34">
             {[
-              { icon: Calendar, value: events.filter(e => e.status === 'published').length, label: 'Publiés', color: resolvedTheme === 'dark' ? 'text-emerald-400' : 'text-emerald-600', bg: resolvedTheme === 'dark' ? 'bg-emerald-900/30' : 'bg-emerald-100' },
-              { icon: Users, value: events.reduce((s, e) => s + e.stats.registrations, 0), label: 'Inscrits', color: resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600', bg: resolvedTheme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100' },
-              { icon: Radio, value: events.filter(e => isUpcoming(e.startDate)).length, label: 'À venir', color: resolvedTheme === 'dark' ? 'text-orange-400' : 'text-orange-600', bg: resolvedTheme === 'dark' ? 'bg-orange-900/30' : 'bg-orange-100' },
+              { icon: Calendar, value: events.filter(e => e?.status === 'published').length, label: 'Publiés', color: resolvedTheme === 'dark' ? 'text-emerald-400' : 'text-emerald-600', bg: resolvedTheme === 'dark' ? 'bg-emerald-900/30' : 'bg-emerald-100' },
+              { icon: Users, value: events.reduce((s, e) => s + (e?.stats?.registrations ?? e?.participantsCount ?? 0), 0), label: 'Inscrits', color: resolvedTheme === 'dark' ? 'text-blue-400' : 'text-blue-600', bg: resolvedTheme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100' },
+              { icon: Radio, value: events.filter(e => e?.startDate && isUpcoming(e.startDate)).length, label: 'À venir', color: resolvedTheme === 'dark' ? 'text-orange-400' : 'text-orange-600', bg: resolvedTheme === 'dark' ? 'bg-orange-900/30' : 'bg-orange-100' },
             ].map((s, i) => (
               <div key={i} className={`flex-shrink-0 ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl border px-3 py-2 flex items-center gap-2.5 min-w-[80px]`}>
                 <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center`}>
@@ -468,7 +500,7 @@ export const SocialEvents = (): JSX.Element => {
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="w-2 h-2" />
-                      {event.stats.registrations}/{event.capacity}
+                      {(event.stats?.registrations ?? event.participantsCount ?? 0)}/{event.capacity || 100}
                     </span>
                   </div>
 
@@ -512,7 +544,7 @@ export const SocialEvents = (): JSX.Element => {
               <div className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} space-y-2`}>
                 <p><strong>Date:</strong> {formatDate(selectedEvent.startDate)}</p>
                 <p><strong>Lieu:</strong> {selectedEvent.format === 'virtual' ? 'En ligne' : selectedEvent.location?.city}</p>
-                <p><strong>Capacité:</strong> {selectedEvent.stats.registrations}/{selectedEvent.capacity} inscrits</p>
+                <p><strong>Capacité:</strong> {(selectedEvent.stats?.registrations ?? selectedEvent.participantsCount ?? 0)}/{selectedEvent.capacity || 100} inscrits</p>
               </div>
             </div>
             <div className="flex gap-3">
