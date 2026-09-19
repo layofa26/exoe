@@ -53,6 +53,11 @@ export interface CreatedPublicationItem {
     lat?: string
     lon?: string
     radius?: string
+    city?: string
+    state?: string
+    country?: string
+    countryCode?: string
+    targetLevel?: 'city' | 'state' | 'country' | 'radius'
   }
   createdAt: string
   stats: {
@@ -113,8 +118,33 @@ export function CreatePublicationModal({
   const [targetScope, setTargetScope] = useState<'worldwide' | 'targeted'>('worldwide')
   const [locationSearchQuery, setLocationSearchQuery] = useState('')
   const [isSearchingLocation, setIsSearchingLocation] = useState(false)
-  const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([])
-  const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: string; lon: string } | null>(null)
+  const [locationSuggestions, setLocationSuggestions] = useState<Array<{
+    display_name: string;
+    lat: string;
+    lon: string;
+    address?: {
+      country?: string;
+      country_code?: string;
+      state?: string;
+      province?: string;
+      department?: string;
+      county?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+      municipality?: string;
+    };
+  }>>([])
+  const [selectedLocation, setSelectedLocation] = useState<{
+    name: string;
+    lat: string;
+    lon: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    countryCode?: string;
+  } | null>(null)
+  const [targetLevel, setTargetLevel] = useState<'city' | 'state' | 'country'>('city')
   const [locationRadius, setLocationRadius] = useState<'10km' | '30km' | 'region' | 'country'>('30km')
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
 
@@ -331,7 +361,12 @@ export function CreatePublicationModal({
         name: selectedLocation?.name || locationSearchQuery || 'Zone ciblée',
         lat: selectedLocation?.lat,
         lon: selectedLocation?.lon,
-        radius: locationRadius
+        radius: locationRadius,
+        city: selectedLocation?.city,
+        state: selectedLocation?.state,
+        country: selectedLocation?.country,
+        countryCode: selectedLocation?.countryCode,
+        targetLevel: targetLevel
       } : undefined
 
 
@@ -2054,7 +2089,7 @@ export function CreatePublicationModal({
                   </div>
                 </div>
 
-                {/* Si "Lieu ciblé" est sélectionné : Recherche OpenStreetMap en direct */}
+                {/* Si "Lieu ciblé" est sélectionné : Option B Mòd Entèlijan (Rechèch + Deteksyon Peyi, Eta/Depatman, Vil) */}
                 {targetScope === 'targeted' && (
                   <div className="mt-3 pt-3 border-t border-zinc-700/40 dark:border-zinc-800 space-y-3 animate-in fade-in duration-150">
                     <div className="relative">
@@ -2070,7 +2105,7 @@ export function CreatePublicationModal({
                             setLocationSearchQuery(e.target.value)
                             if (selectedLocation) setSelectedLocation(null)
                           }}
-                          placeholder="Tapez une ville, région ou pays (ex: Port-au-Prince, Miami, Paris, Montréal...)"
+                          placeholder="Tapez une ville, état, département ou pays (ex: Port-au-Prince, Miami, Paris, Montréal, Santiago...)"
                           className={`w-full pl-9 pr-9 py-2.5 rounded-xl border text-sm ${
                             isDark ? 'bg-zinc-900 border-zinc-700 text-white placeholder-zinc-500' : 'bg-white border-slate-200 text-slate-900'
                           }`}
@@ -2107,66 +2142,178 @@ export function CreatePublicationModal({
                               <X className="w-3 h-3" />
                             </button>
                           </div>
-                          {locationSuggestions.map((item, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                setSelectedLocation({
-                                  name: item.display_name,
-                                  lat: item.lat,
-                                  lon: item.lon
-                                })
-                                setLocationSearchQuery(item.display_name)
-                                setShowLocationDropdown(false)
-                              }}
-                              className={`w-full p-2.5 text-left text-xs hover:bg-orange-500/10 hover:text-orange-500 flex items-start gap-2 border-b last:border-0 ${
-                                isDark ? 'border-zinc-800' : 'border-slate-100'
-                              }`}
-                            >
-                              <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-orange-500" />
-                              <span className="truncate">{item.display_name}</span>
-                            </button>
-                          ))}
+                          {locationSuggestions.map((item, idx) => {
+                            const addr = item.address || {}
+                            const cCountry = addr.country || ''
+                            const cState = addr.state || addr.province || addr.department || addr.county || ''
+                            const cCity = addr.city || addr.town || addr.village || addr.municipality || ''
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedLocation({
+                                    name: item.display_name,
+                                    lat: item.lat,
+                                    lon: item.lon,
+                                    country: cCountry,
+                                    countryCode: (addr.country_code || '').toUpperCase(),
+                                    state: cState,
+                                    city: cCity
+                                  })
+                                  setTargetLevel(cCity ? 'city' : cState ? 'state' : 'country')
+                                  setLocationSearchQuery(item.display_name)
+                                  setShowLocationDropdown(false)
+                                }}
+                                className={`w-full p-2.5 text-left text-xs hover:bg-orange-500/10 hover:text-orange-500 flex items-start gap-2 border-b last:border-0 ${
+                                  isDark ? 'border-zinc-800' : 'border-slate-100'
+                                }`}
+                              >
+                                <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-orange-500" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate font-medium">{item.display_name}</p>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 mt-0.5">
+                                    {cCity && <span>📍 {cCity}</span>}
+                                    {cState && <span>• 🏛️ {cState}</span>}
+                                    {cCountry && <span>• 🌍 {cCountry}</span>}
+                                  </div>
+                                </div>
+                              </button>
+                            )
+                          })}
                         </div>
                       )}
 
-                      {/* Confirmation du lieu sélectionné avec badge */}
+                      {/* Décomposition Automatique en Badges (Option B) */}
                       {selectedLocation && (
-                        <div className="mt-2 flex items-center gap-2 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs">
-                          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                          <span className="font-semibold truncate">Lieu validé : {selectedLocation.name}</span>
+                        <div className={`mt-3 p-3 rounded-xl border ${
+                          isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-slate-200'
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Lieu identifié avec succès
+                            </span>
+                            <span className="text-[10px] text-zinc-400">
+                              Lat: {parseFloat(selectedLocation.lat).toFixed(3)}, Lon: {parseFloat(selectedLocation.lon).toFixed(3)}
+                            </span>
+                          </div>
+
+                          {/* 3 Niveaux Détectés : Pays, État/Département, Ville */}
+                          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                            {selectedLocation.country && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                <Globe className="w-3 h-3" />
+                                <span>Pays : {selectedLocation.country}</span>
+                              </span>
+                            )}
+                            {selectedLocation.state && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                <Building2 className="w-3 h-3" />
+                                <span>État / Dép. : {selectedLocation.state}</span>
+                              </span>
+                            )}
+                            {selectedLocation.city && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                                <MapPin className="w-3 h-3" />
+                                <span>Ville : {selectedLocation.city}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Sélecteur de Portée du Ciblage selon les niveaux détectés */}
+                          <div>
+                            <label className={`block text-[11px] font-semibold mb-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                              Niveau de diffusion ciblé :
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              {selectedLocation.city && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTargetLevel('city')}
+                                  className={`p-2 rounded-xl border text-left transition-all ${
+                                    targetLevel === 'city'
+                                      ? 'border-orange-500 bg-orange-500/15 text-orange-500 font-bold shadow-sm'
+                                      : isDark ? 'border-zinc-800 bg-zinc-800/40 text-zinc-400' : 'border-slate-200 bg-slate-50 text-slate-600'
+                                  }`}
+                                >
+                                  <p className="text-xs font-bold flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    Cette Ville uniquement
+                                  </p>
+                                  <p className="text-[10px] opacity-75 truncate mt-0.5">{selectedLocation.city}</p>
+                                </button>
+                              )}
+
+                              {selectedLocation.state && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTargetLevel('state')}
+                                  className={`p-2 rounded-xl border text-left transition-all ${
+                                    targetLevel === 'state'
+                                      ? 'border-blue-500 bg-blue-500/15 text-blue-500 font-bold shadow-sm'
+                                      : isDark ? 'border-zinc-800 bg-zinc-800/40 text-zinc-400' : 'border-slate-200 bg-slate-50 text-slate-600'
+                                  }`}
+                                >
+                                  <p className="text-xs font-bold flex items-center gap-1">
+                                    <Building2 className="w-3 h-3" />
+                                    Tout l'État / Département
+                                  </p>
+                                  <p className="text-[10px] opacity-75 truncate mt-0.5">{selectedLocation.state}</p>
+                                </button>
+                              )}
+
+                              {selectedLocation.country && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTargetLevel('country')}
+                                  className={`p-2 rounded-xl border text-left transition-all ${
+                                    targetLevel === 'country'
+                                      ? 'border-emerald-500 bg-emerald-500/15 text-emerald-500 font-bold shadow-sm'
+                                      : isDark ? 'border-zinc-800 bg-zinc-800/40 text-zinc-400' : 'border-slate-200 bg-slate-50 text-slate-600'
+                                  }`}
+                                >
+                                  <p className="text-xs font-bold flex items-center gap-1">
+                                    <Globe className="w-3 h-3" />
+                                    Tout le Pays
+                                  </p>
+                                  <p className="text-[10px] opacity-75 truncate mt-0.5">{selectedLocation.country}</p>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Sélecteur de Rayon si niveau ville ou local */}
+                          {targetLevel === 'city' && (
+                            <div className="mt-2.5 pt-2.5 border-t border-zinc-800/60 dark:border-zinc-800">
+                              <label className={`block text-[10px] font-semibold mb-1 text-zinc-400`}>
+                                Périmètre de diffusion autour de la ville :
+                              </label>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {[
+                                  { id: '10km', label: '10 km' },
+                                  { id: '30km', label: '30 km' },
+                                  { id: '50km', label: '50 km' },
+                                  { id: 'region', label: 'Agglomération' },
+                                ].map(r => (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() => setLocationRadius(r.id as any)}
+                                    className={`py-1.5 text-xs rounded-lg border text-center transition-all ${
+                                      locationRadius === r.id
+                                        ? 'border-orange-500/70 bg-orange-500/15 text-orange-500 font-bold'
+                                        : isDark ? 'border-zinc-800 text-zinc-400' : 'border-slate-200 text-slate-600'
+                                    }`}
+                                  >
+                                    {r.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-
-                    {/* Sélecteur de Rayon d'impact */}
-                    <div>
-                      <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Rayon de diffusion géographique
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {[
-                          { id: '10km', label: '10 km', desc: 'Zone immédiate' },
-                          { id: '30km', label: '30 km', desc: 'Agglomération' },
-                          { id: 'region', label: 'Région', desc: 'Tout le département' },
-                          { id: 'country', label: 'Pays entier', desc: 'Tout le pays cible' },
-                        ].map(r => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => setLocationRadius(r.id as any)}
-                            className={`p-2 rounded-xl border text-center transition-all ${
-                              locationRadius === r.id
-                                ? 'border-blue-500/70 bg-blue-500/15 text-blue-500 font-bold'
-                                : isDark ? 'border-zinc-800 text-zinc-400 hover:border-zinc-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                            }`}
-                          >
-                            <p className="text-xs font-bold">{r.label}</p>
-                            <p className="text-[9px] opacity-75">{r.desc}</p>
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 )}
