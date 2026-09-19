@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Bell, Search, Plus, Clock, X, TrendingUp, History } from 'lucide-react'
+import { Building2, Bell, Search, Plus, Clock, X, TrendingUp, History, Briefcase } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRecentSearches } from '../../hooks/useRecentSearches'
+import { API_BASE_URL } from '../../config/api'
 
 interface SocialHeaderProps {
   title?: string
@@ -173,25 +174,48 @@ export function SocialHeader({
   }
 
   return (
-    <header className={`sticky top-0 z-50 ${resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white/90 border-gray-200'} backdrop-blur-md border-b`}>
-      <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          {/* Logo + Title */}
-          {showLogo && (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-social to-blue-600 flex items-center justify-center">
-                <Building2 className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-white" />
+    <header className={`sticky top-0 z-50 ${resolvedTheme === 'dark' ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-slate-200'} backdrop-blur-md border-b`}>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          {/* Logo & Module Switcher */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button
+              onClick={() => navigate('/social')}
+              className="flex items-center gap-2 text-left focus:outline-none"
+            >
+              <img src="/logo_exile_SVG.svg" alt="EXILE" className="w-8 h-8 sm:w-9 sm:h-9 object-contain" />
+              <div className="hidden xs:flex flex-col">
+                <span className={`font-bold text-sm sm:text-base leading-none ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  EXILE
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">
+                  Social
+                </span>
               </div>
-              <div>
-                <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  {title}
-                </h1>
-              </div>
+            </button>
+
+            {/* Quick Switcher Between Pro and Social */}
+            <div className={`hidden sm:flex items-center p-1 rounded-xl border text-xs font-semibold ${
+              resolvedTheme === 'dark' ? 'bg-zinc-800/80 border-zinc-700' : 'bg-slate-100 border-slate-200'
+            }`}>
+              <button
+                onClick={() => navigate('/pro')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                  resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>Professionnel</span>
+              </button>
+              <span className={`px-2.5 py-1 rounded-lg bg-emerald-600 text-white shadow-sm flex items-center gap-1.5`}>
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Social</span>
+              </span>
             </div>
-          )}
+          </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
             {/* Search */}
             {showSearch && (
               <div className="relative" ref={searchRef}>

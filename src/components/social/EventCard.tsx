@@ -1,4 +1,4 @@
-import { Calendar, MapPin, Clock, Users, CheckCircle, Share2, TrendingUp, Video, User } from 'lucide-react'
+import { Calendar, MapPin, Clock, Users, CheckCircle, Share2, TrendingUp, Video, User, ThumbsUp, Sparkles, Lightbulb, Heart } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { SocialEvent } from '../../types/social/event'
 import { motion } from 'framer-motion'
@@ -218,47 +218,51 @@ export const EventCard = ({ event, onRegister, onShare, onJoinLive, onReaction, 
       {/* Reactions System */}
       {event.reactions && (
         <div className={`flex items-center gap-1.5 sm:gap-2 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t ${resolvedTheme === 'dark' ? 'border-zinc-700' : 'border-gray-200'}`}>
-          <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>Réactions :</span>
-          <div className="flex items-center gap-0.5 sm:gap-1">
+          <span className={`text-[10px] sm:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>Intérêt :</span>
+          <div className="flex items-center gap-1">
             <button
               onClick={() => handleReaction('thumbs_up')}
-              className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs transition-all ${
                 selectedReaction === 'thumbs_up'
                   ? 'scale-110 bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-gray-100 text-gray-600'
               }`}
             >
-              👍 {event.reactions.thumbs_up}
+              <ThumbsUp className="w-3 h-3" />
+              <span>{event.reactions.thumbs_up}</span>
             </button>
             <button
               onClick={() => handleReaction('clap')}
-              className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs transition-all ${
                 selectedReaction === 'clap'
                   ? 'scale-110 bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-300'
                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-gray-100 text-gray-600'
               }`}
             >
-              👏 {event.reactions.clap}
+              <Sparkles className="w-3 h-3" />
+              <span>{event.reactions.clap}</span>
             </button>
             <button
               onClick={() => handleReaction('bulb')}
-              className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs transition-all ${
                 selectedReaction === 'bulb'
                   ? 'scale-110 bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300'
                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-gray-100 text-gray-600'
               }`}
             >
-              💡 {event.reactions.bulb}
+              <Lightbulb className="w-3 h-3" />
+              <span>{event.reactions.bulb}</span>
             </button>
             <button
               onClick={() => handleReaction('heart')}
-              className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs transition-all ${
                 selectedReaction === 'heart'
-                  ? 'scale-110 bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-300'
+                  ? 'scale-110 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
                   : resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-gray-100 text-gray-600'
               }`}
             >
-              ❤️ {event.reactions.heart}
+              <Heart className="w-3 h-3" />
+              <span>{event.reactions.heart}</span>
             </button>
           </div>
         </div>

@@ -1,5 +1,22 @@
 import { useState, useEffect } from 'react'
-import { Building2, ArrowRight, ArrowLeft, CheckCircle, Upload, FileText, User, Shield } from 'lucide-react'
+import {
+  Building2,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
+  Upload,
+  FileText,
+  User,
+  Shield,
+  GraduationCap,
+  HeartPulse,
+  Landmark,
+  Handshake,
+  Church,
+  Newspaper,
+  BookOpen,
+  Users
+} from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { SUPPORTED_COUNTRIES, validateRegistrationNumber } from '../../config/institutionCountries'
 import { InstitutionStep1, InstitutionStep2, InstitutionType, InstitutionPlan } from '../../types'
@@ -12,42 +29,36 @@ import {
   validateLegalDocument,
 } from '../../constants/institutionValidation'
 
-const INSTITUTION_TYPES: { value: InstitutionType; label: string; icon: string }[] = [
-  { value: 'school', label: 'École / Université', icon: '🎓' },
-  { value: 'hospital', label: 'Hôpital / Centre de santé', icon: '🏥' },
-  { value: 'bank', label: 'Banque / Institution financière', icon: '🏦' },
-  { value: 'ngo', label: 'ONG / Organisation à but non lucratif', icon: '🤝' },
-  { value: 'company', label: 'Entreprise privée', icon: '🏢' },
-  { value: 'government', label: 'Gouvernement / Administration publique', icon: '🏛️' },
-  { value: 'religious', label: 'Institution religieuse', icon: '⛪' },
-  { value: 'media', label: 'Média / Presse', icon: '📰' },
-  { value: 'training_center', label: 'Centre de formation', icon: '📚' },
-  { value: 'association', label: 'Association', icon: '🤝' },
-  { value: 'other', label: 'Autre', icon: '📋' },
+const INSTITUTION_TYPES: { value: InstitutionType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'school', label: 'École / Université', icon: GraduationCap },
+  { value: 'hospital', label: 'Hôpital / Santé', icon: HeartPulse },
+  { value: 'bank', label: 'Banque / Finance', icon: Landmark },
+  { value: 'ngo', label: 'ONG / Humanitaire', icon: Handshake },
+  { value: 'company', label: 'Entreprise privée', icon: Building2 },
+  { value: 'government', label: 'Gouvernement / État', icon: Landmark },
+  { value: 'religious', label: 'Institution religieuse', icon: Church },
+  { value: 'media', label: 'Média / Presse', icon: Newspaper },
+  { value: 'training_center', label: 'Centre de formation', icon: BookOpen },
+  { value: 'association', label: 'Association', icon: Users },
+  { value: 'other', label: 'Autre organisme', icon: FileText },
 ]
 
 const PLANS: { value: InstitutionPlan; label: string; price: string; features: string[]; available: boolean }[] = [
   {
-    value: 'verified',
-    label: 'Verified',
-    price: 'Gratuit',
-    features: ['Validation de base', 'Publication d\'alertes', 'Recrutement limité (5 offres/mois)', 'Support email'],
-    available: true
-  },
-  {
     value: 'standard',
-    label: 'Standard',
-    price: 'Bientôt disponible',
-    features: ['Validation complète', 'Publication illimitée', 'Recrutement illimité', 'Événements', 'Vidéos', 'Support prioritaire', 'Analytics'],
-    available: false
-  },
-  {
-    value: 'premium',
-    label: 'Premium',
-    price: 'Bientôt disponible',
-    features: ['Tout Standard', 'Boost de visibilité', 'Alertes push automatiques', 'API accès', 'Account manager dédié', 'Personnalisation'],
-    available: false
-  },
+    label: 'Standard Institutionnel',
+    price: '20$/mois',
+    features: [
+      'Validation officielle manuelle par l\'équipe EXILE',
+      'Publication d\'alertes officielles (3 / mois)',
+      'Diffusion de Lives officiels (2 / mois)',
+      'Publication d\'offres de recrutement (3 / mois - CV PDF)',
+      'Publication de vidéos institutionnelles (2 / mois)',
+      'Accès aux Boosts unitaires de visibilité',
+      'Badge Institution Vérifiée & Support prioritaire'
+    ],
+    available: true
+  }
 ]
 
 export const InstitutionRequest = (): JSX.Element => {
@@ -325,8 +336,8 @@ export const InstitutionRequest = (): JSX.Element => {
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <div className="text-lg mb-0.5">{type.icon}</div>
-                        <div className={`text-[9px] font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
+                        <type.icon className={`w-5 h-5 mx-auto mb-1 ${step1Data.institutionType === type.value ? 'text-emerald-500' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`} />
+                        <div className={`text-[10px] font-medium text-center ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>
                           {type.label}
                         </div>
                       </button>

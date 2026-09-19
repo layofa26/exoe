@@ -144,7 +144,8 @@ function App(): JSX.Element {
 
 
   // Pages sans Header principal (accueil header masqué sur events, subscriptions, requests, pub dashboard, etc.)
-  const isNoHeaderPage = location.pathname.startsWith('/pro/conversations') || 
+  const isNoHeaderPage = isSocialRoute ||
+                           location.pathname.startsWith('/pro/conversations') || 
                            location.pathname.startsWith('/pro/profile') ||
                            location.pathname.startsWith('/pro/subscribers') ||
                            location.pathname.startsWith('/pro/calendar') ||
@@ -258,7 +259,7 @@ function App(): JSX.Element {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-          <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage ? 'pb-16' : isSocialRoute ? 'md:pl-64' : ''}`}>
+          <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage ? 'pb-16' : isSocialRoute ? 'md:pl-64 pb-20 md:pb-0' : ''}`}>
             <Suspense fallback={<PageLoading />}>
               <Routes>
                 {/* Public Routes — Redirection directe vers /pro pour capter l'attention sans texte */}
