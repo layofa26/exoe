@@ -174,23 +174,23 @@ export function SocialHeader({
   }
 
   return (
-    <header className={`fixed top-0 left-0 md:left-64 right-0 z-40 ${resolvedTheme === 'dark' ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-slate-200'} backdrop-blur-md border-b shadow-sm transition-colors`}>
-      <div className="w-full px-2 sm:px-4 lg:px-6 xl:px-8">
+    <header className={`fixed top-0 left-0 right-0 z-40 ${resolvedTheme === 'dark' ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-slate-200'} backdrop-blur-md border-b shadow-sm transition-colors`}>
+      <div className="w-full px-3 sm:px-4 lg:px-6 xl:px-8">
         <div className="relative flex items-center justify-between h-14 sm:h-16">
           {/* Espace Gauche (Sans logo EXILE selon directive utilisateur) */}
           <div className="flex-shrink-0 flex items-center z-10 w-6 sm:w-10" />
 
           {/* Navigation Centrale - Exactement comme dans le Module Professionnel (sans logo EXILE) */}
-          <nav className="absolute left-1/2 -translate-x-1/2 bottom-1.5 sm:bottom-1 md:bottom-1 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto flex items-center space-x-2.5 sm:space-x-4 md:space-x-8 z-10 pointer-events-auto max-w-[calc(100%-140px)] sm:max-w-none">
+          <nav className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center space-x-3 sm:space-x-6 md:space-x-8 z-10 pointer-events-auto">
             <Link
               to="/pro"
-              className="relative text-[12px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-2 py-0.5 text-gray-600 dark:text-zinc-300 hover:text-[#FF6B00]"
+              className="relative text-[13px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1.5 sm:px-2 py-0.5 text-gray-600 dark:text-zinc-300 hover:text-[#FF6B00]"
             >
               <span>Professionnel</span>
             </Link>
             <Link
               to="/social"
-              className="relative text-[12px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-2 py-0.5 text-[#FF6B00]"
+              className="relative text-[13px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1.5 sm:px-2 py-0.5 text-[#FF6B00]"
             >
               <span>Social</span>
               <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#FF6B00] rounded-full" />
@@ -199,35 +199,43 @@ export function SocialHeader({
 
           {/* Droite : Recherche & Boutons d'action (Compact sur mobile et tablette) */}
           <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 z-10 ml-auto pl-2 sm:pl-3">
-            {/* Search */}
+            {/* Search - Icon button on mobile/tablet (< lg) */}
             {showSearch && (
-              <div className="relative" ref={searchRef}>
-                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  onFocus={() => {
-                    setShowDropdown(true)
-                    if (window.innerWidth < 640) {
-                      handleMobileSearchOpen()
-                    }
-                  }}
-                  placeholder="Rechercher..."
-                  className={`pl-10 pr-10 py-2 rounded-lg text-sm ${
-                    resolvedTheme === 'dark'
-                      ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500 focus:border-social'
-                      : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500 focus:border-social'
-                  } border focus:outline-none focus:ring-2 focus:ring-social/20 w-48`}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={handleClearSearch}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
-                  >
-                    <X className={`w-3 h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`} />
-                  </button>
-                )}
+              <>
+                <button
+                  type="button"
+                  onClick={handleMobileSearchOpen}
+                  className={`p-1.5 sm:p-2 rounded-lg lg:hidden ${resolvedTheme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800' : 'text-gray-600 hover:bg-gray-100'} transition-colors`}
+                  title="Rechercher"
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+
+                {/* Desktop Search Input (>= lg) */}
+                <div className="relative hidden lg:block" ref={searchRef}>
+                  <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-400'}`} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    onFocus={() => {
+                      setShowDropdown(true)
+                    }}
+                    placeholder="Rechercher..."
+                    className={`pl-9 pr-8 py-1.5 rounded-xl text-sm ${
+                      resolvedTheme === 'dark'
+                        ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500 focus:border-orange-500'
+                        : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500 focus:border-orange-500'
+                    } border focus:outline-none focus:ring-2 focus:ring-orange-500/20 w-44 xl:w-56`}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={handleClearSearch}
+                      className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-200'} transition-colors`}
+                    >
+                      <X className={`w-3.5 h-3.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-400'}`} />
+                    </button>
+                  )}
 
                 {/* Search Dropdown */}
                 {showDropdown && (
@@ -443,7 +451,8 @@ export function SocialHeader({
                   </div>
                 )}
               </div>
-            )}
+            </>
+          )}
 
             {/* Mobile Full Screen Search */}
             {isMobileSearchOpen && createPortal(

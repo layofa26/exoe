@@ -8,59 +8,85 @@ import { SocialHeader } from '../../components/social/SocialHeader'
 const PLANS = [
   {
     id: 'verified' as InstitutionPlan,
-    name: 'Verified',
-    price: 'Gratuit',
-    description: 'Pour les institutions qui souhaitent une validation de base',
+    name: 'Vérifié',
+    price: '$20',
+    period: 'Paiement unique',
+    description: 'Profil institutionnel uniquement avec validation officielle',
     features: [
-      'Validation de l\'institution',
-      'Publication d\'alertes (limité à 5/mois)',
-      'Recrutement (5 offres/mois)',
-      'Événements (2/mois)',
-      'Support email',
-      'Badge "Vérifié"',
+      'Profil public avec badge ⏳',
+      'Recevoir des abonnés (followers)',
+      'Réception de messages entrants',
+      'Validation juridique par EXILE',
+      'Support par email',
     ],
     limitations: [
-      'Pas de vidéos',
-      'Pas de boost de visibilité',
-      'Support standard',
+      'Aucune publication d\'alerte',
+      'Pas de recrutement',
+      'Pas de live ni de vidéo',
     ],
     popular: false,
+    ctaText: 'Demander un compte',
+  },
+  {
+    id: 'starter' as InstitutionPlan,
+    name: 'Starter',
+    price: '$20/mois',
+    period: '/mois',
+    description: 'Pour petites institutions, mairies et délégations locales',
+    features: [
+      'Tout le plan Vérifié inclus',
+      '1 alerte officielle / mois',
+      '1 offre de recrutement / mois',
+      'Badge ✓ vert actif',
+      'Statistiques de consultation de base',
+      'Support standard sous 24h',
+    ],
+    limitations: [
+      'Pas de live',
+      'Pas de vidéo institutionnelle',
+    ],
+    popular: false,
+    ctaText: 'Choisir Starter',
   },
   {
     id: 'standard' as InstitutionPlan,
     name: 'Standard',
-    price: '$49/mois',
-    description: 'Pour les institutions actives qui ont besoin de fonctionnalités complètes',
+    price: '$50/mois',
+    period: '/mois',
+    description: 'Pour institutions actives ayant une communication officielle régulière',
     features: [
-      'Tout Verified',
-      'Publication illimitée',
-      'Recrutement illimité',
-      'Événements illimités',
-      'Vidéos institutionnelles',
-      'Analytics détaillés',
+      'Tout le plan Starter inclus',
+      '3 alertes officielles / mois',
+      '3 offres de recrutement / mois',
+      '1 live officiel / mois',
+      '1 vidéo institutionnelle / mois',
+      'Accès au Boost unitaire pour visibilité',
+      'Statistiques complètes & engagement',
       'Support prioritaire',
-      'Badge "Standard"',
     ],
     limitations: [],
     popular: true,
+    ctaText: 'Choisir Standard',
   },
   {
     id: 'premium' as InstitutionPlan,
     name: 'Premium',
-    price: '$99/mois',
-    description: 'Pour les institutions qui veulent une visibilité maximale',
+    price: '$70/mois',
+    period: '/mois',
+    description: 'Pour ministères, grandes institutions, ONG et organisations internationales',
     features: [
-      'Tout Standard',
-      'Boost de visibilité (x3)',
-      'Alertes push automatiques',
-      'API accès',
-      'Account manager dédié',
-      'Personnalisation avancée',
-      'Rapports personnalisés',
-      'Badge "Premium"',
+      'Publications et alertes illimitées',
+      'Lives officiels illimités',
+      'Vidéos institutionnelles illimitées',
+      'Recrutement officiel illimité',
+      'Badge ✓ or officiel premium',
+      '5 Boosts de visibilité inclus / mois',
+      'Alertes prioritaires avec push ciblé',
+      'Support prioritaire dédié 24/7',
     ],
     limitations: [],
     popular: false,
+    ctaText: 'Choisir Premium',
   },
 ]
 
@@ -114,96 +140,101 @@ export const InstitutionPlans = (): JSX.Element => {
           </div>
         </div>
 
-        {/* Plans Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-12">
+        {/* Plans Grid - Responsive 4 Columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
           {PLANS.map((plan) => (
             <div
               key={plan.id}
               onClick={() => setSelectedPlan(plan.id)}
-              className={`relative rounded-2xl border-2 p-6 md:p-8 cursor-pointer transition-all ${
+              className={`relative rounded-2xl border-2 p-5 sm:p-6 cursor-pointer transition-all flex flex-col justify-between ${
                 selectedPlan === plan.id
-                  ? 'border-social shadow-xl scale-[1.02]'
+                  ? 'border-emerald-500 shadow-xl scale-[1.02] bg-emerald-500/5'
                   : resolvedTheme === 'dark'
                   ? 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
                   : 'border-gray-200 bg-white hover:border-gray-300'
-              } ${plan.popular ? 'md:-mt-4 md:mb-4' : ''}`}
+              } ${plan.popular ? 'lg:-mt-2 lg:mb-2' : ''}`}
             >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-social text-white text-xs font-bold rounded-full shadow-md">
-                  Recommandé
-                </div>
-              )}
-
-              {/* Plan Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-social/10 text-social flex items-center justify-center">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <h3 className={`text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {plan.name}
-                  </h3>
-                </div>
-              </div>
-
-              {/* Price */}
-              <div className="mb-4">
-                {plan.id === 'verified' ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-2xl md:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                      {plan.price}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-2xl md:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                      {isAnnual
-                        ? `$${Math.round(parseInt(plan.price.replace('$', '').replace('/mois', '')) * 0.8)}`
-                        : plan.price.split('/')[0]}
-                    </span>
-                    <span className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>/mois</span>
+              <div>
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-emerald-600 text-white text-[11px] font-bold rounded-full shadow-md whitespace-nowrap">
+                    Recommandé
                   </div>
                 )}
-                {plan.id === 'verified' && <div className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Toujours gratuit</div>}
-              </div>
 
-              {/* Description */}
-              <p className={`text-xs md:text-sm mb-4 md:mb-6 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
-                {plan.description}
-              </p>
-
-              {/* Features */}
-              <ul className="space-y-2 md:space-y-3 mb-4 md:mb-6">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                    <span className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* Limitations */}
-              {plan.limitations.length > 0 && (
-                <div className={`p-2 md:p-3 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-100'} mb-4 md:mb-6`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Info className="w-3 h-3 md:w-4 md:h-4 text-orange-500" />
-                    <span className={`text-[10px] md:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>Limitations</span>
+                {/* Plan Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <h3 className={`text-base sm:text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {plan.name}
+                    </h3>
                   </div>
-                  <ul className="space-y-1">
-                    {plan.limitations.map((limitation) => (
-                      <li key={limitation} className={`text-[10px] md:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
-                        • {limitation}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
-              )}
+
+                {/* Price */}
+                <div className="mb-3">
+                  {plan.period === 'Paiement unique' ? (
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-2xl sm:text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {plan.price}
+                      </span>
+                      <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>unique</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-2xl sm:text-3xl font-extrabold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {isAnnual
+                          ? `$${Math.round(parseInt(plan.price.replace('$', '').replace('/mois', '')) * 0.8)}`
+                          : plan.price.split('/')[0]}
+                      </span>
+                      <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>/mois</span>
+                    </div>
+                  )}
+                  <p className={`text-[11px] mt-0.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                    {plan.period === 'Paiement unique' ? 'Paiement unique de validation' : isAnnual ? 'Facturé annuellement (-20%)' : 'Facturé mensuellement'}
+                  </p>
+                </div>
+
+                {/* Description */}
+                <p className={`text-xs mb-4 min-h-[36px] ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
+                  {plan.description}
+                </p>
+
+                {/* Features */}
+                <ul className="space-y-2 mb-4">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                      <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Limitations */}
+                {plan.limitations.length > 0 && (
+                  <div className={`p-2.5 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-800/60' : 'bg-gray-100'} mb-4`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Info className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                      <span className={`text-[10px] font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>Non inclus</span>
+                    </div>
+                    <ul className="space-y-0.5">
+                      {plan.limitations.map((limitation) => (
+                        <li key={limitation} className={`text-[10px] ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
+                          • {limitation}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
 
               {/* Select Button */}
               <button
-                className={`w-full py-2.5 md:py-3 rounded-xl font-bold transition-all text-xs md:text-sm ${
+                className={`w-full py-2.5 rounded-xl font-bold transition-all text-xs mt-2 ${
                   selectedPlan === plan.id
-                    ? 'bg-social text-white shadow-md'
+                    ? 'bg-emerald-600 text-white shadow-md'
                     : resolvedTheme === 'dark'
                     ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -216,44 +247,48 @@ export const InstitutionPlans = (): JSX.Element => {
         </div>
 
         {/* Comparison Table */}
-        <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} rounded-2xl border p-6 mb-8`}>
-          <h2 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-6`}>
-            Comparaison des fonctionnalités
+        <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} rounded-2xl border p-5 sm:p-6 mb-8 shadow-sm`}>
+          <h2 className={`text-lg sm:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>
+            Comparaison détaillée des 4 plans
           </h2>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-xs sm:text-sm">
               <thead>
                 <tr className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-200'}`}>
-                  <th className={`text-left py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium`}>
+                  <th className={`text-left py-3 px-3 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-semibold`}>
                     Fonctionnalité
                   </th>
-                  <th className={`text-center py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium`}>
-                    Verified
+                  <th className={`text-center py-3 px-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-semibold`}>
+                    Vérifié ($20 unique)
                   </th>
-                  <th className={`text-center py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium text-social font-bold`}>
-                    Standard
+                  <th className={`text-center py-3 px-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-semibold`}>
+                    Starter ($20/mwa)
                   </th>
-                  <th className={`text-center py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium`}>
-                    Premium
+                  <th className={`text-center py-3 px-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-bold text-emerald-500`}>
+                    Standard ($50/mwa)
+                  </th>
+                  <th className={`text-center py-3 px-2 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-semibold`}>
+                    Premium ($70/mwa)
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {[
-                  { feature: 'Alertes', verified: '5/mois', standard: 'Illimité', premium: 'Illimité + Push' },
-                  { feature: 'Recrutement', verified: '5 offres/mois', standard: 'Illimité', premium: 'Illimité' },
-                  { feature: 'Événements', verified: '2/mois', standard: 'Illimité', premium: 'Illimité' },
-                  { feature: 'Vidéos', verified: '❌', standard: '✅', premium: '✅' },
-                  { feature: 'Boost visibilité', verified: '❌', standard: '❌', premium: '✅ (x3)' },
-                  { feature: 'Analytics', verified: 'Basique', standard: 'Détaillé', premium: 'Avancé' },
-                  { feature: 'Support', verified: 'Email', standard: 'Prioritaire', premium: 'Dédié' },
-                  { feature: 'API accès', verified: '❌', standard: '❌', premium: '✅' },
+                  { feature: 'Alertes officielles', verified: '❌', starter: '1 / mois', standard: '3 / mois', premium: 'Illimité + Push' },
+                  { feature: 'Offres de recrutement', verified: '❌', starter: '1 / mois', standard: '3 / mois', premium: 'Illimité (CV PDF)' },
+                  { feature: 'Événements & Sommets', verified: '❌', starter: '❌', standard: '1 / mois', premium: 'Illimité' },
+                  { feature: 'Vidéos institutionnelles', verified: '❌', starter: '❌', standard: '1 / mois', premium: 'Illimité HD' },
+                  { feature: 'Badge de validation', verified: 'Badge ⏳', starter: 'Badge ✓ Vert', standard: 'Badge ✓ Vert', premium: 'Badge ✓ Or' },
+                  { feature: 'Boost visibilité', verified: '❌', starter: '❌', standard: 'Unitaire (Option)', premium: '5 inclus / mois' },
+                  { feature: 'Statistiques', verified: 'Basique', starter: 'Basique', standard: 'Détaillées', premium: 'Avancées & Export' },
+                  { feature: 'Support technique', verified: 'Email standard', starter: 'Email 24h', standard: 'Prioritaire', premium: 'Dédié 24/7' },
                 ].map((row) => (
-                  <tr key={row.feature} className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-100'} last:border-0`}>
-                    <td className={`py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{row.feature}</td>
-                    <td className="text-center py-3 px-4">{row.verified}</td>
-                    <td className="text-center py-3 px-4 text-social font-semibold">{row.standard}</td>
-                    <td className="text-center py-3 px-4">{row.premium}</td>
+                  <tr key={row.feature} className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800/60' : 'border-gray-100'} last:border-0`}>
+                    <td className={`py-3 px-3 font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{row.feature}</td>
+                    <td className="text-center py-3 px-2 text-zinc-400">{row.verified}</td>
+                    <td className="text-center py-3 px-2 text-zinc-300">{row.starter}</td>
+                    <td className="text-center py-3 px-2 font-bold text-emerald-500 bg-emerald-500/5">{row.standard}</td>
+                    <td className="text-center py-3 px-2 text-zinc-300">{row.premium}</td>
                   </tr>
                 ))}
               </tbody>
