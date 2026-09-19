@@ -12,6 +12,8 @@ import {
 import { useVaultModule } from '../../context/VaultModuleContext';
 import { ActiveModule } from '../../types/vault';
 import { useVaultWebSocket } from '../../hooks/useVaultWebSocket';
+import { vaultCache } from '../../utils/vaultCache';
+import { API_BASE_URL } from '../../../config/api';
 
 interface VaultNavbarProps {
   onOpenQuickSearch?: () => void;
@@ -19,7 +21,35 @@ interface VaultNavbarProps {
 
 export const VaultNavbar: React.FC<VaultNavbarProps> = ({ onOpenQuickSearch }) => {
   const { activeModule, setActiveModule } = useVaultModule();
-  const [onlineCount, setOnlineCount] = React.useState<number>(0);
+  const [onlineCount, setOnlineCount] = React.useState<number>(() => {
+    const cached = vaultCache.get<any>('vault_overview_stats');
+    return cached?.onlineCount || 0;
+  });
+
+  React.useEffect(() => {
+    const fetchInitialOnlineCount = async () => {
+      try {
+        const storedToken = sessionStorage.getItem('vault_token') || localStorage.getItem('vault_token') || '';
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (storedToken) headers['x-vault-token'] = storedToken;
+
+        const res = await fetch(`${API_BASE_URL}/vault/overview-stats`, {
+          method: 'GET',
+          credentials: 'include',
+          headers
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data.onlineCount === 'number') {
+            setOnlineCount(data.onlineCount);
+          }
+        }
+      } catch {
+        // silent fallback
+      }
+    };
+    fetchInitialOnlineCount();
+  }, []);
 
   const { isConnected } = useVaultWebSocket({
     onEvent: (event) => {

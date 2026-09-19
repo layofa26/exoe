@@ -883,11 +883,11 @@ const Profile = () => {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-4">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-lg p-3 sm:p-4 animate-pulse`}>
-                  <div className={`h-8 w-8 rounded mb-2 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'}`}></div>
-                  <div className={`h-6 w-1/2 rounded ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'}`}></div>
+                <div key={i} className={`${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-white'} rounded-xl p-2 sm:p-4 animate-pulse`}>
+                  <div className={`h-6 w-6 sm:h-8 sm:w-8 rounded mb-1.5 sm:mb-2 ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'}`}></div>
+                  <div className={`h-4 sm:h-6 w-1/2 rounded ${resolvedTheme === 'dark' ? 'bg-zinc-700' : 'bg-gray-200'}`}></div>
                 </div>
               ))}
             </div>
@@ -1518,14 +1518,14 @@ const Profile = () => {
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 {t('pro.stats.title', 'Statistiques Globales')}
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
                 {stats.map((stat, index) => (
                   <div
                     key={index}
-                    className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-lg p-3 sm:p-3`}
+                    className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} border rounded-xl p-2 sm:p-3 transition-all hover:border-blue-500/40 min-w-0`}
                   >
-                    <div className="flex items-center gap-1.5 sm:gap-1.5 mb-1.5 sm:mb-1.5">
-                      <stat.icon className={`w-4 h-4 sm:w-4 sm:h-4 ${
+                    <div className="flex items-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5 min-w-0">
+                      <stat.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${
                         stat.color === 'blue' ? 'text-blue-500' :
                         stat.color === 'purple' ? 'text-purple-500' :
                         stat.color === 'green' ? 'text-green-500' :
@@ -1533,11 +1533,11 @@ const Profile = () => {
                         stat.color === 'orange' ? 'text-orange-500' :
                         'text-pink-500'
                       }`} />
-                      <span className={`text-xs sm:text-sm font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
+                      <span className={`text-[10px] sm:text-xs md:text-sm font-medium truncate ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                         {stat.label}
                       </span>
                     </div>
-                    <p className={`text-xl sm:text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    <p className={`text-base sm:text-xl md:text-2xl font-bold truncate ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       {stat.value}
                     </p>
                   </div>
