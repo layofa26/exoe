@@ -1,235 +1,318 @@
 import { useState } from 'react'
-import {
-  Building2,
-  CheckCircle,
-  ArrowRight,
-  ShieldCheck,
-  TrendingUp,
-  FileCheck,
-  AlertTriangle,
-  Radio,
-  Briefcase,
-  Video as VideoIcon,
-  Sparkles,
-  HelpCircle
-} from 'lucide-react'
+import { Building2, CheckCircle, ArrowRight, Info } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { InstitutionPlan } from '../../types'
 import { useNavigate } from 'react-router-dom'
+import { SocialHeader } from '../../components/social/SocialHeader'
+
+const PLANS = [
+  {
+    id: 'verified' as InstitutionPlan,
+    name: 'Verified',
+    price: 'Gratuit',
+    description: 'Pour les institutions qui souhaitent une validation de base',
+    features: [
+      'Validation de l\'institution',
+      'Publication d\'alertes (limité à 5/mois)',
+      'Recrutement (5 offres/mois)',
+      'Événements (2/mois)',
+      'Support email',
+      'Badge "Vérifié"',
+    ],
+    limitations: [
+      'Pas de vidéos',
+      'Pas de boost de visibilité',
+      'Support standard',
+    ],
+    popular: false,
+  },
+  {
+    id: 'standard' as InstitutionPlan,
+    name: 'Standard',
+    price: '$49/mois',
+    description: 'Pour les institutions actives qui ont besoin de fonctionnalités complètes',
+    features: [
+      'Tout Verified',
+      'Publication illimitée',
+      'Recrutement illimité',
+      'Événements illimités',
+      'Vidéos institutionnelles',
+      'Analytics détaillés',
+      'Support prioritaire',
+      'Badge "Standard"',
+    ],
+    limitations: [],
+    popular: true,
+  },
+  {
+    id: 'premium' as InstitutionPlan,
+    name: 'Premium',
+    price: '$99/mois',
+    description: 'Pour les institutions qui veulent une visibilité maximale',
+    features: [
+      'Tout Standard',
+      'Boost de visibilité (x3)',
+      'Alertes push automatiques',
+      'API accès',
+      'Account manager dédié',
+      'Personnalisation avancée',
+      'Rapports personnalisés',
+      'Badge "Premium"',
+    ],
+    limitations: [],
+    popular: false,
+  },
+]
 
 export const InstitutionPlans = (): JSX.Element => {
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
-  const isDark = resolvedTheme === 'dark'
+  const [selectedPlan, setSelectedPlan] = useState<InstitutionPlan>('standard')
+  const [isAnnual, setIsAnnual] = useState(false)
+
+  const handleContinue = () => {
+    localStorage.setItem('exile_selected_plan', selectedPlan)
+    navigate('/social/institution/request')
+  }
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-zinc-950 text-white' : 'bg-slate-50 text-slate-900'} py-8 px-4 pb-24 md:pb-12`}>
-      <div className="max-w-5xl mx-auto space-y-10">
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-gray-50 text-gray-900'} pb-24 md:pb-12`}>
+      <SocialHeader title="Plans d'abonnement" showSearch={false} showCreateButton={false} />
+
+      <div className="max-w-7xl mx-auto px-4 py-8 pt-16 sm:pt-20">
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Infrastructure Institutionnelle EXILE
+        <div className="text-center mb-8 md:mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 mb-3">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Offres Institutionnelles EXILE</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
-            Adhésion & Formules Officielles
+          <h1 className={`text-2xl md:text-4xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>
+            Choisissez le plan adapté à votre institution
           </h1>
-          <p className={`text-xs sm:text-sm ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-            EXILE Social n'est pas un réseau social classique, mais une infrastructure officielle digitale sécurisée pour les institutions vérifiées.
+          <p className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'} max-w-2xl mx-auto`}>
+            Des solutions flexibles pour toutes les tailles d'institutions. Changez ou annulez à tout moment.
           </p>
+
+          {/* Billing Toggle */}
+          <div className="flex items-center justify-center gap-4 mt-6">
+            <span className={`text-xs md:text-sm ${!isAnnual ? 'font-semibold text-social' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
+              Mensuel
+            </span>
+            <button
+              onClick={() => setIsAnnual(!isAnnual)}
+              className="relative w-12 h-6 rounded-full bg-social p-1 transition-colors"
+            >
+              <div
+                className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                  isAnnual ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className={`text-xs md:text-sm ${isAnnual ? 'font-semibold text-social' : resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
+              Annuel <span className="text-emerald-500 font-bold">-20%</span>
+            </span>
+          </div>
         </div>
 
-        {/* Plan Principal : Standard Institutionnel 20$/mois */}
-        <div className="max-w-2xl mx-auto">
-          <div className={`relative rounded-3xl border-2 ${
-            isDark ? 'bg-zinc-900/90 border-emerald-500/50' : 'bg-white border-emerald-500'
-          } p-6 sm:p-8 shadow-2xl space-y-6 overflow-hidden`}>
-            {/* Top Badge */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
-                  <Building2 className="w-5 h-5" />
+        {/* Plans Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-12">
+          {PLANS.map((plan) => (
+            <div
+              key={plan.id}
+              onClick={() => setSelectedPlan(plan.id)}
+              className={`relative rounded-2xl border-2 p-6 md:p-8 cursor-pointer transition-all ${
+                selectedPlan === plan.id
+                  ? 'border-social shadow-xl scale-[1.02]'
+                  : resolvedTheme === 'dark'
+                  ? 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              } ${plan.popular ? 'md:-mt-4 md:mb-4' : ''}`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-social text-white text-xs font-bold rounded-full shadow-md">
+                  Recommandé
                 </div>
-                <div>
-                  <h2 className="text-lg sm:text-xl font-bold">Abonnement Standard</h2>
-                  <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Formule institutionnelle officielle</p>
+              )}
+
+              {/* Plan Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-social/10 text-social flex items-center justify-center">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <h3 className={`text-lg md:text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {plan.name}
+                  </h3>
                 </div>
               </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-sm">
-                Recommandé
-              </span>
-            </div>
 
-            {/* Price */}
-            <div className="flex items-baseline gap-2 pt-2 border-t border-zinc-800/60 dark:border-zinc-800">
-              <span className="text-4xl sm:text-5xl font-extrabold text-emerald-500">20$</span>
-              <span className={`text-sm font-semibold ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>/ mois</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 ml-auto font-medium">Sans engagement</span>
-            </div>
+              {/* Price */}
+              <div className="mb-4">
+                {plan.id === 'verified' ? (
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-2xl md:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {plan.price}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-2xl md:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {isAnnual
+                        ? `$${Math.round(parseInt(plan.price.replace('$', '').replace('/mois', '')) * 0.8)}`
+                        : plan.price.split('/')[0]}
+                    </span>
+                    <span className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>/mois</span>
+                  </div>
+                )}
+                {plan.id === 'verified' && <div className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>Toujours gratuit</div>}
+              </div>
 
-            {/* Inclusions / Quotas mensuels officiels */}
-            <div className="space-y-3 pt-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Quotas & Privilèges Mensuels Inclus :</p>
-              <ul className="space-y-3 text-xs sm:text-sm">
-                <li className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold">3 Alertes Officielles par mois</span>
-                    <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Diffusion prioritaire en tête de fil sans distraction pour la sécurité civile et la santé.</p>
-                  </div>
-                </li>
+              {/* Description */}
+              <p className={`text-xs md:text-sm mb-4 md:mb-6 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>
+                {plan.description}
+              </p>
 
-                <li className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Radio className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold">2 Diffusions Lives par mois</span>
-                    <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Conférences de presse, points de situation officiels en direct.</p>
-                  </div>
-                </li>
-
-                <li className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Briefcase className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold">3 Offres de Recrutement par mois</span>
-                    <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Système simplifié avec dépôt obligatoire de CV au format PDF.</p>
-                  </div>
-                </li>
-
-                <li className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <VideoIcon className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold">2 Vidéos Institutionnelles par mois</span>
-                    <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Allocutions officielles, rapports d'activité et communications publiques.</p>
-                  </div>
-                </li>
-
-                <li className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold">Statistiques de consultation de base & Badge Vérifié</span>
-                    <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Audience certifiée, impact des publications et reconnaissance officielle.</p>
-                  </div>
-                </li>
+              {/* Features */}
+              <ul className="space-y-2 md:space-y-3 mb-4 md:mb-6">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{feature}</span>
+                  </li>
+                ))}
               </ul>
-            </div>
 
-            {/* CTA Button */}
-            <div className="pt-4">
+              {/* Limitations */}
+              {plan.limitations.length > 0 && (
+                <div className={`p-2 md:p-3 rounded-lg ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-100'} mb-4 md:mb-6`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="w-3 h-3 md:w-4 md:h-4 text-orange-500" />
+                    <span className={`text-[10px] md:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>Limitations</span>
+                  </div>
+                  <ul className="space-y-1">
+                    {plan.limitations.map((limitation) => (
+                      <li key={limitation} className={`text-[10px] md:text-xs ${resolvedTheme === 'dark' ? 'text-zinc-500' : 'text-gray-500'}`}>
+                        • {limitation}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Select Button */}
               <button
-                onClick={() => navigate('/social/institution/request')}
-                className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-95 transition-all"
+                className={`w-full py-2.5 md:py-3 rounded-xl font-bold transition-all text-xs md:text-sm ${
+                  selectedPlan === plan.id
+                    ? 'bg-social text-white shadow-md'
+                    : resolvedTheme === 'dark'
+                    ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
-                <span>Demander mon adhésion institutionnelle</span>
-                <ArrowRight className="w-4 h-4" />
+                {selectedPlan === plan.id ? 'Sélectionné' : 'Sélectionner'}
               </button>
             </div>
+          ))}
+        </div>
+
+        {/* Comparison Table */}
+        <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} rounded-2xl border p-6 mb-8`}>
+          <h2 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-6`}>
+            Comparaison des fonctionnalités
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-200'}`}>
+                  <th className={`text-left py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium`}>
+                    Fonctionnalité
+                  </th>
+                  <th className={`text-center py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium`}>
+                    Verified
+                  </th>
+                  <th className={`text-center py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium text-social font-bold`}>
+                    Standard
+                  </th>
+                  <th className={`text-center py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'} font-medium`}>
+                    Premium
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { feature: 'Alertes', verified: '5/mois', standard: 'Illimité', premium: 'Illimité + Push' },
+                  { feature: 'Recrutement', verified: '5 offres/mois', standard: 'Illimité', premium: 'Illimité' },
+                  { feature: 'Événements', verified: '2/mois', standard: 'Illimité', premium: 'Illimité' },
+                  { feature: 'Vidéos', verified: '❌', standard: '✅', premium: '✅' },
+                  { feature: 'Boost visibilité', verified: '❌', standard: '❌', premium: '✅ (x3)' },
+                  { feature: 'Analytics', verified: 'Basique', standard: 'Détaillé', premium: 'Avancé' },
+                  { feature: 'Support', verified: 'Email', standard: 'Prioritaire', premium: 'Dédié' },
+                  { feature: 'API accès', verified: '❌', standard: '❌', premium: '✅' },
+                ].map((row) => (
+                  <tr key={row.feature} className={`border-b ${resolvedTheme === 'dark' ? 'border-zinc-800' : 'border-gray-100'} last:border-0`}>
+                    <td className={`py-3 px-4 ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-700'}`}>{row.feature}</td>
+                    <td className="text-center py-3 px-4">{row.verified}</td>
+                    <td className="text-center py-3 px-4 text-social font-semibold">{row.standard}</td>
+                    <td className="text-center py-3 px-4">{row.premium}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Option Boost Unitaire (Feuille de route stratégique) */}
-        <div className="space-y-4 max-w-4xl mx-auto">
-          <div className="text-center space-y-1">
-            <div className="inline-flex items-center gap-1.5 text-amber-500 text-xs font-bold uppercase tracking-wider">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Monétisation de visibilité
-            </div>
-            <h2 className="text-xl sm:text-2xl font-bold">Options Boost Unitaire</h2>
-            <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-              Pour les alertes et annonces nécessitant une portée maximale immédiate.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Boost 5$ */}
-            <div className={`p-5 rounded-2xl border ${
-              isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
-            } space-y-3 text-center`}>
-              <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-                <Sparkles className="w-4 h-4" />
+        {/* FAQ */}
+        <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} rounded-2xl border p-6 mb-8`}>
+          <h2 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-6`}>
+            Questions fréquentes
+          </h2>
+          <div className="space-y-4">
+            {[
+              {
+                question: 'Puis-je changer de plan plus tard?',
+                answer: 'Oui, vous pouvez changer de plan à tout moment. Les changements sont appliqués immédiatement.',
+              },
+              {
+                question: 'Quels modes de paiement acceptez-vous?',
+                answer: 'Nous acceptons les cartes de crédit (Visa, Mastercard, American Express) et les virements bancaires.',
+              },
+              {
+                question: 'Y a-t-il un engagement?',
+                answer: 'Non, tous nos plans sont sans engagement. Vous pouvez annuler à tout moment.',
+              },
+              {
+                question: 'Comment fonctionne la validation?',
+                answer: 'La validation est effectuée manuellement par notre équipe. Le processus prend généralement 1-2 jours ouvrables.',
+              },
+            ].map((faq, index) => (
+              <div key={index} className={`p-4 rounded-xl ${resolvedTheme === 'dark' ? 'bg-zinc-800' : 'bg-gray-50'}`}>
+                <h3 className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-1`}>
+                  {faq.question}
+                </h3>
+                <p className={`text-xs md:text-sm ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-600'}`}>{faq.answer}</p>
               </div>
-              <p className="font-bold text-sm">Boost Flash (24h)</p>
-              <p className="text-2xl font-extrabold text-amber-500">5$</p>
-              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Placement prioritaire en tête du fil institutionnel pendant 24 heures avec badge "Boosté".
-              </p>
-            </div>
-
-            {/* Boost 10$ */}
-            <div className={`p-5 rounded-2xl border-2 ${
-              isDark ? 'bg-zinc-900 border-amber-500/50' : 'bg-white border-amber-500'
-            } space-y-3 text-center relative shadow-md`}>
-              <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
-                Plus populaire
-              </span>
-              <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <p className="font-bold text-sm">Boost Pro (72h)</p>
-              <p className="text-2xl font-extrabold text-amber-500">10$</p>
-              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Maintien en tête de fil pendant 3 jours consécutifs avec portée élargie sur les alertes sanitaires ou recrutements.
-              </p>
-            </div>
-
-            {/* Boost 25$ */}
-            <div className={`p-5 rounded-2xl border ${
-              isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
-            } space-y-3 text-center`}>
-              <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <p className="font-bold text-sm">Boost National (7 jours)</p>
-              <p className="text-2xl font-extrabold text-amber-500">25$</p>
-              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Campagne officielle complète d'une semaine avec priorité absolue et mise en avant dans les flux.
-              </p>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Processus de Vérification & Exigences */}
-        <div className={`p-6 sm:p-8 rounded-3xl border ${
-          isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'
-        } max-w-4xl mx-auto space-y-4`}>
-          <div className="flex items-center gap-3">
-            <FileCheck className="w-5 h-5 text-emerald-500" />
-            <h3 className="font-bold text-base sm:text-lg">Processus de Vérification Obligatoire</h3>
-          </div>
-          <p className={`text-xs sm:text-sm ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-            Pour préserver la crédibilité d'EXILE, chaque compte institutionnel fait l'objet d'un audit de conformité sous 24h à 48h. Documents requis :
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <div className={`p-3.5 rounded-xl ${isDark ? 'bg-zinc-800/60' : 'bg-slate-50'} text-xs space-y-1`}>
-              <p className="font-bold text-emerald-500">1. Statuts & Acte Légal</p>
-              <p className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Décret de création, statuts enregistrés ou charte officielle.</p>
-            </div>
-            <div className={`p-3.5 rounded-xl ${isDark ? 'bg-zinc-800/60' : 'bg-slate-50'} text-xs space-y-1`}>
-              <p className="font-bold text-emerald-500">2. Immatriculation</p>
-              <p className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Numéro RNC / NIF ou patente commerciale en vigueur.</p>
-            </div>
-            <div className={`p-3.5 rounded-xl ${isDark ? 'bg-zinc-800/60' : 'bg-slate-50'} text-xs space-y-1`}>
-              <p className="font-bold text-emerald-500">3. Représentant Légal</p>
-              <p className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Pièce d'identité officielle et mandat de délégation.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="text-center pt-2">
+        {/* Actions */}
+        <div className="flex justify-center gap-4">
           <button
-            onClick={() => navigate('/social')}
-            className={`text-xs font-semibold ${isDark ? 'text-zinc-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'} underline`}
+            onClick={() => navigate('/social/institution/request')}
+            className={`px-6 py-3 rounded-xl font-semibold text-xs md:text-sm ${
+              resolvedTheme === 'dark'
+                ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            } transition-colors`}
           >
-            ← Retourner au fil institutionnel
+            Retour
+          </button>
+          <button
+            onClick={handleContinue}
+            className="flex items-center gap-2 px-6 py-3 bg-social text-white rounded-xl font-bold text-xs md:text-sm hover:bg-social/90 shadow-md transition-all active:scale-95"
+          >
+            Continuer avec {PLANS.find((p) => p.id === selectedPlan)?.name}
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -238,4 +321,3 @@ export const InstitutionPlans = (): JSX.Element => {
 }
 
 export default InstitutionPlans
-

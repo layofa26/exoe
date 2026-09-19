@@ -22,7 +22,7 @@ const SOCIAL_DESKTOP_NAV = [
   { to: '/social/events', label: 'Événements & Sommets', icon: Calendar, end: true },
   { to: '/social/institution', label: 'Mon Institution', icon: Building2, end: true },
   { to: '/social/institution/dashboard', label: 'Tableau de bord', icon: LayoutDashboard, end: true },
-  { to: '/social/plans', label: 'Plans & Quotas', icon: ShieldCheck, end: true },
+  { to: '/social/plans', label: 'Plans d\'abonnement', icon: ShieldCheck, end: true },
   { to: '/social/institution/request', label: 'Demande d\'adhésion', icon: Building2, end: true },
 ]
 
@@ -45,15 +45,11 @@ export function SocialSidebar(): JSX.Element | null {
 
   const handleAction = (actionType: 'alert' | 'job' | 'video' | 'event' | 'announcement') => {
     setShowActionSheet(false)
-    if (actionType === 'event') {
-      navigate('/social/events?create=true')
-      return
-    }
     if (location.pathname !== '/social') {
       navigate('/social', { state: { openAction: actionType } })
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('exile_social_action', { detail: { action: actionType } }))
-      }, 100)
+      }, 150)
     } else {
       window.dispatchEvent(new CustomEvent('exile_social_action', { detail: { action: actionType } }))
     }

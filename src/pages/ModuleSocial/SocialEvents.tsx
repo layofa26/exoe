@@ -8,6 +8,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useToast } from '../../hooks/useToast'
 import { API_BASE_URL } from '../../config/api'
+import { SocialHeader } from '../../components/social/SocialHeader'
 
 // ============ SOCIAL EVENT TYPES ============
 interface SocialEventItem {
@@ -242,7 +243,9 @@ export const SocialEvents = (): JSX.Element => {
   const isUpcoming = (date: string) => new Date(date) > new Date()
 
   return (
-    <div className={`flex-1 flex flex-col ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pb-20`}>
+    <div className={`flex-1 flex flex-col ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'} pt-14 sm:pt-16 pb-24 md:pb-12`}>
+      <SocialHeader title="Événements" showSearch={false} showCreateButton={false} />
+
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-emerald-500/90 backdrop-blur text-white px-5 py-2.5 rounded-full text-sm font-medium shadow-xl animate-in fade-in slide-in-from-top-2 flex items-center gap-2">
@@ -251,8 +254,8 @@ export const SocialEvents = (): JSX.Element => {
         </div>
       )}
 
-      {/* HEADER - Compact pour desktop */}
-      <div className={`fixed top-0 left-0 right-0 w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'} backdrop-blur-lg border-b z-[100] px-4 py-3 md:py-2 md:mt-0 shadow-md transition-all duration-300 ${showCreateModal ? 'blur-md opacity-40 scale-95' : ''}`}>
+      {/* SUB-HEADER EVENTS - Compact pour desktop */}
+      <div className={`sticky top-14 sm:top-16 left-0 right-0 w-full ${resolvedTheme === 'dark' ? 'bg-zinc-900/95 border-zinc-700' : 'bg-white/95 border-gray-200'} backdrop-blur-lg border-b z-30 px-4 py-3 md:py-2.5 shadow-sm transition-all duration-300 ${showCreateModal ? 'blur-md opacity-40 scale-95' : ''}`}>
         {/* Mobile: Vertical layout */}
         <div className="md:hidden flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -400,7 +403,7 @@ export const SocialEvents = (): JSX.Element => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-full px-4 py-6 pt-20 md:pt-24">
+      <div className="max-w-full px-4 py-4 sm:py-6">
 
         {/* Quick Navigation Links */}
         <div className={`mb-6 ${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-xl border`}>

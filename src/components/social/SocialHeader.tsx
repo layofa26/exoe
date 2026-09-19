@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Building2, Bell, Search, Plus, Clock, X, TrendingUp, History, Briefcase } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useRecentSearches } from '../../hooks/useRecentSearches'
@@ -174,48 +174,31 @@ export function SocialHeader({
   }
 
   return (
-    <header className={`sticky top-0 z-50 ${resolvedTheme === 'dark' ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-slate-200'} backdrop-blur-md border-b`}>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
-        <div className="flex items-center justify-between gap-2 sm:gap-4">
-          {/* Logo & Module Switcher */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <button
-              onClick={() => navigate('/social')}
-              className="flex items-center gap-2 text-left focus:outline-none"
+    <header className={`fixed top-0 left-0 md:left-64 right-0 z-40 ${resolvedTheme === 'dark' ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-slate-200'} backdrop-blur-md border-b shadow-sm transition-colors`}>
+      <div className="w-full px-2 sm:px-4 lg:px-6 xl:px-8">
+        <div className="relative flex items-center justify-between h-14 sm:h-16">
+          {/* Espace Gauche (Sans logo EXILE selon directive utilisateur) */}
+          <div className="flex-shrink-0 flex items-center z-10 w-6 sm:w-10" />
+
+          {/* Navigation Centrale - Exactement comme dans le Module Professionnel (sans logo EXILE) */}
+          <nav className="absolute left-1/2 -translate-x-1/2 bottom-1.5 sm:bottom-1 md:bottom-1 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto flex items-center space-x-2.5 sm:space-x-4 md:space-x-8 z-10 pointer-events-auto max-w-[calc(100%-140px)] sm:max-w-none">
+            <Link
+              to="/pro"
+              className="relative text-[12px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-2 py-0.5 text-gray-600 dark:text-zinc-300 hover:text-[#FF6B00]"
             >
-              <img src="/logo_exile_SVG.svg" alt="EXILE" className="w-8 h-8 sm:w-9 sm:h-9 object-contain" />
-              <div className="hidden xs:flex flex-col">
-                <span className={`font-bold text-sm sm:text-base leading-none ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  EXILE
-                </span>
-                <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">
-                  Social
-                </span>
-              </div>
-            </button>
+              <span>Professionnel</span>
+            </Link>
+            <Link
+              to="/social"
+              className="relative text-[12px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-2 py-0.5 text-[#FF6B00]"
+            >
+              <span>Social</span>
+              <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#FF6B00] rounded-full" />
+            </Link>
+          </nav>
 
-            {/* Quick Switcher Between Pro and Social */}
-            <div className={`hidden sm:flex items-center p-1 rounded-xl border text-xs font-semibold ${
-              resolvedTheme === 'dark' ? 'bg-zinc-800/80 border-zinc-700' : 'bg-slate-100 border-slate-200'
-            }`}>
-              <button
-                onClick={() => navigate('/pro')}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
-                  resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Briefcase className="w-3.5 h-3.5" />
-                <span>Professionnel</span>
-              </button>
-              <span className={`px-2.5 py-1 rounded-lg bg-emerald-600 text-white shadow-sm flex items-center gap-1.5`}>
-                <Building2 className="w-3.5 h-3.5" />
-                <span>Social</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
+          {/* Droite : Recherche & Boutons d'action (Compact sur mobile et tablette) */}
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 z-10 ml-auto pl-2 sm:pl-3">
             {/* Search */}
             {showSearch && (
               <div className="relative" ref={searchRef}>
@@ -773,10 +756,11 @@ export function SocialHeader({
             {showCreateButton && (
               <button
                 onClick={onCreateClick}
-                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-emerald-700 transition-colors active:scale-95"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl shadow-md font-semibold text-xs sm:text-sm transition-all duration-200 hover:shadow-orange-500/25 active:scale-95 flex-shrink-0"
+                title="Créer une publication institutionnelle"
               >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Créer</span>
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span className="hidden sm:inline font-bold">Créer</span>
               </button>
             )}
           </div>

@@ -568,7 +568,7 @@ export const InstitutionProfile = (): JSX.Element => {
     <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-900' : 'bg-gray-50'}`}>
       <SocialHeader title="Mon Institution" showSearch={false} showCreateButton={false} />
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-4 py-6 pt-16 sm:pt-20">
         {/* Profile Header - Premium Design */}
         <div className={`${resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-gray-200'} rounded-2xl border overflow-hidden mb-8 shadow-2xl`}>
           {/* Bannière à Couleur Dynamique - Étendue sur toute la hauteur */}

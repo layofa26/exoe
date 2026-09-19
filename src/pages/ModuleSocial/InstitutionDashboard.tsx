@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useToast } from '../../hooks/useToast'
+import { SocialHeader } from '../../components/social/SocialHeader'
 import { 
   Building2, 
   CheckCircle, 
@@ -102,8 +103,9 @@ export const InstitutionDashboard = (): JSX.Element => {
   const StatusIcon = statusInfo.icon
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 md:p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className={`min-h-screen pb-24 md:pb-12 ${resolvedTheme === 'dark' ? 'bg-zinc-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+      <SocialHeader title="Tableau de bord" showSearch={false} showCreateButton={false} />
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 md:p-8 pt-16 sm:pt-20">
         {/* Header */}
         <div className="mb-8">
           <h1 className={`text-2xl sm:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>

@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Building2, AlertTriangle, Briefcase, Calendar, Video, Megaphone, Filter, TrendingUp, CheckCircle, Share2, Upload, Radio, X, Users, FileText, Heart, Star, Zap, FileCheck, Send } from 'lucide-react'
+import { Building2, AlertTriangle, Briefcase, Calendar, Video, Megaphone, Filter, TrendingUp, CheckCircle, Share2, Upload, Radio, X, Users, FileText, Heart, Star, Zap, FileCheck, Send, Plus } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { SocialHeader } from '../../components/social/SocialHeader'
 import { InstitutionVideoCard } from '../../components/social/InstitutionVideoCard'
+import { CreatePublicationModal, type CreatedPublicationItem } from '../../components/social/CreatePublicationModal'
 import { AlertType, AlertPriority } from '../../types/social/alert'
 import { useToast } from '../../hooks/useToast'
 import { API_BASE_URL } from '../../config/api'
@@ -178,22 +179,32 @@ export const SocialFeed = (): JSX.Element => {
     cvFile: null as File | null
   })
   const [isSubmittingApplication, setIsSubmittingApplication] = useState(false)
+  const [createModalInitialType, setCreateModalInitialType] = useState<'alert' | 'job' | 'video' | 'event'>('alert')
+
+  const handlePublicationCreated = useCallback((newItem: CreatedPublicationItem) => {
+    setFeedItems(prev => [newItem as unknown as FeedItem, ...prev])
+    showToast('Publication officielle diffusée avec succès !')
+  }, [showToast])
 
   // Listen to mobile action sheet events
   useEffect(() => {
     const handleSocialAction = (e: any) => {
       const action = e.detail?.action
       if (action === 'alert') {
-        setAlertType('urgency')
-        setShowAlertModal(true)
+        setCreateModalInitialType('alert')
+        setShowCreateModal(true)
       } else if (action === 'job') {
-        setAlertType('recruitment')
-        setShowAlertModal(true)
+        setCreateModalInitialType('job')
+        setShowCreateModal(true)
       } else if (action === 'announcement') {
-        setAlertType('announcement')
-        setShowAlertModal(true)
+        setCreateModalInitialType('alert')
+        setShowCreateModal(true)
       } else if (action === 'video') {
-        setShowVideoImportModal(true)
+        setCreateModalInitialType('video')
+        setShowCreateModal(true)
+      } else if (action === 'event') {
+        setCreateModalInitialType('event')
+        setShowCreateModal(true)
       }
     }
 
@@ -203,6 +214,13 @@ export const SocialFeed = (): JSX.Element => {
 
   // Fetch alerts from API with reliable fallback to authentic seed data
   const fetchAlerts = useCallback(async () => {
+    let customItems: FeedItem[] = []
+    try {
+      customItems = JSON.parse(localStorage.getItem('exile_social_custom_feed') || '[]')
+    } catch (e) {
+      customItems = []
+    }
+
     try {
       const token = localStorage.getItem('accessToken')
       const headers: Record<string, string> = {}
@@ -216,14 +234,14 @@ export const SocialFeed = (): JSX.Element => {
         const data = await response.json()
         const items = Array.isArray(data) ? data : (data.results || [])
         if (items.length > 0) {
-          setFeedItems(items)
+          setFeedItems([...customItems, ...items])
           return
         }
       }
-      setFeedItems(AUTHENTIC_INSTITUTIONAL_FEED)
+      setFeedItems([...customItems, ...AUTHENTIC_INSTITUTIONAL_FEED])
     } catch (error) {
       console.warn('[SocialFeed] Using institutional baseline feed:', error)
-      setFeedItems(AUTHENTIC_INSTITUTIONAL_FEED)
+      setFeedItems([...customItems, ...AUTHENTIC_INSTITUTIONAL_FEED])
     }
   }, [])
 
@@ -452,7 +470,7 @@ export const SocialFeed = (): JSX.Element => {
         onSearch={(query) => setSearchQuery(query)}
       />
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-6 sm:pt-8 pb-4 sm:pb-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-16 sm:pt-20 pb-24 md:pb-8">
 
         {/* Tabs */}
         <div className="mb-4 sm:mb-6">
@@ -1451,6 +1469,14 @@ export const SocialFeed = (): JSX.Element => {
           </div>
         </div>
       )}
+
+      {/* Modal Complet de Création Institutionnelle (Feuille de Route EXILE) */}
+      <CreatePublicationModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        initialType={createModalInitialType}
+        onSuccess={handlePublicationCreated}
+      />
     </div>
   )
 }

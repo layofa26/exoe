@@ -22,6 +22,7 @@ import { SUPPORTED_COUNTRIES, validateRegistrationNumber } from '../../config/in
 import { InstitutionStep1, InstitutionStep2, InstitutionType, InstitutionPlan } from '../../types'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../hooks/useToast'
+import { SocialHeader } from '../../components/social/SocialHeader'
 import { PhoneInput } from '../../components/common/PhoneInput'
 import { validateEmail } from '../../utils/emailValidation'
 import {
@@ -250,7 +251,9 @@ export const InstitutionRequest = (): JSX.Element => {
   }
 
   return (
-    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-gray-50'} py-6 md:py-8 px-4`}>
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-zinc-950' : 'bg-gray-50'} pb-24 md:pb-12`}>
+      <SocialHeader title="Demande d'Adhésion" showSearch={false} showCreateButton={false} />
+
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-emerald-500/90 backdrop-blur text-white px-5 py-2.5 rounded-full text-sm font-medium shadow-xl animate-in fade-in slide-in-from-top-2 flex items-center gap-2">
@@ -259,9 +262,9 @@ export const InstitutionRequest = (): JSX.Element => {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto px-4 py-6 md:py-8 pt-16 sm:pt-20">
         {/* Header - Minimalist */}
-        <div className="text-center mb-1 md:mb-8 mt-8">
+        <div className="text-center mb-6 md:mb-8">
           <h1 className={`text-xl md:text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-1`}>
             Créer un compte institutionnel
           </h1>
