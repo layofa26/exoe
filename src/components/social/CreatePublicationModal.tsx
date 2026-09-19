@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   X,
@@ -220,6 +221,17 @@ export function CreatePublicationModal({
     isBoosted: false
   })
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   // Mise à jour automatique de la remise (%) en promotion
@@ -435,11 +447,11 @@ export function CreatePublicationModal({
     }, 500)
   }
 
-  return (
-    <div className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[999999] bg-black/80 sm:backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-hidden animate-in fade-in duration-200">
       <div
-        className={`w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden my-auto ${
-          isDark ? 'bg-zinc-900 border-zinc-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+        className={`w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[92vh] flex flex-col rounded-none sm:rounded-2xl border-0 sm:border shadow-2xl overflow-hidden my-0 sm:my-auto ${
+          isDark ? 'bg-zinc-900 sm:border-zinc-700 text-white' : 'bg-white sm:border-slate-200 text-slate-900'
         }`}
       >
         {/* En-tête sobre et clair */}
@@ -1883,7 +1895,8 @@ export function CreatePublicationModal({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
