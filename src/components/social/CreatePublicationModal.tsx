@@ -24,6 +24,10 @@ import {
   ExternalLink,
   MapPin,
   Phone,
+  Globe,
+  Search,
+  Loader2,
+  Check,
   Mail,
   Clock,
   User
@@ -42,6 +46,14 @@ export interface CreatedPublicationItem {
     avatar?: string
   }
   isBoosted: boolean
+  visibility?: 'public' | 'private'
+  targetScope?: 'worldwide' | 'targeted'
+  targetedLocation?: {
+    name: string
+    lat?: string
+    lon?: string
+    radius?: string
+  }
   createdAt: string
   stats: {
     views: number
@@ -94,6 +106,52 @@ export function CreatePublicationModal({
   const [isVerifiedInstitution, setIsVerifiedInstitution] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // -------------------------------------------------------------
+  // Paramètres de Visibilité & Ciblage Géographique (OpenStreetMap 100% Gratuit)
+  // -------------------------------------------------------------
+  const [visibility, setVisibility] = useState<'public' | 'private'>('public')
+  const [targetScope, setTargetScope] = useState<'worldwide' | 'targeted'>('worldwide')
+  const [locationSearchQuery, setLocationSearchQuery] = useState('')
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false)
+  const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([])
+  const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: string; lon: string } | null>(null)
+  const [locationRadius, setLocationRadius] = useState<'10km' | '30km' | 'region' | 'country'>('30km')
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+
+  // Recherche OpenStreetMap Nominatim 100% Gratuite avec debounce
+  useEffect(() => {
+    if (targetScope !== 'targeted' || !locationSearchQuery.trim() || (selectedLocation && selectedLocation.name === locationSearchQuery)) {
+      setLocationSuggestions([])
+      setIsSearchingLocation(false)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingLocation(true)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locationSearchQuery)}&format=json&addressdetails=1&limit=5`,
+          {
+            headers: {
+              'Accept-Language': 'fr,ht,en'
+            }
+          }
+        )
+        if (res.ok) {
+          const data = await res.json()
+          setLocationSuggestions(data || [])
+          setShowLocationDropdown(true)
+        }
+      } catch (err) {
+        console.warn('Erreur de recherche OpenStreetMap:', err)
+      } finally {
+        setIsSearchingLocation(false)
+      }
+    }, 350)
+
+    return () => clearTimeout(timer)
+  }, [locationSearchQuery, targetScope, selectedLocation])
+
 
   // -------------------------------------------------------------
   // 1. FORMULAIRE URGENCE
@@ -266,6 +324,17 @@ export function CreatePublicationModal({
     setTimeout(() => {
       let createdItem: CreatedPublicationItem
 
+      const scopeLabel = targetScope === 'worldwide' ? '🌍 Diffusion Mondiale' : `📍 Ciblage : ${selectedLocation?.name || locationSearchQuery || 'Zone ciblée'} (${locationRadius})`
+      const visibilityLabel = visibility === 'public' ? '🌐 Public' : '🔒 Privé (Membres & Abonnés)'
+      const geoMeta = `\n\n[${visibilityLabel} • ${scopeLabel}]`
+      const targetLocationObj = targetScope === 'targeted' ? {
+        name: selectedLocation?.name || locationSearchQuery || 'Zone ciblée',
+        lat: selectedLocation?.lat,
+        lon: selectedLocation?.lon,
+        radius: locationRadius
+      } : undefined
+
+
       if (activeTab === 'urgency') {
         if (!urgencyForm.title.trim() || !urgencyForm.description.trim()) {
           setErrorMessage("Veuillez renseigner au moins le titre et la description de l'urgence.")
@@ -292,7 +361,10 @@ export function CreatePublicationModal({
           },
           isBoosted: urgencyForm.isBoosted,
           createdAt: 'À l\'instant',
-          stats: { views: 1, shares: 0, comments: urgencyForm.allowComments ? 0 : 0 }
+          stats: { views: 1, shares: 0, comments: urgencyForm.allowComments ? 0 : 0 },
+          visibility,
+          targetScope,
+          targetedLocation: targetLocationObj
         }
       } else if (activeTab === 'health') {
         if (!healthForm.title.trim() || !healthForm.description.trim()) {
@@ -313,7 +385,10 @@ export function CreatePublicationModal({
           },
           isBoosted: healthForm.isBoosted,
           createdAt: 'À l\'instant',
-          stats: { views: 1, shares: 0, comments: 0 }
+          stats: { views: 1, shares: 0, comments: 0 },
+          visibility,
+          targetScope,
+          targetedLocation: targetLocationObj
         }
       } else if (activeTab === 'recruitment') {
         if (!recruitmentForm.title.trim() || !recruitmentForm.description.trim()) {
@@ -335,6 +410,9 @@ export function CreatePublicationModal({
           isBoosted: recruitmentForm.isBoosted,
           createdAt: 'À l\'instant',
           stats: { views: 1, shares: 0, comments: 0 },
+          visibility,
+          targetScope,
+          targetedLocation: targetLocationObj,
           recruitmentDetails: {
             contractType: recruitmentForm.contractType,
             location: recruitmentForm.location,
@@ -361,7 +439,10 @@ export function CreatePublicationModal({
           },
           isBoosted: announcementForm.isBoosted,
           createdAt: 'À l\'instant',
-          stats: { views: 1, shares: 0, comments: 0 }
+          stats: { views: 1, shares: 0, comments: 0 },
+          visibility,
+          targetScope,
+          targetedLocation: targetLocationObj
         }
       } else if (activeTab === 'promotion') {
         if (!promotionForm.promoName.trim() || !promotionForm.productOrService.trim()) {
@@ -383,7 +464,10 @@ export function CreatePublicationModal({
           isBoosted: promotionForm.isBoosted,
           createdAt: 'À l\'instant',
           stats: { views: 1, shares: 0, comments: 0 },
-          videoUrl: promotionForm.videoUrl || undefined
+          videoUrl: promotionForm.videoUrl || undefined,
+          visibility,
+          targetScope,
+          targetedLocation: targetLocationObj
         }
       } else if (activeTab === 'video') {
         if (!videoForm.title.trim() || !videoForm.description.trim()) {
@@ -405,7 +489,10 @@ export function CreatePublicationModal({
           isBoosted: videoForm.isBoosted,
           createdAt: 'À l\'instant',
           stats: { views: 1, shares: 0, comments: 0 },
-          videoUrl: videoForm.videoUrl
+          videoUrl: videoForm.videoUrl,
+          visibility,
+          targetScope,
+          targetedLocation: targetLocationObj
         }
       } else {
         // Event
@@ -429,7 +516,10 @@ export function CreatePublicationModal({
           createdAt: 'À l\'instant',
           stats: { views: 1, shares: 0, comments: 0 },
           eventDate: eventForm.startDate || 'Prochainement',
-          eventLocation: eventForm.city
+          eventLocation: eventForm.city,
+          visibility,
+          targetScope,
+          targetedLocation: targetLocationObj
         }
       }
 
@@ -1863,6 +1953,224 @@ export function CreatePublicationModal({
                   </div>
                 </div>
               )}
+
+
+              {/* ---------------- SECTION COMMUNE : VISIBILITÉ & CIBLAGE GÉOGRAPHIQUE MONDIAL (100% GRATUIT) ---------------- */}
+              <div className={`p-4 rounded-2xl border transition-all mt-4 ${
+                isDark ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50/90 border-slate-200'
+              }`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
+                    <Globe className="w-3.5 h-3.5 text-[#FF6B00]" />
+                  </div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    Paramètres de Diffusion & Ciblage Géographique (OpenStreetMap Gratuit)
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* 1. Visibilité : Public vs Privé */}
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Visibilité de la publication
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setVisibility('public')}
+                        className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
+                          visibility === 'public'
+                            ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-500 font-bold shadow-sm'
+                            : isDark ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <Globe className="w-4 h-4 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs leading-tight">Public</p>
+                          <p className="text-[10px] opacity-75 leading-tight mt-0.5">Visible par tous</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setVisibility('private')}
+                        className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
+                          visibility === 'private'
+                            ? 'border-amber-500/60 bg-amber-500/10 text-amber-500 font-bold shadow-sm'
+                            : isDark ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <Lock className="w-4 h-4 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs leading-tight">Privé</p>
+                          <p className="text-[10px] opacity-75 leading-tight mt-0.5">Abonnés & certifiés</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2. Ciblage : Mondial vs Lieu Ciblé */}
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Zone de diffusion géographique
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTargetScope('worldwide')
+                          setSelectedLocation(null)
+                          setLocationSearchQuery('')
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
+                          targetScope === 'worldwide'
+                            ? 'border-orange-500/60 bg-orange-500/10 text-orange-500 font-bold shadow-sm'
+                            : isDark ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <Globe className="w-4 h-4 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs leading-tight">Mondial</p>
+                          <p className="text-[10px] opacity-75 leading-tight mt-0.5">Partout sur EXILE</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTargetScope('targeted')}
+                        className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
+                          targetScope === 'targeted'
+                            ? 'border-blue-500/60 bg-blue-500/10 text-blue-500 font-bold shadow-sm'
+                            : isDark ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <MapPin className="w-4 h-4 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs leading-tight">Lieu ciblé</p>
+                          <p className="text-[10px] opacity-75 leading-tight mt-0.5">Zone spécifique</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Si "Lieu ciblé" est sélectionné : Recherche OpenStreetMap en direct */}
+                {targetScope === 'targeted' && (
+                  <div className="mt-3 pt-3 border-t border-zinc-700/40 dark:border-zinc-800 space-y-3 animate-in fade-in duration-150">
+                    <div className="relative">
+                      <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                        Rechercher un lieu dans le monde (OpenStreetMap Gratuit) *
+                      </label>
+                      <div className="relative">
+                        <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`} />
+                        <input
+                          type="text"
+                          value={locationSearchQuery}
+                          onChange={e => {
+                            setLocationSearchQuery(e.target.value)
+                            if (selectedLocation) setSelectedLocation(null)
+                          }}
+                          placeholder="Tapez une ville, région ou pays (ex: Port-au-Prince, Miami, Paris, Montréal...)"
+                          className={`w-full pl-9 pr-9 py-2.5 rounded-xl border text-sm ${
+                            isDark ? 'bg-zinc-900 border-zinc-700 text-white placeholder-zinc-500' : 'bg-white border-slate-200 text-slate-900'
+                          }`}
+                        />
+                        {isSearchingLocation ? (
+                          <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-orange-500" />
+                        ) : locationSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLocationSearchQuery('')
+                              setSelectedLocation(null)
+                              setLocationSuggestions([])
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-zinc-400 hover:text-zinc-200"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Dropdown des résultats OpenStreetMap Nominatim */}
+                      {showLocationDropdown && locationSuggestions.length > 0 && (
+                        <div className={`absolute left-0 right-0 top-full mt-1.5 rounded-xl border shadow-xl z-50 max-h-56 overflow-y-auto ${
+                          isDark ? 'bg-zinc-900 border-zinc-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+                        }`}>
+                          <div className="p-2 text-[10px] uppercase font-bold text-zinc-400 border-b border-zinc-800 flex items-center justify-between">
+                            <span>Lieux détectés (OpenStreetMap Gratuit)</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowLocationDropdown(false)}
+                              className="text-zinc-400 hover:text-zinc-200"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          {locationSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setSelectedLocation({
+                                  name: item.display_name,
+                                  lat: item.lat,
+                                  lon: item.lon
+                                })
+                                setLocationSearchQuery(item.display_name)
+                                setShowLocationDropdown(false)
+                              }}
+                              className={`w-full p-2.5 text-left text-xs hover:bg-orange-500/10 hover:text-orange-500 flex items-start gap-2 border-b last:border-0 ${
+                                isDark ? 'border-zinc-800' : 'border-slate-100'
+                              }`}
+                            >
+                              <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-orange-500" />
+                              <span className="truncate">{item.display_name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Confirmation du lieu sélectionné avec badge */}
+                      {selectedLocation && (
+                        <div className="mt-2 flex items-center gap-2 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs">
+                          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                          <span className="font-semibold truncate">Lieu validé : {selectedLocation.name}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sélecteur de Rayon d'impact */}
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                        Rayon de diffusion géographique
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: '10km', label: '10 km', desc: 'Zone immédiate' },
+                          { id: '30km', label: '30 km', desc: 'Agglomération' },
+                          { id: 'region', label: 'Région', desc: 'Tout le département' },
+                          { id: 'country', label: 'Pays entier', desc: 'Tout le pays cible' },
+                        ].map(r => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => setLocationRadius(r.id as any)}
+                            className={`p-2 rounded-xl border text-center transition-all ${
+                              locationRadius === r.id
+                                ? 'border-blue-500/70 bg-blue-500/15 text-blue-500 font-bold'
+                                : isDark ? 'border-zinc-800 text-zinc-400 hover:border-zinc-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                            }`}
+                          >
+                            <p className="text-xs font-bold">{r.label}</p>
+                            <p className="text-[9px] opacity-75">{r.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Bouton d'action et Annuler */}
               <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-zinc-800/40 mt-4">
