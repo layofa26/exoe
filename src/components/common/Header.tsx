@@ -27,18 +27,21 @@ import {
   Plus,
   Video as VideoIcon,
   Calendar as CalendarIcon,
-  Sparkles,
   Megaphone,
   Radio,
   ArrowRight,
-  Trash2
+  Trash2,
+  MoreVertical,
+  Flag,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { UploadVideo } from '../video/UploadVideo'
 import { useTranslation } from 'react-i18next'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 export const Header = (): JSX.Element => {
   const { t } = useTranslation()
@@ -184,11 +187,18 @@ export const Header = (): JSX.Element => {
     }
   }, [user?.uuid, (user as any)?.id])
 
-  // Fermer le menu notification lors d'un clic extérieur (en protégeant le portail mobile)
+  // Menu 3-points pour notification (ID de la notif ouverte)
+  const [openMenuNotifId, setOpenMenuNotifId] = useState<string | null>(null)
+  const [notifToast, setNotifToast] = useState<string | null>(null)
+
+  // Fermer le menu notification lors d'un clic extérieur (en protégeant le portail mobile et le sous-menu 3-points)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null
       if (!target) return
+      if (openMenuNotifId && !target.closest('[data-notif-menu]')) {
+        setOpenMenuNotifId(null)
+      }
       // Ne jamais fermer lors d'un clic dans le portail mobile des notifications
       if (target.closest('[data-notif-portal]')) return
       if (notifRef.current && notifRef.current.contains(target)) return
@@ -196,22 +206,31 @@ export const Header = (): JSX.Element => {
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [openMenuNotifId])
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  // État de recherche et filtrage pour les notifications
+  // État de recherche et pagination pour les notifications
   const [notifSearchQuery, setNotifSearchQuery] = useState('')
-  const [notifCategoryFilter, setNotifCategoryFilter] = useState<NotificationCategory>('all')
+  const [notifPage, setNotifPage] = useState(1)
+  const NOTIFS_PER_PAGE = 6
 
+  useEffect(() => {
+    setNotifPage(1)
+  }, [notifSearchQuery])
+
+  // Limite de caractères par message de notification (pour empêcher le débordement)
+  const MAX_NOTIF_MSG_LENGTH = 100
+  const formatNotifMessage = (msg?: string) => {
+    if (!msg) return ''
+    const trimmed = msg.trim()
+    if (trimmed.length <= MAX_NOTIF_MSG_LENGTH) return trimmed
+    return trimmed.slice(0, MAX_NOTIF_MSG_LENGTH) + '...'
+  }
+
+  // Stream propre et unifié : toutes les notifications reçues sans onglets encombrants
   const filteredNotifications = useMemo(() => {
     return notifications.filter((notif) => {
-      // 1. Filtrage par onglet de catégorie
-      if (notifCategoryFilter !== 'all') {
-        const cat = getNotificationCategory(notif)
-        if (cat !== notifCategoryFilter) return false
-      }
-      // 2. Recherche textuelle dans le titre et le contenu
       if (notifSearchQuery.trim()) {
         const q = notifSearchQuery.toLowerCase()
         const titleMatch = (notif.title || '').toLowerCase().includes(q)
@@ -220,7 +239,26 @@ export const Header = (): JSX.Element => {
       }
       return true
     })
-  }, [notifications, notifCategoryFilter, notifSearchQuery])
+  }, [notifications, notifSearchQuery])
+
+  const totalNotifPages = Math.max(1, Math.ceil(filteredNotifications.length / NOTIFS_PER_PAGE))
+  const paginatedNotifications = useMemo(() => {
+    const start = (notifPage - 1) * NOTIFS_PER_PAGE
+    return filteredNotifications.slice(start, start + NOTIFS_PER_PAGE)
+  }, [filteredNotifications, notifPage])
+
+  useEffect(() => {
+    if (notifPage > totalNotifPages) {
+      setNotifPage(totalNotifPages)
+    }
+  }, [notifPage, totalNotifPages])
+
+  const handleReportNotification = (notif: AppNotification) => {
+    setNotifToast(t('notifications.reportedSuccess', 'Notification signalée aux modérateurs avec succès.'))
+    setTimeout(() => {
+      setNotifToast(null)
+    }, 3500)
+  }
 
   // Routage dynamique et intelligent des clics selon le type précis de notification
   const handleNotificationClick = (notif: AppNotification) => {
@@ -322,36 +360,16 @@ export const Header = (): JSX.Element => {
   const { recentSearches, addRecentSearch, clearRecentSearches } = useRecentSearches()
   const [showFilterMenu, setShowFilterMenu] = useState(false)
 
-  // Synchroniser avec localStorage pour éviter les conflits avec App.tsx
-  useEffect(() => {
-    const checkMobileSearch = () => {
-      try {
-        const isActive = localStorage.getItem('exile_mobile_search_active')
-        setIsMobileSearchOpen(isActive === 'true')
-      } catch (e) {
-        setIsMobileSearchOpen(false)
-      }
-    }
-    
-    checkMobileSearch()
-    
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'exile_mobile_search_active') {
-        setIsMobileSearchOpen(e.newValue === 'true')
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [])
+
 
   // Badge demandes reçues (pending)
   const [newRequestsCount, setNewRequestsCount] = useState(0)
   
   useEffect(() => {
+    let isMounted = true
     const loadUnreadRequests = async () => {
-      if (!user?.id) { setNewRequestsCount(0); return }
-      const token = localStorage.getItem('accessToken')
+      if (!user?.id) { if (isMounted) setNewRequestsCount(0); return }
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
       if (!token) return
       try {
         const res = await fetch(`${API_BASE_URL}/demandes/`, {
@@ -360,13 +378,38 @@ export const Header = (): JSX.Element => {
         if (!res.ok) return
         const data = await res.json()
         const raw: any[] = Array.isArray(data) ? data : (data.results || [])
-        const userId = (() => {
-          try { return String(JSON.parse(atob(token.split('.')[1])).user_id) } catch { return '' }
-        })()
-        setNewRequestsCount(raw.filter(r => String(r.receiver?.id || r.receiver_id) === userId && r.status === 'envoye').length)
-      } catch { setNewRequestsCount(0) }
+        const currentUid = String(user?.id)
+        const count = raw.filter(r => {
+          const rId = String(r.receiver?.id || r.receiver_id || r.receiver || '')
+          const isMe = rId === currentUid
+          const isPending = r.status === 'envoye' || r.status === 'pending'
+          return isMe && isPending
+        }).length
+        if (isMounted) {
+          setNewRequestsCount(count)
+        }
+      } catch { if (isMounted) setNewRequestsCount(0) }
     }
+
     loadUnreadRequests()
+
+    const handleUpdate = () => {
+      loadUnreadRequests()
+    }
+
+    window.addEventListener('exile_demande_created', handleUpdate)
+    window.addEventListener('exile_demande_updated', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+
+    const interval = setInterval(loadUnreadRequests, 3500)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('exile_demande_created', handleUpdate)
+      window.removeEventListener('exile_demande_updated', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
+      clearInterval(interval)
+    }
   }, [location.pathname, user?.id])
 
   
@@ -510,13 +553,11 @@ export const Header = (): JSX.Element => {
   const handleMobileSearchOpen = () => {
     setIsMobileSearchOpen(true)
     setShowDropdown(true)
-    localStorage.setItem('exile_mobile_search_active', 'true')
   }
 
   const handleMobileSearchClose = () => {
     setIsMobileSearchOpen(false)
     setShowDropdown(false)
-    localStorage.setItem('exile_mobile_search_active', 'false')
     setSearchQuery('')
     setSearchResults({ professionals: [], videos: [] })
   }
@@ -539,18 +580,18 @@ export const Header = (): JSX.Element => {
           {/* Logo - Gauche */}
           <div className="flex-shrink-0 flex items-center z-10">
             <Link to="/" className="flex items-center">
-              <img src="/logo_exile_SVG.svg" alt="EXILE" className="w-13 h-13 sm:w-16 sm:h-16 md:w-16 md:h-16 object-contain" />
+              <img src="/logo_exile_SVG.svg" alt="EXILE" className="h-5 sm:h-6 md:h-7 w-auto object-contain" />
             </Link>
           </div>
 
-          {/* Navigation - Parfaitement positionnée et aérée pour éviter toute collision avec la recherche sur mobile */}
-          <nav className="absolute left-1/2 -translate-x-1/2 bottom-1.5 sm:bottom-1 md:bottom-1 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto flex items-center space-x-2.5 sm:space-x-4 md:space-x-8 z-10 pointer-events-auto max-w-[calc(100%-140px)] sm:max-w-none">
+          {/* Navigation - En flex-1 sur mobile pour ne jamais chevaucher le logo ni la recherche */}
+          <nav className="flex-1 lg:flex-initial flex items-center justify-center space-x-2 sm:space-x-3.5 lg:space-x-8 lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:top-1/2 lg:-translate-y-1/2 z-10 pointer-events-auto px-1 sm:px-2 min-w-0">
             {navLinks.map((link) => (
               link.show && (
-                <div key={link.to} className="relative group">
+                <div key={link.to} className="relative group flex-shrink-0">
                   <Link
                     to={link.disabled ? '#' : link.to}
-                    className={`relative text-[12px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-2 py-0.5 ${
+                    className={`relative text-[11px] sm:text-sm md:text-base font-bold tracking-tight transition-colors whitespace-nowrap px-1 sm:px-2 py-0.5 ${
                       isActive(link.to)
                         ? 'text-[#FF6B00]'
                         : link.disabled
@@ -578,7 +619,7 @@ export const Header = (): JSX.Element => {
           </nav>
 
           {/* Droite : Recherche & Boutons d'action (Compact sur mobile et tablette) */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 z-10 ml-auto pl-2 sm:pl-3">
+          <div className="flex-shrink-0 flex items-center justify-end gap-1 sm:gap-2 md:gap-3 z-10 pl-1 sm:pl-3">
             {/* Bouton + Publier (Caché sur la page de connexion /login et autres pages d'authentification) */}
             {!['/login', '/register', '/forgot-password', '/reset-password', '/forgot-email', '/confirm-email'].includes(location.pathname) && (
               <div className="relative hidden md:block" ref={publishRef}>
@@ -913,10 +954,10 @@ export const Header = (): JSX.Element => {
                     {/* Mobile & Tablet Search Trigger Icon */}
                     <button
                       onClick={handleMobileSearchOpen}
-                      className="lg:hidden p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"
+                      className="lg:hidden p-1.5 sm:p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg flex-shrink-0"
                       title="Rechercher"
                     >
-                      <Search className="w-5 h-5 sm:w-5 sm:h-5" />
+                      <Search className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </button>
 
                     {/* Filter Type Floating Menu */}
@@ -1065,12 +1106,12 @@ export const Header = (): JSX.Element => {
                 <div className="relative" ref={notifRef}>
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                    className="relative p-1.5 sm:p-2 text-gray-600 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
                     title={t('notifications.title', "Notifications")}
                   >
-                    <Bell className="w-5 h-5 sm:w-5 sm:h-5" />
+                    <Bell className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     {(unreadCount > 0 || newRequestsCount > 0) && (
-                      <span className="absolute top-1 right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
+                      <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 flex items-center justify-center min-w-[15px] h-3.5 sm:min-w-[16px] sm:h-4 px-1 text-[9px] sm:text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
                         {unreadCount + newRequestsCount > 9 ? '9+' : unreadCount + newRequestsCount}
                       </span>
                     )}
@@ -1117,16 +1158,24 @@ export const Header = (): JSX.Element => {
                       </div>
 
                       {/* Barre de Recherche Notifications (Mobile) */}
-                      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50 dark:bg-zinc-900/70 flex-shrink-0">
+                      <div className={`px-4 py-2.5 border-b flex-shrink-0 transition-colors ${
+                        resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                         <div className="relative flex items-center" onClick={(e) => e.stopPropagation()}>
-                          <Search className="absolute left-3 w-4 h-4 text-gray-400 dark:text-zinc-400 pointer-events-none" />
+                          <Search className={`absolute left-3 w-4 h-4 pointer-events-none ${
+                            resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-400'
+                          }`} />
                           <input
                             type="text"
                             value={notifSearchQuery}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => setNotifSearchQuery(e.target.value)}
                             placeholder={t('notifications.searchPlaceholder', 'Rechercher une notification...')}
-                            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/40"
+                            className={`w-full pl-9 pr-8 py-2 text-xs rounded-xl transition-all focus:outline-none focus:ring-2 ${
+                              resolvedTheme === 'dark'
+                                ? 'bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-[#FF6B00]/40 focus:border-[#FF6B00]'
+                                : 'bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-[#FF6B00]/30 focus:border-[#FF6B00]'
+                            }`}
                           />
                           {notifSearchQuery && (
                             <button
@@ -1134,42 +1183,28 @@ export const Header = (): JSX.Element => {
                                 e.stopPropagation()
                                 setNotifSearchQuery('')
                               }}
-                              className="absolute right-2.5 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400 dark:text-zinc-400"
+                              className={`absolute right-2.5 p-0.5 rounded-full ${
+                                resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-slate-200 text-slate-400'
+                              }`}
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
-
-                        {/* Onglets Filtres de Catégories (Mobile) */}
-                        <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar pb-0.5" onClick={(e) => e.stopPropagation()}>
-                          {[
-                            { key: 'all', label: t('notifications.tabs.all', 'Toutes') },
-                            { key: 'message', label: t('notifications.tabs.message', 'Messages') },
-                            { key: 'pub', label: t('notifications.tabs.pub', 'Publicités') },
-                            { key: 'request', label: t('notifications.tabs.request', 'Demandes') },
-                            { key: 'system', label: t('notifications.tabs.system', 'Système') }
-                          ].map((tab) => (
-                            <button
-                              key={tab.key}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setNotifCategoryFilter(tab.key as NotificationCategory)
-                              }}
-                              className={`px-3 py-1 text-[11px] font-bold rounded-full whitespace-nowrap transition-all ${
-                                notifCategoryFilter === tab.key
-                                  ? 'bg-[#FF6B00] text-white shadow-sm'
-                                  : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border border-gray-200/80 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-700/60'
-                              }`}
-                            >
-                              {tab.label}
-                            </button>
-                          ))}
-                        </div>
                       </div>
 
+                      {/* Toast notification de signalement / action */}
+                      {notifToast && (
+                        <div className="mx-4 my-2 px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-between animate-in fade-in duration-150 flex-shrink-0">
+                          <span>{notifToast}</span>
+                          <button onClick={() => setNotifToast(null)} className="p-0.5 hover:opacity-75">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
                       {/* Liste Déroulante Notifications (Mobile) */}
-                      <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800/60 pb-20 no-scrollbar">
+                      <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800/60 pb-4 no-scrollbar">
                         {filteredNotifications.length === 0 ? (
                           <div className="py-24 px-4 text-center">
                             <Bell className="w-12 h-12 mx-auto text-gray-300 dark:text-zinc-600 mb-3 opacity-60" />
@@ -1181,18 +1216,15 @@ export const Header = (): JSX.Element => {
                             </p>
                             {notifSearchQuery && (
                               <button
-                                onClick={() => {
-                                  setNotifSearchQuery('')
-                                  setNotifCategoryFilter('all')
-                                }}
+                                onClick={() => setNotifSearchQuery('')}
                                 className="mt-3 text-xs font-bold text-blue-600 dark:text-blue-400 underline"
                               >
-                                {t('notifications.resetFilters', 'Réinitialiser les filtres')}
+                                {t('notifications.resetFilters', 'Réinitialiser la recherche')}
                               </button>
                             )}
                           </div>
                         ) : (
-                          filteredNotifications.map((notif) => (
+                          paginatedNotifications.map((notif) => (
                             <div
                               key={notif.id}
                               onClick={() => handleNotificationClick(notif)}
@@ -1240,26 +1272,63 @@ export const Header = (): JSX.Element => {
                                   }`}>
                                     {notif.title}
                                   </p>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                  <div className="flex items-center gap-1.5 flex-shrink-0 relative" data-notif-menu>
                                     {!notif.read && (
                                       <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
                                     )}
-                                    {/* Suppression individuelle */}
+
+                                    {/* Bouton 3 petits points (Menu options) */}
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        notificationService.deleteNotification(notif.id)
-                                        setNotifications(notificationService.getNotifications())
+                                        setOpenMenuNotifId(prev => prev === notif.id ? null : notif.id)
                                       }}
-                                      title={t('notifications.delete', 'Supprimer la notification')}
-                                      className="p-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                      title={t('common.options', 'Options')}
+                                      className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <MoreVertical className="w-4 h-4" />
                                     </button>
+
+                                    {/* Dropdown Options du Menu 3-points */}
+                                    {openMenuNotifId === notif.id && (
+                                      <div
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`absolute right-0 top-7 z-30 w-36 rounded-xl shadow-xl border py-1 animate-in fade-in zoom-in-95 duration-100 ${
+                                          resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-200 shadow-black/60' : 'bg-white border-gray-200 text-gray-700 shadow-slate-300/50'
+                                        }`}
+                                      >
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setOpenMenuNotifId(null)
+                                            notificationService.deleteNotification(notif.id)
+                                            setNotifications(notificationService.getNotifications())
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                          <span>{t('common.delete', 'Supprimer')}</span>
+                                        </button>
+
+                                        {notif.type !== 'system' && notif.type !== 'verification_reminder' && notif.category !== 'system' && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setOpenMenuNotifId(null)
+                                              handleReportNotification(notif)
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors text-amber-600 dark:text-amber-400"
+                                          >
+                                            <Flag className="w-3.5 h-3.5" />
+                                            <span>{t('common.report', 'Signaler')}</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                                <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
-                                  {notif.message}
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words overflow-hidden">
+                                  {formatNotifMessage(notif.message)}
                                 </p>
 
                                 {(notif.actionButton || notif.data?.actionButton) && (
@@ -1286,6 +1355,50 @@ export const Header = (): JSX.Element => {
                           ))
                         )}
                       </div>
+
+                      {/* Pagination Mobile */}
+                      {totalNotifPages > 1 && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className={`flex items-center justify-between px-4 py-3 border-t text-xs select-none flex-shrink-0 ${
+                            resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          <button
+                            onClick={() => setNotifPage(p => Math.max(1, p - 1))}
+                            disabled={notifPage <= 1}
+                            className={`px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1 ${
+                              notifPage <= 1
+                                ? 'opacity-30 cursor-not-allowed'
+                                : resolvedTheme === 'dark'
+                                  ? 'hover:bg-zinc-800 text-zinc-200 active:scale-95'
+                                  : 'hover:bg-slate-200 text-slate-800 active:scale-95'
+                            }`}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                            <span>{t('common.previous', 'Précédent')}</span>
+                          </button>
+
+                          <span className="font-extrabold text-xs text-gray-700 dark:text-zinc-300">
+                            {notifPage} / {totalNotifPages}
+                          </span>
+
+                          <button
+                            onClick={() => setNotifPage(p => Math.min(totalNotifPages, p + 1))}
+                            disabled={notifPage >= totalNotifPages}
+                            className={`px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1 ${
+                              notifPage >= totalNotifPages
+                                ? 'opacity-30 cursor-not-allowed'
+                                : resolvedTheme === 'dark'
+                                  ? 'hover:bg-zinc-800 text-zinc-200 active:scale-95'
+                                  : 'hover:bg-slate-200 text-slate-800 active:scale-95'
+                            }`}
+                          >
+                            <span>{t('common.next', 'Suivant')}</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>,
                     document.body
                   )}
@@ -1317,49 +1430,46 @@ export const Header = (): JSX.Element => {
                       </div>
 
                       {/* Barre de Recherche Notifications (Desktop) */}
-                      <div className="px-3.5 py-2.5 border-b border-gray-100 dark:border-zinc-700/60 bg-gray-50/70 dark:bg-zinc-850/60 flex-shrink-0">
+                      <div className={`px-3.5 py-2.5 border-b flex-shrink-0 transition-colors ${
+                        resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-750 border-zinc-700/60' : 'bg-slate-50 border-slate-200'
+                      }`}>
                         <div className="relative flex items-center">
-                          <Search className="absolute left-2.5 w-3.5 h-3.5 text-gray-400 dark:text-zinc-500 pointer-events-none" />
+                          <Search className={`absolute left-2.5 w-3.5 h-3.5 pointer-events-none ${
+                            resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-slate-400'
+                          }`} />
                           <input
                             type="text"
                             value={notifSearchQuery}
                             onChange={(e) => setNotifSearchQuery(e.target.value)}
                             placeholder={t('common.search', 'Rechercher...')}
-                            className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-white dark:bg-zinc-750 border border-gray-200 dark:border-zinc-600/80 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            className={`w-full pl-8 pr-7 py-1.5 text-xs rounded-lg transition-all focus:outline-none focus:ring-2 ${
+                              resolvedTheme === 'dark'
+                                ? 'bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-[#FF6B00]/40 focus:border-[#FF6B00]'
+                                : 'bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-[#FF6B00]/30 focus:border-[#FF6B00]'
+                            }`}
                           />
                           {notifSearchQuery && (
                             <button
                               onClick={() => setNotifSearchQuery('')}
-                              className="absolute right-2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400"
+                              className={`absolute right-2 p-0.5 rounded-full ${
+                                resolvedTheme === 'dark' ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-slate-200 text-slate-400'
+                              }`}
                             >
                               <X className="w-3 h-3" />
                             </button>
                           )}
                         </div>
-
-                        {/* Onglets Filtres de Catégories (Desktop) */}
-                        <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-0.5">
-                          {[
-                            { key: 'all', label: t('notifications.tabs.all', 'Toutes') },
-                            { key: 'message', label: t('notifications.tabs.message', 'Messages') },
-                            { key: 'pub', label: t('notifications.tabs.pub', 'Publicités') },
-                            { key: 'request', label: t('notifications.tabs.request', 'Demandes') },
-                            { key: 'system', label: t('notifications.tabs.system', 'Système') }
-                          ].map((tab) => (
-                            <button
-                              key={tab.key}
-                              onClick={() => setNotifCategoryFilter(tab.key as NotificationCategory)}
-                              className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full whitespace-nowrap transition-all ${
-                                notifCategoryFilter === tab.key
-                                  ? 'bg-[#FF6B00] text-white shadow-xs'
-                                  : 'bg-white dark:bg-zinc-700 text-gray-600 dark:text-zinc-300 border border-gray-200/80 dark:border-zinc-600'
-                              }`}
-                            >
-                              {tab.label}
-                            </button>
-                          ))}
-                        </div>
                       </div>
+
+                      {/* Toast notification desktop */}
+                      {notifToast && (
+                        <div className="mx-3 my-2 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center justify-between animate-in fade-in duration-150 flex-shrink-0">
+                          <span>{notifToast}</span>
+                          <button onClick={() => setNotifToast(null)} className="p-0.5 hover:opacity-75">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
 
                       <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-700/40">
                         {filteredNotifications.length === 0 ? (
@@ -1373,7 +1483,7 @@ export const Header = (): JSX.Element => {
                             </p>
                           </div>
                         ) : (
-                          filteredNotifications.map((notif) => (
+                          paginatedNotifications.map((notif) => (
                             <div
                               key={notif.id}
                               onClick={() => handleNotificationClick(notif)}
@@ -1420,26 +1530,63 @@ export const Header = (): JSX.Element => {
                                   }`}>
                                     {notif.title}
                                   </p>
-                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <div className="flex items-center gap-1.5 flex-shrink-0 relative" data-notif-menu>
                                     {!notif.read && (
                                       <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
                                     )}
-                                    {/* Bouton de suppression individuelle */}
+
+                                    {/* Bouton 3 petits points (Menu options) */}
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        notificationService.deleteNotification(notif.id)
-                                        setNotifications(notificationService.getNotifications())
+                                        setOpenMenuNotifId(prev => prev === notif.id ? null : notif.id)
                                       }}
-                                      title={t('notifications.delete', 'Supprimer la notification')}
-                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-500 transition-all"
+                                      title={t('common.options', 'Options')}
+                                      className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <MoreVertical className="w-3.5 h-3.5" />
                                     </button>
+
+                                    {/* Dropdown Options du Menu 3-points */}
+                                    {openMenuNotifId === notif.id && (
+                                      <div
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`absolute right-0 top-6 z-30 w-36 rounded-xl shadow-xl border py-1 animate-in fade-in zoom-in-95 duration-100 ${
+                                          resolvedTheme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-200 shadow-black/60' : 'bg-white border-gray-200 text-gray-700 shadow-slate-300/50'
+                                        }`}
+                                      >
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setOpenMenuNotifId(null)
+                                            notificationService.deleteNotification(notif.id)
+                                            setNotifications(notificationService.getNotifications())
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                          <span>{t('common.delete', 'Supprimer')}</span>
+                                        </button>
+
+                                        {notif.type !== 'system' && notif.type !== 'verification_reminder' && notif.category !== 'system' && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setOpenMenuNotifId(null)
+                                              handleReportNotification(notif)
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors text-amber-600 dark:text-amber-400"
+                                          >
+                                            <Flag className="w-3.5 h-3.5" />
+                                            <span>{t('common.report', 'Signaler')}</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                                <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">
-                                  {notif.message}
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words overflow-hidden">
+                                  {formatNotifMessage(notif.message)}
                                 </p>
 
                                 {(notif.actionButton || notif.data?.actionButton) && (
@@ -1466,6 +1613,50 @@ export const Header = (): JSX.Element => {
                           ))
                         )}
                       </div>
+
+                      {/* Pagination Desktop */}
+                      {totalNotifPages > 1 && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className={`flex items-center justify-between px-3.5 py-2 border-t text-xs select-none flex-shrink-0 ${
+                            resolvedTheme === 'dark' ? 'bg-zinc-900 border-zinc-700/60 text-zinc-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          <button
+                            onClick={() => setNotifPage(p => Math.max(1, p - 1))}
+                            disabled={notifPage <= 1}
+                            className={`px-2.5 py-1 rounded-lg font-semibold transition-colors flex items-center gap-1 ${
+                              notifPage <= 1
+                                ? 'opacity-30 cursor-not-allowed'
+                                : resolvedTheme === 'dark'
+                                  ? 'hover:bg-zinc-800 text-zinc-200 active:scale-95'
+                                  : 'hover:bg-slate-200 text-slate-800 active:scale-95'
+                            }`}
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span>{t('common.previous', 'Précédent')}</span>
+                          </button>
+
+                          <span className="font-bold text-[11px] text-gray-700 dark:text-zinc-300">
+                            {notifPage} / {totalNotifPages}
+                          </span>
+
+                          <button
+                            onClick={() => setNotifPage(p => Math.min(totalNotifPages, p + 1))}
+                            disabled={notifPage >= totalNotifPages}
+                            className={`px-2.5 py-1 rounded-lg font-semibold transition-colors flex items-center gap-1 ${
+                              notifPage >= totalNotifPages
+                                ? 'opacity-30 cursor-not-allowed'
+                                : resolvedTheme === 'dark'
+                                  ? 'hover:bg-zinc-800 text-zinc-200 active:scale-95'
+                                  : 'hover:bg-slate-200 text-slate-800 active:scale-95'
+                            }`}
+                          >
+                            <span>{t('common.next', 'Suivant')}</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1474,9 +1665,9 @@ export const Header = (): JSX.Element => {
                 <div className="relative" ref={profileRef}>
                   <button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                    className="flex items-center space-x-2 p-1 md:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
+                    className="flex items-center space-x-1.5 sm:space-x-2 p-0.5 sm:p-1 md:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 flex-shrink-0"
                   >
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-zinc-800 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden shadow-sm ring-1 ring-white/10 flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-zinc-800 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm overflow-hidden shadow-sm ring-1 ring-white/10 flex-shrink-0">
                       {headerAvatar && !headerAvatarError && isOnline ? (
                         <img
                           src={headerAvatar}

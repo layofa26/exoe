@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }: AuthProviderProps): JSX.Element => {
 
   const fetchProfileAvatar = async (tokenStr: string, currentUserId: string | number) => {
     try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1'
       const headers = { Authorization: `Bearer ${tokenStr}` }
       const res = await fetch(`${API_BASE}/profil/profils/me/`, { headers }).catch(() => null)
       let profileData: any = null

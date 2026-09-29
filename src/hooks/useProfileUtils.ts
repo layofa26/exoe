@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { resolveMediaUrl } from '../utils/mediaUtils';
 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 interface Skill {
   id: string;
@@ -103,8 +103,8 @@ export const getProfileWithFallback = async (token: string) => {
  * Mapping unique backend -> UI (évite que des champs restent aux anciennes valeurs)
  */
 export const mapBackendProfile = (data: any): UserProfile => {
-  const supabaseBase = import.meta.env.VITE_SUPABASE_URL || 'https://yovqbztvqotktkmkkqsq.supabase.co'
-  const SUPABASE_URL = `${supabaseBase}/storage/v1/object/public/Exile_images`
+  const supabaseBase = import.meta.env.VITE_SUPABASE_URL || ''
+  const SUPABASE_URL = supabaseBase ? `${supabaseBase}/storage/v1/object/public/Exile_images` : ''
   
   const getPublicImageUrl = (urlOrFilename: string | null | undefined): string | undefined => {
     if (!urlOrFilename || typeof urlOrFilename !== 'string') return undefined

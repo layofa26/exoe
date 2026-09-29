@@ -6,7 +6,7 @@ import {
   Eye, EyeOff, ChevronRight, Play,
   User, Camera, MapPin, Briefcase, Plus, X, Info,
   Check, MessageSquare, UserCheck, UserX, AlertCircle,
-  Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key, Crown, Wifi, Sparkles, RefreshCw,
+  Loader2, ArrowLeft, Copy, CheckCircle2, QrCode, Key, Crown, Wifi, RefreshCw,
   Search, FileText, Video, ShieldCheck, CreditCard, ChevronDown
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'

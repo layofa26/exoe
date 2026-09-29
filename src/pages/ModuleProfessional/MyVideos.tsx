@@ -13,7 +13,6 @@ import {
   List,
   Clock,
   ArrowLeft,
-  Sparkles,
   Share2,
   Play,
   Film,
@@ -28,7 +27,7 @@ import ConfirmModal from '../../components/common/ConfirmModal'
 import { UploadVideo } from '../../components/video/UploadVideo'
 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 interface MyVideo {
   id: string

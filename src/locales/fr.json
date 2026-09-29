@@ -793,7 +793,7 @@
     }
   },
   "pub": {
-    "enterpriseSpace": "Espace Entreprise (PUB)",
+    "enterpriseSpace": "",
     "promoteBrand": "Promouvez votre marque auprès des professionnels EXILE.",
     "makeInquiry": "Faire une demande publicitaire",
     "visit": "Visiter",
@@ -836,7 +836,7 @@
     },
     "inquiryPage": {
       "title": "Demande de Campagne Publicitaire",
-      "subtitle": "Espace Entreprise (PUB) · Visibilité auprès de la communauté EXILE",
+      "subtitle": "Visibilité auprès de la communauté EXILE",
       "successTitle": "Demande envoyée avec succès !",
       "successDesc": "Notre équipe va examiner votre demande et configurer votre campagne dans le Dashboard PUB. Vous recevrez une notification dès validation.",
       "sendAnother": "Envoyer une autre demande",

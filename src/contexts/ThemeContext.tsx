@@ -13,9 +13,17 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('exile_theme') as Theme
-    return saved || 'dark'
+    return saved || 'auto'
   })
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>('dark')
+  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('exile_theme') as Theme
+    if (saved === 'light') return 'light'
+    if (saved === 'dark') return 'dark'
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+    return 'light'
+  })
 
   useEffect(() => {
     const root = window.document.documentElement

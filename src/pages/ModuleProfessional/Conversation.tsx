@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Send, MoreVertical, Search, X, Paperclip,
   Reply, CheckCheck, Check, Pin, PinOff, Archive, Shield, Phone,
-  Video, Star, Wifi, WifiOff, Loader2, Edit2, Trash2, Flag, Forward, Clock,
+  Video, Star, Loader2, Edit2, Trash2, Flag, Forward, Clock,
   UserCheck, UserX
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -19,7 +19,7 @@ import { MessageBubble, MessageBubbleData } from '../../components/MessageBubble
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 interface ReplyContext {
   id: string
@@ -131,6 +131,17 @@ export const ConversationView = ({
     }
   }, [conversationId])
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      localStorage.setItem('exile_in_mobile_conversation', 'true')
+      window.dispatchEvent(new CustomEvent('exile_mobile_conversation_change', { detail: { inConversation: true } }))
+    }
+    return () => {
+      localStorage.removeItem('exile_in_mobile_conversation')
+      window.dispatchEvent(new CustomEvent('exile_mobile_conversation_change', { detail: { inConversation: false } }))
+    }
+  }, [])
+
   const id = activeConvId || (conversationId ? String(conversationId) : params.id)
   const navigate = useNavigate()
 
@@ -142,6 +153,39 @@ export const ConversationView = ({
   const currentUserId = useMemo(() => {
     if (user?.id) return String(user.id)
     return getCurrentUserId()
+  }, [user])
+
+  // ─── Current User Identity Sets ─────────────────────────────────────────────
+  const myIds = useMemo(() => {
+    const s = new Set<string>()
+    if (user?.id) s.add(String(user.id).trim().toLowerCase())
+    const fromToken = getCurrentUserId()
+    if (fromToken) s.add(String(fromToken).trim().toLowerCase())
+    try {
+      const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+      if (storedProfile.id) s.add(String(storedProfile.id).trim().toLowerCase())
+      if (storedProfile.user_id) s.add(String(storedProfile.user_id).trim().toLowerCase())
+    } catch {}
+    return s
+  }, [user])
+
+  const myUsernames = useMemo(() => {
+    const s = new Set<string>()
+    if (user?.username) {
+      s.add(user.username.replace(/^@/, '').trim().toLowerCase())
+    }
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        if (payload.username) s.add(String(payload.username).replace(/^@/, '').trim().toLowerCase())
+      }
+    } catch {}
+    try {
+      const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+      if (storedProfile.username) s.add(String(storedProfile.username).replace(/^@/, '').trim().toLowerCase())
+    } catch {}
+    return s
   }, [user])
 
   // ─── State ──────────────────────────────────────────────────────────────────
@@ -156,6 +200,116 @@ export const ConversationView = ({
     }
     return null
   })
+
+  const effectivePartnerId = useMemo(() => {
+    if (partnerId) return String(partnerId)
+    if (conversation?.participants && Array.isArray(conversation.participants)) {
+      const other = conversation.participants.find((p: any) => {
+        const pid = String(p.id || p.uuid || '').trim().toLowerCase()
+        return pid && !myIds.has(pid)
+      })
+      if (other?.id) return String(other.id)
+    }
+    return null
+  }, [partnerId, conversation, myIds])
+
+  const otherParticipant = useMemo(() => {
+    if (!conversation) {
+      if (partnerUsername || partnerId) {
+        return {
+          id: partnerId || 'other',
+          username: partnerUsername || 'Utilisateur',
+          full_name: partnerUsername || 'Utilisateur',
+          avatar_url: partnerAvatar || null,
+        }
+      }
+      return null
+    }
+    const parts: any[] = conversation.participants || []
+    const found = parts.find((p: any) => {
+      const pid = String(p.id || p.uuid || '').trim().toLowerCase()
+      return pid && !myIds.has(pid)
+    })
+    if (found) return found
+    if (partnerUsername || partnerId) {
+      return {
+        id: partnerId || 'other',
+        username: partnerUsername || 'Utilisateur',
+        full_name: partnerUsername || 'Utilisateur',
+        avatar_url: partnerAvatar || null,
+      }
+    }
+    return null
+  }, [conversation, myIds, partnerId, partnerUsername, partnerAvatar])
+
+  const partnerIds = useMemo(() => {
+    const s = new Set<string>()
+    if (partnerId) s.add(String(partnerId).trim().toLowerCase())
+    if (otherParticipant?.id) s.add(String(otherParticipant.id).trim().toLowerCase())
+    if (conversation?.participants && Array.isArray(conversation.participants)) {
+      conversation.participants.forEach((p: any) => {
+        const pid = String(p.id || p.uuid || '').trim().toLowerCase()
+        if (pid && !myIds.has(pid)) s.add(pid)
+      })
+    }
+    return s
+  }, [partnerId, otherParticipant, conversation, myIds])
+
+  const partnerUsernames = useMemo(() => {
+    const s = new Set<string>()
+    if (partnerUsername) s.add(partnerUsername.replace(/^@/, '').trim().toLowerCase())
+    if (otherParticipant?.username) s.add(String(otherParticipant.username).replace(/^@/, '').trim().toLowerCase())
+    if (conversation?.participants && Array.isArray(conversation.participants)) {
+      conversation.participants.forEach((p: any) => {
+        const puname = String(p.username || '').replace(/^@/, '').trim().toLowerCase()
+        if (puname && !myUsernames.has(puname)) s.add(puname)
+      })
+    }
+    return s
+  }, [partnerUsername, otherParticipant, conversation, myUsernames])
+
+  const isMessageMine = useCallback((msg: MessageBubbleData): boolean => {
+    // 1. Explicit author markers
+    if (msg.senderName === 'Moi' || msg.senderId === 'me') {
+      return true
+    }
+    if (msg.senderId === 'partner') {
+      return false
+    }
+
+    // 2. Initial message special case (from a Demande)
+    if (msg.id === 'init-msg') {
+      return Boolean(isDemandeSender)
+    }
+
+    const sId = String(msg.senderId || '').trim().toLowerCase()
+    const sUname = String(msg.senderUsername || '').replace(/^@/, '').trim().toLowerCase()
+    const sName = String(msg.senderName || '').trim().toLowerCase()
+
+    // 3. Positively matches Partner -> NOT MINE (LEFT)
+    if (sId && partnerIds.has(sId)) {
+      return false
+    }
+    if (sUname && partnerUsernames.has(sUname)) {
+      return false
+    }
+
+    // 4. Positively matches Current User -> MINE (RIGHT)
+    if (sId && myIds.has(sId)) {
+      return true
+    }
+    if (sUname && myUsernames.has(sUname)) {
+      return true
+    }
+    if (user?.fullName && sName && sName === user.fullName.trim().toLowerCase()) {
+      return true
+    }
+
+    // 5. CRITICAL DEFAULT: If not definitively verified to be sent by me,
+    // it MUST ALWAYS be positioned on the LEFT (other user). NEVER default to true!
+    return false
+  }, [isDemandeSender, partnerIds, partnerUsernames, myIds, myUsernames, user])
+
   const [messages, setMessages] = useState<MessageBubbleData[]>(() => {
     try {
       const convKey = conversationId || partnerId || 'temp'
@@ -168,7 +322,7 @@ export const ConversationView = ({
       return [{
         id: 'init-msg',
         content: initialMessage,
-        senderId: isMine ? String(currentUserId || '') : String(partnerId || ''),
+        senderId: isMine ? (currentUserId ? String(currentUserId) : 'me') : (partnerId ? String(partnerId) : 'partner'),
         senderName: isMine ? 'Moi' : (partnerUsername || 'Utilisateur'),
         senderUsername: isMine ? '' : (partnerUsername || ''),
         senderAvatar: isMine ? undefined : (partnerAvatar || undefined),
@@ -184,6 +338,7 @@ export const ConversationView = ({
   const [error, setError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [hasDraft, setHasDraft] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
 
   // UI state
   const [showSearch, setShowSearch] = useState(false)
@@ -194,7 +349,31 @@ export const ConversationView = ({
   const [isPinned, setIsPinned] = useState(false)
   const [isArchived, setIsArchived] = useState(false)
   const [isBlocked, setIsBlocked] = useState(false)
+  const [blockedByMe, setBlockedByMe] = useState(false)
+  const [blockedByThem, setBlockedByThem] = useState(false)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  const headerMenuRef = useRef<HTMLDivElement>(null)
+  const headerMenuBtnRef = useRef<HTMLButtonElement>(null)
+
+  // Fermer le menu 3 points lors d'un clic en dehors
+  useEffect(() => {
+    if (!showMenu) return
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node
+      if (
+        headerMenuRef.current && !headerMenuRef.current.contains(target) &&
+        headerMenuBtnRef.current && !headerMenuBtnRef.current.contains(target)
+      ) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [showMenu])
 
   // Messaging features
   const [replyingTo, setReplyingTo] = useState<ReplyContext | null>(null)
@@ -219,7 +398,7 @@ export const ConversationView = ({
 
   // WebSocket state
   const [typingUser, setTypingUser] = useState<{ userId: string; username: string } | null>(null)
-  const [onlineUserId, setOnlineUserId] = useState<string | null>(null)
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set())
   const [wsError, setWsError] = useState(false)
 
   // ─── Show toast ─────────────────────────────────────────────────────────────
@@ -262,6 +441,21 @@ export const ConversationView = ({
             setConversation(data)
             setIsPinned(Boolean(data.is_pinned))
             setIsArchived(Boolean(data.is_archived))
+            if (data.participants && Array.isArray(data.participants)) {
+              const onlineSet = new Set<string>()
+              data.participants.forEach((p: any) => {
+                const isOnline = p.is_online || p.isOnline || (p.user && (p.user.is_online || p.user.isOnline))
+                if (isOnline) {
+                  if (p.id) onlineSet.add(String(p.id))
+                  if (p.uuid) onlineSet.add(String(p.uuid))
+                  if (p.user?.id) onlineSet.add(String(p.user.id))
+                  if (p.user?.uuid) onlineSet.add(String(p.user.uuid))
+                }
+              })
+              if (onlineSet.size > 0) {
+                setOnlineUserIds(prev => new Set([...prev, ...onlineSet]))
+              }
+            }
             const normalized: MessageBubbleData[] = (data.messages || []).map((m: any) => ({
               id: String(m.id),
               content: m.content || '',
@@ -288,7 +482,7 @@ export const ConversationView = ({
               setMessages([{
                 id: 'init-msg',
                 content: initialMessage,
-                senderId: isMine ? String(currentUserId || '') : String(partnerId || ''),
+                senderId: isMine ? (currentUserId ? String(currentUserId) : 'me') : (partnerId ? String(partnerId) : 'partner'),
                 senderName: isMine ? 'Moi' : (partnerUsername || 'Utilisateur'),
                 senderUsername: isMine ? '' : (partnerUsername || ''),
                 senderAvatar: isMine ? undefined : (partnerAvatar || undefined),
@@ -342,7 +536,7 @@ export const ConversationView = ({
                 setMessages([{
                   id: 'init-msg',
                   content: initialMessage,
-                  senderId: isMine ? String(currentUserId || '') : String(partnerId || ''),
+                  senderId: isMine ? (currentUserId ? String(currentUserId) : 'me') : (partnerId ? String(partnerId) : 'partner'),
                   senderName: isMine ? 'Moi' : (partnerUsername || 'Utilisateur'),
                   senderUsername: isMine ? '' : (partnerUsername || ''),
                   senderAvatar: isMine ? undefined : (partnerAvatar || undefined),
@@ -512,11 +706,13 @@ export const ConversationView = ({
       }
 
       case 'chat.read': {
-        const readerId = String(msg.user_id)
-        if (String(readerId) !== String(currentUserId)) {
+        const readerId = String(msg.user_id || '')
+        if (!readerId || String(readerId) !== String(currentUserId)) {
           // Mark all my sent messages as read
           setMessages(prev => prev.map(m =>
-            String(m.senderId) === String(currentUserId) ? { ...m, read: true } : m
+            (isMessageMine(m) || String(m.senderId) === String(currentUserId) || m.senderId === 'me' || m.senderName === 'Moi')
+              ? { ...m, read: true }
+              : m
           ))
         }
         break
@@ -541,9 +737,17 @@ export const ConversationView = ({
       }
 
       case 'user.presence': {
-        const uid = String(msg.user_id)
-        if (String(uid) !== String(currentUserId)) {
-          setOnlineUserId(msg.status === 'online' ? uid : null)
+        const uid = String(msg.user_id || '')
+        if (uid && String(uid) !== String(currentUserId)) {
+          setOnlineUserIds(prev => {
+            const next = new Set(prev)
+            if (msg.status === 'online') {
+              next.add(uid)
+            } else {
+              next.delete(uid)
+            }
+            return next
+          })
         }
         break
       }
@@ -553,13 +757,25 @@ export const ConversationView = ({
         break
       }
     }
-  }, [currentUserId, showToast])
+  }, [currentUserId, showToast, isMessageMine])
 
   const { send: wsSend, connectionState, isConnected } = useWebSocket({
     conversationId: id || '',
     onMessage: handleWSMessage,
     enabled: !!id && !isLoading,
   })
+
+  // When WebSocket connects, query online presence immediately and mark read
+  useEffect(() => {
+    if (isConnected) {
+      wsSend({ type: 'chat.read' })
+      wsSend({ type: 'user.query_presence' })
+      if (id && id !== 'temp' && !id.startsWith('demande-')) {
+        apiFetch(`/conversations/${id}/mark_read/`, { method: 'POST' }).catch(() => {})
+        window.dispatchEvent(new CustomEvent('exile_demande_updated'))
+      }
+    }
+  }, [isConnected, wsSend, id])
 
   // WS error tracking
   useEffect(() => {
@@ -593,103 +809,114 @@ export const ConversationView = ({
   // ─── Send message (Direct or from input) ──────────────────────────────────────
   const sendDirectMessage = useCallback(async (textToSend?: string) => {
     const content = (textToSend !== undefined ? textToSend : newMessage).trim()
-    if (!content) return
+    if (!content || isSendingMessage) return
 
-    // Stop typing indicator
-    wsSend({ type: 'chat.typing', is_typing: false })
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-
-    // Optimistic UI
-    const replyTarget = replyingTo ? { ...replyingTo } : null
-    const optimisticId = `temp_${Date.now()}`
-    const optimisticMsg: MessageBubbleData = {
-      id: optimisticId,
-      content,
-      senderId: currentUserId || '',
-      senderName: 'Moi',
-      createdAt: new Date().toISOString(),
-      read: false,
-      isImportant: false,
-      isEdited: false,
-      replyToId: replyTarget?.id,
-      replyPreview: replyTarget
-        ? { senderName: replyTarget.senderName, content: replyTarget.content }
-        : undefined,
+    if (demandeStatus === 'pending') {
+      showToast(t('pro.requests.cannotSendWhilePending', 'Vous ne pouvez pas envoyer de message tant que la demande n\'est pas acceptée.'), 'error')
+      return
     }
-    setMessages(prev => [...prev, optimisticMsg])
-    if (textToSend === undefined) {
-      setNewMessage('')
-      if (id) localStorage.removeItem(`draft_${id}`)
-      setHasDraft(false)
-    }
-    setReplyingTo(null)
 
-    // Check if we have a real numeric ID or need to create conversation
-    let realConvId = activeConvId || (id && /^\d+$/.test(String(id)) ? id : null)
+    setIsSendingMessage(true)
+    try {
+      // Stop typing indicator
+      wsSend({ type: 'chat.typing', is_typing: false })
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
 
-    if (!realConvId && partnerId) {
-      try {
-        const startRes = await apiFetch('/conversations/start/', {
-          method: 'POST',
-          body: JSON.stringify({ participant_id: Number(partnerId) }),
-        })
-        if (startRes.ok) {
-          const startData = await startRes.json()
-          if (startData.id) {
-            realConvId = String(startData.id)
-            setActiveConvId(realConvId)
+      // Optimistic UI
+      const replyTarget = replyingTo ? { ...replyingTo } : null
+      const optimisticId = `temp_${Date.now()}`
+      const optimisticMsg: MessageBubbleData = {
+        id: optimisticId,
+        content,
+        senderId: currentUserId || 'me',
+        senderName: 'Moi',
+        senderUsername: user?.username ? user.username.replace(/^@/, '') : undefined,
+        createdAt: new Date().toISOString(),
+        read: false,
+        isImportant: false,
+        isEdited: false,
+        replyToId: replyTarget?.id,
+        replyPreview: replyTarget
+          ? { senderName: replyTarget.senderName, content: replyTarget.content }
+          : undefined,
+      }
+      setMessages(prev => [...prev, optimisticMsg])
+      if (textToSend === undefined) {
+        setNewMessage('')
+        if (id) localStorage.removeItem(`draft_${id}`)
+        setHasDraft(false)
+      }
+      setReplyingTo(null)
+
+      // Check if we have a real numeric ID or need to create conversation
+      let realConvId = activeConvId || (id && /^\d+$/.test(String(id)) ? id : null)
+
+      if (!realConvId && partnerId) {
+        try {
+          const startRes = await apiFetch('/conversations/start/', {
+            method: 'POST',
+            body: JSON.stringify({ participant_id: Number(partnerId) }),
+          })
+          if (startRes.ok) {
+            const startData = await startRes.json()
+            if (startData.id) {
+              realConvId = String(startData.id)
+              setActiveConvId(realConvId)
+            }
+          }
+        } catch {}
+      }
+
+      // Persist via REST to guarantee DB storage
+      let savedSuccessfully = false
+      if (realConvId) {
+        try {
+          const postRes = await apiFetch('/conversations/messages/', {
+            method: 'POST',
+            body: JSON.stringify({
+              content,
+              conversation: Number(realConvId),
+              reply_to: replyTarget?.id && /^\d+$/.test(String(replyTarget.id)) ? Number(replyTarget.id) : null,
+            }),
+          })
+          if (postRes.ok) {
+            const savedMsg = await postRes.json()
+            savedSuccessfully = true
+            setMessages(prev => prev.map(m => m.id === optimisticId ? {
+              ...m,
+              id: String(savedMsg.id),
+              createdAt: savedMsg.created_at || m.createdAt,
+              replyToId: savedMsg.reply_to ? String(savedMsg.reply_to) : (m.replyToId || (replyTarget?.id ? String(replyTarget.id) : undefined)),
+              replyPreview: savedMsg.reply_preview ? {
+                senderName: savedMsg.reply_preview.sender_name || savedMsg.reply_preview.senderName || replyTarget?.senderName || 'Utilisateur',
+                content: savedMsg.reply_preview.content || replyTarget?.content || '',
+              } : m.replyPreview,
+            } : m))
+            // Backend MessageViewSet automatically broadcasts via channel_layer to all WebSocket clients!
+            return
+          }
+        } catch {
+          // Fallback to WebSocket if REST failed
+          if (!isConnected) {
+            showToast(t('pro.requests.sendError', 'Erreur lors de l\'envoi. Vérifiez votre connexion.'))
           }
         }
-      } catch {}
-    }
-
-    // Persist via REST to guarantee DB storage
-    let savedSuccessfully = false
-    if (realConvId) {
-      try {
-        const postRes = await apiFetch('/conversations/messages/', {
-          method: 'POST',
-          body: JSON.stringify({
-            content,
-            conversation: Number(realConvId),
-            reply_to: replyTarget?.id && /^\d+$/.test(String(replyTarget.id)) ? Number(replyTarget.id) : null,
-          }),
-        })
-        if (postRes.ok) {
-          const savedMsg = await postRes.json()
-          savedSuccessfully = true
-          setMessages(prev => prev.map(m => m.id === optimisticId ? {
-            ...m,
-            id: String(savedMsg.id),
-            createdAt: savedMsg.created_at || m.createdAt,
-            replyToId: savedMsg.reply_to ? String(savedMsg.reply_to) : (m.replyToId || (replyTarget?.id ? String(replyTarget.id) : undefined)),
-            replyPreview: savedMsg.reply_preview ? {
-              senderName: savedMsg.reply_preview.sender_name || savedMsg.reply_preview.senderName || replyTarget?.senderName || 'Utilisateur',
-              content: savedMsg.reply_preview.content || replyTarget?.content || '',
-            } : m.replyPreview,
-          } : m))
-          // Backend MessageViewSet automatically broadcasts via channel_layer to all WebSocket clients!
-          return
-        }
-      } catch {
-        // Fallback to WebSocket if REST failed
-        if (!isConnected) {
-          showToast(t('pro.requests.sendError', 'Erreur lors de l\'envoi. Vérifiez votre connexion.'))
-        }
       }
-    }
 
-    // Send via WebSocket if REST was not performed or failed
-    if (!savedSuccessfully && isConnected) {
-      wsSend({
-        type: 'chat.message',
-        content,
-        reply_to_id: replyTarget?.id || null,
-      })
-    } else if (!savedSuccessfully && !realConvId) {
-      showToast('Erreur lors de l\'envoi. Vérifiez votre connexion.')
+      // Send via WebSocket if REST was not performed or failed
+      if (!savedSuccessfully && isConnected) {
+        wsSend({
+          type: 'chat.message',
+          content,
+          reply_to_id: replyTarget?.id || null,
+        })
+      } else if (!savedSuccessfully && !realConvId) {
+        showToast('Erreur lors de l\'envoi. Vérifiez votre connexion.')
+      }
+    } finally {
+      setIsSendingMessage(false)
     }
-  }, [newMessage, id, activeConvId, partnerId, replyingTo, isConnected, currentUserId, wsSend, showToast, t])
+  }, [newMessage, isSendingMessage, id, activeConvId, partnerId, replyingTo, isConnected, currentUserId, user, wsSend, showToast, t, demandeStatus])
 
   const sendMessage = () => sendDirectMessage()
 
@@ -837,39 +1064,18 @@ export const ConversationView = ({
   }, [messages, selectedMessageIds, showToast, t])
 
   // ─── Derived data ─────────────────────────────────────────────────────────────
-  const otherParticipant = useMemo(() => {
-    if (!conversation) {
-      if (partnerUsername || partnerId) {
-        return {
-          id: partnerId || 'other',
-          username: partnerUsername || 'Utilisateur',
-          full_name: partnerUsername || 'Utilisateur',
-          avatar_url: partnerAvatar || null,
-        }
-      }
-      return null
-    }
-    const parts: any[] = conversation.participants || []
-    const found = parts.find((p: any) => String(p.id) !== String(currentUserId))
-    if (found) return found
-    if (partnerUsername || partnerId) {
-      return {
-        id: partnerId || 'other',
-        username: partnerUsername || 'Utilisateur',
-        full_name: partnerUsername || 'Utilisateur',
-        avatar_url: partnerAvatar || null,
-      }
-    }
-    return null
-  }, [conversation, currentUserId, partnerId, partnerUsername, partnerAvatar])
 
   const isOtherOnline = useMemo(() => {
     if (!otherParticipant) return false
-    if (onlineUserId && onlineUserId === String(otherParticipant.id)) return true
+    for (const pid of partnerIds) {
+      if (onlineUserIds.has(pid)) return true
+    }
+    if (otherParticipant.id && onlineUserIds.has(String(otherParticipant.id))) return true
+    if (otherParticipant.uuid && onlineUserIds.has(String(otherParticipant.uuid))) return true
     if (otherParticipant.is_online !== undefined) return Boolean(otherParticipant.is_online)
     if (otherParticipant.isOnline !== undefined) return Boolean(otherParticipant.isOnline)
     return Boolean(otherParticipant.is_active || otherParticipant.isActive)
-  }, [onlineUserId, otherParticipant])
+  }, [onlineUserIds, partnerIds, otherParticipant])
 
   const filteredMessages = useMemo(() => {
     if (!searchQuery.trim()) return messages
@@ -884,17 +1090,50 @@ export const ConversationView = ({
     if (!targetUserId || targetUserId === 'other') return
     const checkBlocked = async () => {
       try {
-        const res = await apiFetch('/blocked/blocked-users/')
+        const res = await apiFetch(`/blocked/blocked-users/check/?user_id=${targetUserId}`)
         if (res.ok) {
-          const list = await res.json()
+          const data = await res.json()
+          setIsBlocked(Boolean(data.is_blocked))
+          setBlockedByMe(Boolean(data.blocked_by_me))
+          setBlockedByThem(Boolean(data.blocked_by_them))
+          return
+        }
+        const listRes = await apiFetch('/blocked/blocked-users/')
+        if (listRes.ok) {
+          const list = await listRes.json()
           const arr = Array.isArray(list) ? list : (list.results || [])
           const found = arr.some((b: any) => String(b.blocked?.id || b.blocked_user) === String(targetUserId))
           setIsBlocked(found)
+          setBlockedByMe(found)
         }
       } catch {}
     }
     checkBlocked()
-  }, [otherParticipant?.id, partnerId])
+
+    const handleBlockedEvt = (e: any) => {
+      if (e.detail?.userId && String(e.detail.userId) === String(targetUserId)) {
+        setIsBlocked(true)
+        if (e.detail?.byMe !== undefined) {
+          setBlockedByMe(Boolean(e.detail.byMe))
+        } else {
+          setBlockedByMe(true)
+        }
+      }
+    }
+    const handleUnblockedEvt = (e: any) => {
+      if (e.detail?.userId && String(e.detail.userId) === String(targetUserId)) {
+        setBlockedByMe(false)
+        setIsBlocked(blockedByThem)
+      }
+    }
+    window.addEventListener('exile_user_blocked', handleBlockedEvt)
+    window.addEventListener('exile_user_unblocked', handleUnblockedEvt)
+    return () => {
+      window.removeEventListener('exile_user_blocked', handleBlockedEvt)
+      window.removeEventListener('exile_user_unblocked', handleUnblockedEvt)
+    }
+  }, [otherParticipant?.id, partnerId, blockedByThem])
+
 
   // ─── Pin / Archive / Block / Delete Handlers ─────────────────────────────────
   const handleTogglePin = useCallback(async () => {
@@ -945,26 +1184,51 @@ export const ConversationView = ({
     if (!targetUserId || targetUserId === 'other') return
     setLoadingAction('block')
     try {
-      if (isBlocked) {
-        const res = await apiFetch('/blocked/blocked-users/', {
-          method: 'DELETE',
-          body: JSON.stringify({ blocked_user: targetUserId }),
+      if (blockedByMe) {
+        const res = await apiFetch('/blocked/blocked-users/unblock/', {
+          method: 'POST',
+          body: JSON.stringify({ blocked_id: targetUserId, blocked_user: targetUserId }),
         })
         if (res.ok) {
-          setIsBlocked(false)
+          setBlockedByMe(false)
+          setIsBlocked(blockedByThem)
           showToast(t('pro.requests.unblockedToast', 'Utilisateur débloqué ✓'))
-          window.dispatchEvent(new CustomEvent('exile_user_unblocked', { detail: { userId: targetUserId } }))
+          window.dispatchEvent(new CustomEvent('exile_user_unblocked', { detail: { userId: targetUserId, byMe: true } }))
+        } else {
+          const delRes = await apiFetch('/blocked/blocked-users/', {
+            method: 'DELETE',
+            body: JSON.stringify({ blocked_id: targetUserId, blocked_user: targetUserId }),
+          })
+          if (delRes.ok) {
+            setBlockedByMe(false)
+            setIsBlocked(blockedByThem)
+            showToast(t('pro.requests.unblockedToast', 'Utilisateur débloqué ✓'))
+            window.dispatchEvent(new CustomEvent('exile_user_unblocked', { detail: { userId: targetUserId, byMe: true } }))
+          }
         }
       } else {
-        const res = await apiFetch('/blocked/blocked-users/', {
+        const res = await apiFetch('/blocked/blocked-users/block/', {
           method: 'POST',
-          body: JSON.stringify({ blocked_user: targetUserId }),
+          body: JSON.stringify({ blocked_id: targetUserId, blocked_user: targetUserId }),
         })
         if (res.ok) {
+          setBlockedByMe(true)
           setIsBlocked(true)
           showToast(t('pro.requests.blockedToast', '🚫 Utilisateur bloqué'))
           if (onBlockUser) onBlockUser()
-          window.dispatchEvent(new CustomEvent('exile_user_blocked', { detail: { userId: targetUserId } }))
+          window.dispatchEvent(new CustomEvent('exile_user_blocked', { detail: { userId: targetUserId, byMe: true } }))
+        } else {
+          const fallbackRes = await apiFetch('/blocked/blocked-users/', {
+            method: 'POST',
+            body: JSON.stringify({ blocked_id: targetUserId, blocked_user: targetUserId }),
+          })
+          if (fallbackRes.ok) {
+            setBlockedByMe(true)
+            setIsBlocked(true)
+            showToast(t('pro.requests.blockedToast', '🚫 Utilisateur bloqué'))
+            if (onBlockUser) onBlockUser()
+            window.dispatchEvent(new CustomEvent('exile_user_blocked', { detail: { userId: targetUserId, byMe: true } }))
+          }
         }
       }
     } catch {
@@ -973,7 +1237,8 @@ export const ConversationView = ({
       setLoadingAction(null)
       setShowConfirm({ type: null })
     }
-  }, [otherParticipant, partnerId, isBlocked, onBlockUser, showToast, t])
+  }, [otherParticipant, partnerId, blockedByMe, blockedByThem, onBlockUser, showToast, t])
+
 
   const handleDeleteConversationAction = useCallback(async () => {
     setShowConfirm({ type: null })
@@ -1037,10 +1302,10 @@ export const ConversationView = ({
 
       {/* ── Header ── */}
       <div className={`flex-shrink-0 flex items-center gap-3 px-3 sm:px-5 py-3
-        backdrop-blur-xl border-b z-30
+        backdrop-blur-xl border-b z-30 sticky top-0
         ${isDark
-          ? 'bg-black/60 border-white/5 text-white'
-          : 'bg-white/80 border-slate-200 text-slate-900 shadow-sm'}`}>
+          ? 'bg-[#0f0f13]/95 border-white/5 text-white'
+          : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'}`}>
 
         <button
           onClick={() => {
@@ -1102,13 +1367,6 @@ export const ConversationView = ({
 
         {/* Header actions */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* WS connection indicator */}
-          <div title={isConnected ? 'Temps réel actif' : connectionState}>
-            {isConnected
-              ? <Wifi size={15} className="text-emerald-400" />
-              : <WifiOff size={15} className={isDark ? 'text-slate-500' : 'text-slate-400'} />}
-          </div>
-
           <button
             onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
             className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
@@ -1118,6 +1376,7 @@ export const ConversationView = ({
           </button>
 
           <button
+            ref={headerMenuBtnRef}
             onClick={() => setShowMenu(v => !v)}
             className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
           >
@@ -1127,9 +1386,9 @@ export const ConversationView = ({
 
         {/* Header dropdown */}
         {showMenu && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-            <div className={`absolute top-16 right-3 z-50 w-52 rounded-2xl shadow-2xl border overflow-hidden
+          <div
+            ref={headerMenuRef}
+            className={`absolute top-16 right-3 z-50 w-52 rounded-2xl shadow-2xl border overflow-hidden
               ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
               {[
                 {
@@ -1150,17 +1409,12 @@ export const ConversationView = ({
                   action: () => { setIsSelectionMode(true); setShowMenu(false) },
                 },
                 {
-                  icon: isBlocked ? UserCheck : Shield,
-                  label: isBlocked ? t('pro.requests.unblock', 'Débloquer') : t('pro.requests.block', 'Bloquer'),
+                  icon: blockedByMe ? UserCheck : Shield,
+                  label: blockedByMe ? t('pro.requests.unblock', 'Débloquer') : t('pro.requests.block', 'Bloquer'),
                   action: () => {
-                    if (isBlocked) {
-                      handleBlockUserAction()
-                    } else {
-                      setShowConfirm({ type: 'block' })
-                      setShowMenu(false)
-                    }
+                    handleBlockUserAction()
                   },
-                  danger: !isBlocked,
+                  danger: !blockedByMe,
                 },
                 {
                   icon: Trash2,
@@ -1183,7 +1437,6 @@ export const ConversationView = ({
                 </button>
               ))}
             </div>
-          </>
         )}
       </div>
 
@@ -1193,14 +1446,22 @@ export const ConversationView = ({
           ${isDark ? 'bg-orange-950/40 border-orange-500/20 text-orange-300' : 'bg-orange-50 border-orange-200 text-orange-800'}`}>
           <div className="flex items-center gap-2 min-w-0">
             <Shield size={16} className="text-orange-400 flex-shrink-0" />
-            <span className="truncate">{t('pro.requests.blockedWarning', 'Cet utilisateur est bloqué. Vous ne pouvez plus échanger de messages.')}</span>
+            <span className="truncate">
+              {blockedByMe && blockedByThem
+                ? t('pro.requests.mutualBlockedWarning', 'Vous vous êtes bloqués mutuellement. Aucun message ne peut être échangé.')
+                : blockedByMe
+                  ? t('pro.requests.blockedByMeWarning', 'Vous avez bloqué cet utilisateur. Vous ne pouvez plus échanger de messages.')
+                  : t('pro.requests.blockedByThemWarning', 'Cet utilisateur vous a bloqué. Vous ne pouvez plus échanger de messages.')}
+            </span>
           </div>
-          <button
-            onClick={handleBlockUserAction}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 transition-colors flex-shrink-0 ml-2"
-          >
-            {t('pro.modals.unblock', 'Débloquer')}
-          </button>
+          {blockedByMe && (
+            <button
+              onClick={handleBlockUserAction}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 transition-colors flex-shrink-0 ml-2"
+            >
+              {t('pro.modals.unblock', 'Débloquer')}
+            </button>
+          )}
         </div>
       )}
 
@@ -1297,7 +1558,7 @@ export const ConversationView = ({
       )}
 
       {/* ── Messages Area ── */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-0.5 scroll-smooth" id="messages-container">
+      <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-0.5 scroll-smooth" id="messages-container">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={32} className="animate-spin text-violet-500" />
@@ -1324,6 +1585,8 @@ export const ConversationView = ({
                   })()
                 : undefined
 
+              const computedIsMine = isMessageMine(msg)
+
               return (
                 <MessageBubble
                   key={msg.id}
@@ -1331,7 +1594,7 @@ export const ConversationView = ({
                     ...msg,
                     replyPreview: effectiveReplyPreview,
                   }}
-                  isMine={String(msg.senderId) === String(currentUserId)}
+                  isMine={computedIsMine}
                   theme={resolvedTheme as 'dark' | 'light'}
                   isSelected={selectedMessageIds.has(msg.id)}
                   isSelectionMode={isSelectionMode}
@@ -1411,9 +1674,58 @@ export const ConversationView = ({
         </div>
       )}
 
-      {/* ── Input Area ── */}
-      <div className={`flex-shrink-0 px-3 py-2.5 border-t relative
-        ${isDark ? 'bg-black/50 border-white/5 backdrop-blur-xl' : 'bg-white/80 border-slate-200 backdrop-blur-xl shadow-lg'}`}>
+      {/* ── Input Area OR Pending Demande Notice ── */}
+      {demandeStatus === 'pending' ? (
+        <div className={`flex-shrink-0 p-4 sm:p-5 border-t backdrop-blur-xl text-center select-none
+          ${isDark ? 'bg-slate-900/95 border-white/5 text-slate-300' : 'bg-white/95 border-slate-200 text-slate-700 shadow-sm'}`}>
+          <div className="max-w-md mx-auto flex flex-col items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+              <Clock size={20} />
+            </div>
+            {isDemandeSender ? (
+              <>
+                <p className="text-xs sm:text-sm font-semibold text-amber-400">
+                  {t('pro.requests.pendingWaitNotice', 'Demande en attente de confirmation')}
+                </p>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  {t('pro.requests.pendingSenderDesc', "Le destinataire n'a pas encore accepté votre demande. La messagerie sera automatiquement débloquée dès son acceptation.")}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs sm:text-sm font-semibold text-amber-400">
+                  {t('pro.requests.pendingReceiverNotice', 'Nouvelle demande reçue')}
+                </p>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  {t('pro.requests.pendingReceiverDesc', 'Acceptez cette demande pour débloquer la messagerie instantanée et pouvoir échanger avec cet utilisateur.')}
+                </p>
+                {onAcceptDemande && (
+                  <div className="flex items-center gap-2 mt-2">
+                    {onRejectDemande && (
+                      <button
+                        onClick={onRejectDemande}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                          isDark ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'
+                        }`}
+                      >
+                        Refuser
+                      </button>
+                    )}
+                    <button
+                      onClick={onAcceptDemande}
+                      className="px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5"
+                    >
+                      <Check size={14} /> Accepter la demande
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className={`flex-shrink-0 px-3 py-2.5 border-t relative
+          ${isDark ? 'bg-black/50 border-white/5 backdrop-blur-xl' : 'bg-white/80 border-slate-200 backdrop-blur-xl shadow-lg'}`}>
 
         {/* Hidden inputs */}
         <input
@@ -1525,7 +1837,7 @@ export const ConversationView = ({
             value={newMessage}
             onChange={e => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isBlocked ? t('pro.requests.blockedInput', 'Utilisateur bloqué. Débloquez-le pour lui écrire.') : t('pro.conversations.typeMessage', 'Écrivez un message...')}
+            placeholder={isBlocked ? (blockedByMe ? t('pro.requests.blockedInput', 'Utilisateur bloqué. Débloquez-le pour lui écrire.') : t('pro.requests.blockedByThemInput', 'Cet utilisateur vous a bloqué.')) : t('pro.conversations.typeMessage', 'Écrivez un message...')}
             rows={1}
             style={{ resize: 'none', minHeight: 36, maxHeight: 120 }}
             className={`flex-1 bg-transparent outline-none text-sm leading-relaxed py-1
@@ -1541,9 +1853,9 @@ export const ConversationView = ({
           {/* Send button */}
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim() || isBlocked}
+            disabled={!newMessage.trim() || isBlocked || isSendingMessage}
             className={`p-2 rounded-xl transition-all mb-0.5 flex-shrink-0
-              ${isBlocked
+              ${isBlocked || isSendingMessage
                 ? 'opacity-40 cursor-not-allowed text-slate-500'
                 : newMessage.trim()
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/30 hover:scale-105'
@@ -1558,6 +1870,7 @@ export const ConversationView = ({
           {t('pro.requests.enterToSend', 'Entrée pour envoyer · Maj+Entrée pour nouvelle ligne')}
         </p>
       </div>
+      )}
 
       {/* ── Modal Proposition Professionnelle (Devis Pro) ── */}
       {showProOfferModal && (
@@ -1738,18 +2051,16 @@ export const ConversationView = ({
         </div>
       )}
 
-      {/* ── Confirm Dialog ── */}
-      {showConfirm.type && (
+      {/* ── Confirm Dialog (Delete) ── */}
+      {showConfirm.type === 'delete' && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowConfirm({ type: null })}>
           <div className={`w-full max-w-sm rounded-2xl p-5 shadow-2xl border
             ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
             <h3 className={`font-bold mb-2 text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {showConfirm.type === 'block' ? `🛡️ ${t('pro.requests.blockUserConfirm', 'Bloquer cet utilisateur ?')}` : `🗑️ ${t('pro.requests.deleteConversationConfirm', 'Supprimer la conversation ?')}`}
+              🗑️ {t('pro.requests.deleteConversationConfirm', 'Supprimer la conversation ?')}
             </h3>
             <p className={`text-xs mb-5 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {showConfirm.type === 'block'
-                ? t('pro.requests.blockUserDesc', 'Vous ne pourrez plus vous envoyer de messages. Vous pourrez le débloquer à tout moment.')
-                : t('pro.requests.deleteConversationDesc', 'Cette action est irréversible. Tous les messages de cette conversation seront définitivement supprimés.')}
+              {t('pro.requests.deleteConversationDesc', 'Cette action est irréversible. Tous les messages de cette conversation seront définitivement supprimés.')}
             </p>
             <div className="flex gap-2 justify-end">
               <button
@@ -1760,15 +2071,8 @@ export const ConversationView = ({
               </button>
               <button
                 disabled={Boolean(loadingAction)}
-                onClick={() => {
-                  if (showConfirm.type === 'delete') {
-                    handleDeleteConversationAction()
-                  } else if (showConfirm.type === 'block') {
-                    handleBlockUserAction()
-                  }
-                }}
-                className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-all
-                  ${showConfirm.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                onClick={handleDeleteConversationAction}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-all"
               >
                 {loadingAction ? <Loader2 size={14} className="animate-spin" /> : t('common.confirm', 'Confirmer')}
               </button>
@@ -1788,7 +2092,11 @@ export const ConversationView = ({
 }
 
 export const ConversationPage = (): JSX.Element => {
-  return <ConversationView />
+  return (
+    <div className="h-full w-full flex flex-col min-h-0 overflow-hidden">
+      <ConversationView />
+    </div>
+  )
 }
 
 export default ConversationPage

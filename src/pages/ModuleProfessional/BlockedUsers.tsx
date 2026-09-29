@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../services/apiClient'
 import { useQuery } from '../../hooks/useQuery'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 interface BlockedUser {
   id: string
@@ -88,18 +88,30 @@ export const BlockedUsers = (): JSX.Element => {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
-        method: 'DELETE',
+      let response = await fetch(`${API_BASE_URL}/blocked/blocked-users/unblock/`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ blocked_user: userId })
+        body: JSON.stringify({ blocked_id: userId, blocked_user: userId })
       })
+
+      if (!response.ok) {
+        response = await fetch(`${API_BASE_URL}/blocked/blocked-users/`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ blocked_id: userId, blocked_user: userId })
+        })
+      }
 
       if (response.ok) {
         setToast(t('pro.modals.unblockSuccess', 'Utilisateur débloqué avec succès'))
         setTimeout(() => setToast(''), 3000)
+        window.dispatchEvent(new CustomEvent('exile_user_unblocked', { detail: { userId } }))
         // Reload the blocked users list
         loadBlockedUsers()
       } else {

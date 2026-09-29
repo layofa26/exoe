@@ -55,7 +55,7 @@ export const PayerPremiumButton: React.FC<PayerPremiumButtonProps> = ({
         return;
       }
 
-      const apiBase = API_BASE_URL || 'https://exile-backend-9q6o.onrender.com/api/v1';
+      const apiBase = API_BASE_URL;
 
       const response = await fetch(`${apiBase}/abonnement/abonnements/initier_paiement/`, {
         method: 'POST',

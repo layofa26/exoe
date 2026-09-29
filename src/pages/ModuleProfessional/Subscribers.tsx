@@ -11,7 +11,7 @@ import {
   MapPin,
   Briefcase,
   ExternalLink,
-  Sparkles,
+  TrendingUp,
   Calendar,
   X
 } from 'lucide-react'
@@ -163,7 +163,7 @@ export const Subscribers = (): JSX.Element => {
           } shadow-sm`}>
             <div className="flex items-center justify-between mb-2">
               <span className={`text-xs font-semibold ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pro.subscribers.newRecent', 'Nouveaux (30j)')}</span>
-              <Sparkles className="w-4 h-4 text-emerald-500" />
+              <TrendingUp className="w-4 h-4 text-emerald-500" />
             </div>
             <p className="text-2xl font-extrabold text-emerald-500">+{stats.recent}</p>
           </div>

@@ -25,7 +25,6 @@ import {
   ArrowLeft,
   Briefcase,
   Globe,
-  Sparkles,
   ChevronDown,
   ChevronUp,
   Play,
@@ -35,7 +34,7 @@ import {
 import { ContactModal } from '../../components/modals/ContactModal';
 import ConfirmModal from '../../components/common/ConfirmModal';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 export const PublicProfile = () => {
   const { t, i18n } = useTranslation();
@@ -143,24 +142,26 @@ export const PublicProfile = () => {
     try {
       const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
       if (token) {
-        const res = await fetch(`${API_BASE_URL}/conversations/start/`, {
-          method: 'POST',
+        const convRes = await fetch(`${API_BASE_URL}/conversations/`, {
           headers: {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ participant_id: Number(targetUserId) })
+          }
         });
-
-        if (res.ok) {
-          const convData = await res.json();
-          if (convData && convData.id) {
-            navigate(`/pro/requests?conv=${convData.id}`);
+        if (convRes.ok) {
+          const convList = await convRes.json();
+          const convs = Array.isArray(convList) ? convList : (convList.results || []);
+          const matched = convs.find((c: any) =>
+            c.participants?.some((p: any) => String(p.id || p.user_id) === String(targetUserId))
+          );
+          if (matched && matched.id) {
+            navigate(`/pro/requests?conv=${matched.id}`);
             return;
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error('Error checking existing conversation:', e);
+    }
 
     setShowContactModal(true);
   };
@@ -307,7 +308,7 @@ export const PublicProfile = () => {
                 className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
               >
                 <Send className="w-4 h-4" />
-                <span>{t('pro.modals.service', 'Demande')}</span>
+                <span>{t('pro.profile.contact', 'Contacter')}</span>
               </button>
             </div>
 
@@ -569,15 +570,23 @@ export const PublicProfile = () => {
       </div>
 
       {/* Contact Modal */}
-      {showContactModal && (
+      {showContactModal && profile && (
         <ContactModal
           isOpen={showContactModal}
           onClose={() => setShowContactModal(false)}
-          targetUserId={profile.id || id || ''}
-          targetName={formattedUsername}
-          targetProfession={profile.profession}
-          targetSpeciality={profile.speciality}
-          targetAvatar={profile.avatarUrl}
+          receiver={{
+            id: String(profile.userId || profile.id || id || ''),
+            name: profile.name || profile.username || formattedUsername,
+            username: (profile.username || formattedUsername).replace(/^@/, ''),
+            avatar: profile.avatarUrl || null,
+            profession: profile.profession || '',
+          }}
+          sender={{
+            id: String(user?.id || ''),
+            name: user?.username || 'Moi',
+            avatar: user?.avatar || null,
+            profession: '',
+          }}
         />
       )}
 

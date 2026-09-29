@@ -6,66 +6,39 @@ export type EventFormat = 'in-person' | 'virtual' | 'hybrid'
 export type TicketType = 'free' | 'paid'
 export type RegistrationStatus = 'confirmed' | 'pending' | 'cancelled' | 'attended'
 
-export interface Event {
+export interface EventItem {
   id: string
   title: string
-  description: string
-  type: EventType
-  format: EventFormat
-  status: EventStatus
-  
-  // Dat & Lye
+  description?: string
   startDate: string
   endDate: string
-  timezone: string
-  location?: {
-    venue: string
-    address: string
-    city: string
-    country: string
-    lat?: number
-    lng?: number
-  }
-  
-  // Streaming Live & WebRTC
-  streaming?: {
-    isLive: boolean
-    platform: 'webrtc' | 'zoom' | 'youtube' | 'custom'
-    roomName: string // Nom du salon de direct
-    startTime?: string // Date/Heure de début
-    endTime?: string // Date/Heure de fin
-    recording?: boolean
-  }
-  
-  // Media
+  format: 'in-person' | 'virtual' | 'hybrid'
+  status: 'draft' | 'published' | 'cancelled' | 'completed' | 'live' | 'termine' | 'publier'
+  location?: { city: string; venue?: string; address?: string }
   coverImage?: string
-  images: string[]
-  
-  // Kategori & Tags
   category: string
-  tags: string[]
-  
-  // K apasite
   capacity: number
-  
-  // Pwopriyetè
-  organizerId: string
+  stats: { views: number; registrations: number; attendees: number; revenue: number; shares?: number }
   organizerName: string
   organizerAvatar?: string
-  
-  // Metadata
+  ownerId?: number | string
   createdAt: string
-  updatedAt: string
   publishedAt?: string
-  
-  // Estatistik
-  stats: {
-    views: number
-    registrations: number
-    attendees: number
-    revenue: number
-  }
+  price: number
+  isLive: boolean
+  liveRoomName?: string
+  liveStatus?: 'at_coming' | 'live' | 'ended'
+  speaker?: { name: string; avatar?: string }
+  participantsCount?: number
+  maxParticipants?: number
+  reactions?: { thumbs_up: number; clap: number; bulb: number; heart: number }
+  isRegistered?: boolean
+  recordingUrl?: string
+  replayUrl?: string
+  autoStartOnSchedule?: boolean
 }
+
+export type Event = EventItem
 
 export interface Ticket {
   id: string

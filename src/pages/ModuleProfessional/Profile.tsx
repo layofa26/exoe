@@ -6,7 +6,7 @@ import {
   Briefcase, Plus, Edit2, Lock, X,
   Users, Video, MessageSquare,
   TrendingUp, Settings, Camera, Heart, ArrowLeft,
-  ChevronDown, Award, Sparkles, Menu, ShieldCheck, ShieldAlert
+  ChevronDown, Award, Menu, ShieldCheck, ShieldAlert
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -168,6 +168,7 @@ const Profile = () => {
   const [loading, setLoading] = useState<boolean>(!initialProfileCache.hasCache)
   const [error, setError] = useState<string | null>(null)
   const [imageCacheBuster, setImageCacheBuster] = useState(Date.now())
+  const [isEditMode, setIsEditMode] = useState<boolean>(false)
 
   // Setters avec synchronisation automatique du cache
   const setProfile = (updater: UserProfile | null | ((prev: UserProfile | null) => UserProfile | null)) => {
@@ -948,13 +949,15 @@ const Profile = () => {
                       </div>
                     )
                   })()}
-                  <button
-                    onClick={() => bannerInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full shadow-lg transition-all backdrop-blur-sm opacity-90 group-hover:opacity-100"
-                    title={t('pro.profile.changeBanner', 'Modifier la bannière')}
-                  >
-                    <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
+                  {isEditMode && (
+                    <button
+                      onClick={() => bannerInputRef.current?.click()}
+                      className="absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full shadow-lg transition-all backdrop-blur-sm opacity-90 group-hover:opacity-100"
+                      title={t('pro.profile.changeBanner', 'Modifier la bannière')}
+                    >
+                      <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  )}
                   <input
                     ref={bannerInputRef}
                     type="file"
@@ -995,19 +998,21 @@ const Profile = () => {
                         </div>
                       )
                     })()}
-                {canModifyPhoto(profile?.photoLastModified) ? (
-                  <button
-                    onClick={triggerFileInput}
-                    className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-transform active:scale-90"
-                    title={t('pro.profile.changePhoto', 'Changer la photo')}
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                  </button>
-                ) : (
-                  <div className="absolute bottom-0 right-0 flex items-center gap-1 px-2 py-1 bg-gray-500/80 text-white rounded-full shadow-lg">
-                    <Lock className="w-2 h-2" />
-                    <span className="text-[8px]">{getDaysUntilPhotoModification(profile?.photoLastModified)}{t('pro.profile.days', 'j')}</span>
-                  </div>
+                {isEditMode && (
+                  canModifyPhoto(profile?.photoLastModified) ? (
+                    <button
+                      onClick={triggerFileInput}
+                      className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-transform active:scale-90"
+                      title={t('pro.profile.changePhoto', 'Changer la photo')}
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <div className="absolute bottom-0 right-0 flex items-center gap-1 px-2 py-1 bg-gray-500/80 text-white rounded-full shadow-lg">
+                      <Lock className="w-2 h-2" />
+                      <span className="text-[8px]">{getDaysUntilPhotoModification(profile?.photoLastModified)}{t('pro.profile.days', 'j')}</span>
+                    </div>
+                  )
                 )}
                 <input
                   ref={fileInputRef}
@@ -1060,24 +1065,42 @@ const Profile = () => {
                   )}
                 </div>
 
+                {/* Bouton stylé Activer / Désactiver le mode Édition */}
+                <div className="flex items-center justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditMode(prev => !prev)}
+                    className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-bold shadow-md transition-all transform active:scale-95 cursor-pointer ${
+                      isEditMode
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/50 shadow-emerald-600/30'
+                        : 'bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 hover:opacity-95 text-white shadow-orange-500/30'
+                    }`}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>{isEditMode ? t('pro.profile.finishEdit', 'Terminer l\'édition') : t('pro.profile.editProfile', 'Modifier le profil')}</span>
+                  </button>
+                </div>
+
                 {/* Profession */}
                 <div className="flex items-center justify-center gap-1.5">
                   <Briefcase className={`w-4 h-4 md:w-5 md:h-5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
                   <span className={`text-sm md:text-base font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {profile?.profession || t('pro.profile.notSpecified', 'Non renseigné')}
                   </span>
-                  {canModifyProfession(profile?.lastProfessionUpdate) ? (
-                    <button
-                      onClick={() => setShowProfessionModal(true)}
-                      className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
-                    >
-                      <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    </button>
-                  ) : (
-                    <div className={`flex items-center gap-1 px-2 py-0.5 bg-gray-500/80 text-white rounded-full shadow-lg`}>
-                      <Lock className={`w-2 h-2`} />
-                      <span className={`text-[10px]`}>{t('pro.profile.modifiableIn', 'Modifiable dans')} {getDaysUntilModification()}{t('pro.profile.days', 'j')}</span>
-                    </div>
+                  {isEditMode && (
+                    canModifyProfession(profile?.lastProfessionUpdate) ? (
+                      <button
+                        onClick={() => setShowProfessionModal(true)}
+                        className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                      >
+                        <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                      </button>
+                    ) : (
+                      <div className={`flex items-center gap-1 px-2 py-0.5 bg-gray-500/80 text-white rounded-full shadow-lg`}>
+                        <Lock className={`w-2 h-2`} />
+                        <span className={`text-[10px]`}>{t('pro.profile.modifiableIn', 'Modifiable dans')} {getDaysUntilModification()}{t('pro.profile.days', 'j')}</span>
+                      </div>
+                    )
                   )}
                 </div>
 
@@ -1087,15 +1110,17 @@ const Profile = () => {
                   <span className={`text-sm md:text-base font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {profile?.speciality || t('pro.profile.notSpecified', 'Non renseigné')}
                   </span>
-                  <button
-                    onClick={() => {
-                      setNewSpeciality(profile?.speciality || '')
-                      setShowSpecialityModal(true)
-                    }}
-                    className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
-                  >
-                    <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                  </button>
+                  {isEditMode && (
+                    <button
+                      onClick={() => {
+                        setNewSpeciality(profile?.speciality || '')
+                        setShowSpecialityModal(true)
+                      }}
+                      className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                    >
+                      <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Mobile: Compact info with dropdown */}
@@ -1120,15 +1145,17 @@ const Profile = () => {
                           <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                             {profile?.bio || t('pro.profile.noBio', 'Aucune biographie rédigée.')}
                           </p>
-                          <button
-                            onClick={() => {
-                              setNewBio(profile?.bio || '')
-                              setShowBioModal(true)
-                            }}
-                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
-                          >
-                            <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                          </button>
+                          {isEditMode && (
+                            <button
+                              onClick={() => {
+                                setNewBio(profile?.bio || '')
+                                setShowBioModal(true)
+                              }}
+                              className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
+                            >
+                              <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1138,15 +1165,17 @@ const Profile = () => {
                           <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                             {t('pro.profile.location', 'Localisation')}
                           </label>
-                          <button
-                            onClick={() => {
-                              setNewLocation(profile?.location || profile?.city || '')
-                              setShowLocationModal(true)
-                            }}
-                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
-                          >
-                            <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                          </button>
+                          {isEditMode && (
+                            <button
+                              onClick={() => {
+                                setNewLocation(profile?.location || profile?.city || '')
+                                setShowLocationModal(true)
+                              }}
+                              className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
+                            >
+                              <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                            </button>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5">
                           <MapPin className={`w-4 h-4 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
@@ -1164,13 +1193,15 @@ const Profile = () => {
                           <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`}>
                             {t('pro.profile.websites', 'Sites web')}
                           </label>
-                          <button
-                            onClick={() => setShowWebsitesModal(true)}
-                            className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
-                            disabled={(profile?.websites || []).length >= 6}
-                          >
-                            <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                          </button>
+                          {isEditMode && (
+                            <button
+                              onClick={() => setShowWebsitesModal(true)}
+                              className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-600' : 'hover:bg-gray-200'} transition-colors`}
+                              disabled={(profile?.websites || []).length >= 6}
+                            >
+                              <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                            </button>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {(profile?.websites || []).slice(0, 2).map((website, index) => (
@@ -1183,12 +1214,14 @@ const Profile = () => {
                               >
                                 {website}
                               </a>
-                              <button
-                                onClick={() => handleDeleteWebsite(website)}
-                                className="hover:opacity-70"
-                              >
-                                <X className="w-2.5 h-2.5 text-red-500" />
-                              </button>
+                              {isEditMode && (
+                                <button
+                                  onClick={() => handleDeleteWebsite(website)}
+                                  className="hover:opacity-70"
+                                >
+                                  <X className="w-2.5 h-2.5 text-red-500" />
+                                </button>
+                              )}
                             </div>
                           ))}
                           {(profile?.websites || []).length > 2 && (
@@ -1220,15 +1253,17 @@ const Profile = () => {
                       <p className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                         {profile?.bio || t('pro.profile.noBio', 'Aucune biographie rédigée.')}
                       </p>
-                      <button
-                        onClick={() => {
-                          setNewBio(profile?.bio || '')
-                          setShowBioModal(true)
-                        }}
-                        className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
-                      >
-                        <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                      </button>
+                      {isEditMode && (
+                        <button
+                          onClick={() => {
+                            setNewBio(profile?.bio || '')
+                            setShowBioModal(true)
+                          }}
+                          className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                        >
+                          <Edit2 className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1240,15 +1275,17 @@ const Profile = () => {
                         ? `${profile.city}, ${profile.country}`
                         : profile?.city || profile?.country || profile?.location || t('pro.profile.notSpecified', 'Non renseigné')}
                     </span>
-                    <button
-                      onClick={() => {
-                        setNewLocation(profile?.location || profile?.city || '')
-                        setShowLocationModal(true)
-                      }}
-                      className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
-                    >
-                      <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                    </button>
+                    {isEditMode && (
+                      <button
+                        onClick={() => {
+                          setNewLocation(profile?.location || profile?.city || '')
+                          setShowLocationModal(true)
+                        }}
+                        className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                      >
+                        <Edit2 className={`w-2.5 h-2.5 md:w-3 md:h-3 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                      </button>
+                    )}
                   </div>
 
                   {/* Websites */}
@@ -1258,13 +1295,15 @@ const Profile = () => {
                       <span className={`text-sm md:text-base ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-gray-600'}`}>
                         {t('pro.profile.websites', 'Sites web')}
                       </span>
-                      <button
-                        onClick={() => setShowWebsitesModal(true)}
-                        className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
-                        disabled={(profile?.websites || []).length >= 6}
-                      >
-                        <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
-                      </button>
+                      {isEditMode && (
+                        <button
+                          onClick={() => setShowWebsitesModal(true)}
+                          className={`p-1 rounded ${resolvedTheme === 'dark' ? 'hover:bg-zinc-700' : 'hover:bg-gray-100'} transition-colors`}
+                          disabled={(profile?.websites || []).length >= 6}
+                        >
+                          <Plus className={`w-2.5 h-2.5 ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'}`} />
+                        </button>
+                      )}
                     </div>
                     <div className="flex flex-wrap justify-center gap-1.5">
                       {(profile?.websites || []).slice(0, 2).map((website, index) => (
@@ -1277,12 +1316,14 @@ const Profile = () => {
                           >
                             {website}
                           </a>
-                          <button
-                            onClick={() => handleDeleteWebsite(website)}
-                            className="hover:opacity-70"
-                          >
-                            <X className="w-2.5 h-2.5 text-red-500" />
-                          </button>
+                          {isEditMode && (
+                            <button
+                              onClick={() => handleDeleteWebsite(website)}
+                              className="hover:opacity-70"
+                            >
+                              <X className="w-2.5 h-2.5 text-red-500" />
+                            </button>
+                          )}
                         </div>
                       ))}
                       {(profile?.websites || []).length > 2 && (
@@ -1312,12 +1353,14 @@ const Profile = () => {
                                   >
                                     {website}
                                   </a>
-                                  <button
-                                    onClick={() => handleDeleteWebsite(website)}
-                                    className="hover:opacity-70 p-1 text-red-500"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
+                                  {isEditMode && (
+                                    <button
+                                      onClick={() => handleDeleteWebsite(website)}
+                                      className="hover:opacity-70 p-1 text-red-500"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1340,179 +1383,187 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Redesigned Skills Section with Accordion Dropdown */}
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700/80">
-              <div className="flex items-center justify-between mb-2">
-                <button
-                  onClick={() => setShowSkillsAccordion(!showSkillsAccordion)}
-                  className="flex items-center gap-2 group hover:opacity-85 transition-opacity"
-                  type="button"
-                >
-                  <div className="p-1 rounded-lg bg-blue-500/10 text-blue-500">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <h3 className={`text-sm sm:text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                      {t('pro.profile.skills', 'Compétences')}
-                    </h3>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                      {(profile?.skills || []).length}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${showSkillsAccordion ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-                {(profile?.skills || []).length < 10 && (
+            {/* Redesigned Skills Section with Accordion Dropdown - INSIDE Left Card */}
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700/80 px-4 sm:px-0 pb-3">
+                <div className="flex items-center justify-between mb-2">
                   <button
-                    onClick={() => setShowSkillModal(true)}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all active:scale-95"
+                    onClick={() => setShowSkillsAccordion(!showSkillsAccordion)}
+                    className="flex items-center gap-2 group hover:opacity-85 transition-opacity"
+                    type="button"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    {t('common.add', 'Ajouter')}
+                    <div className="p-1 rounded-lg bg-blue-500/10 text-blue-500">
+                      <Award className="w-4 h-4" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className={`text-sm sm:text-base font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {t('pro.profile.skills', 'Compétences')}
+                      </h3>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                        {(profile?.skills || []).length}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${showSkillsAccordion ? 'rotate-180' : ''}`} />
+                    </div>
                   </button>
-                )}
-              </div>
-
-              {showSkillsAccordion && (
-                <div className="mt-2.5">
-                  {(profile?.skills || []).length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Affichage des 2 premières compétences */}
-                      {(profile?.skills || []).slice(0, 2).map((skill) => {
-                        const categoryStyles: Record<string, { bg: string, border: string, text: string, dot: string }> = {
-                          technical: { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800/50', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-                          soft: { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800/50', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
-                          language: { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800/50', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
-                          communication: { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800/50', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-                          management: { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-800/50', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
-                          other: { bg: 'bg-zinc-100 dark:bg-zinc-800', border: 'border-zinc-200 dark:border-zinc-700', text: 'text-zinc-700 dark:text-zinc-300', dot: 'bg-zinc-400' }
-                        }
-
-                        const levelLabels: Record<string, string> = {
-                          beginner: 'Débutant',
-                          intermediate: 'Intermédiaire',
-                          advanced: 'Avancé',
-                          expert: 'Expert',
-                          'Débutant': 'Débutant',
-                          'Intermédiaire': 'Intermédiaire',
-                          'Avancé': 'Avancé',
-                          'Expert': 'Expert'
-                        }
-
-                        const style = categoryStyles[skill.category?.toLowerCase()] || categoryStyles.technical
-                        const levelText = levelLabels[skill.level] || skill.level
-
-                        return (
-                          <div
-                            key={skill.id}
-                            className={`group relative flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl border ${style.bg} ${style.border} transition-all hover:shadow-sm`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                            <span className={`text-xs font-semibold ${style.text}`}>
-                              {skill.name}
-                            </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-medium">
-                              {levelText}
-                            </span>
-                            <button
-                              onClick={() => handleDeleteSkill(skill.id)}
-                              className="opacity-60 hover:opacity-100 p-0.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors"
-                              title="Supprimer"
-                            >
-                              <X className="w-3 h-3 text-red-500" />
-                            </button>
-                          </div>
-                        )
-                      })}
-
-                      {/* Menu déroulant pour les compétences à partir de la 3ème */}
-                      {(profile?.skills || []).length > 2 && (
-                        <div className="relative" ref={extraSkillsRef}>
-                          <button
-                            type="button"
-                            onClick={() => setShowExtraSkillsDropdown(!showExtraSkillsDropdown)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-300 dark:border-zinc-700 bg-gray-100/80 dark:bg-zinc-800/90 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors shadow-sm"
-                          >
-                            <span>+{(profile?.skills || []).length - 2} autres</span>
-                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showExtraSkillsDropdown ? 'rotate-180' : ''}`} />
-                          </button>
-
-                          {showExtraSkillsDropdown && (
-                            <div className="absolute left-0 top-full mt-2 w-72 max-h-56 overflow-y-auto p-2 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-gray-200 dark:border-zinc-700 z-50 flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-150">
-                              <div className="text-[11px] font-semibold text-gray-500 dark:text-zinc-400 px-2 py-1 border-b border-gray-100 dark:border-zinc-700/60 flex items-center justify-between">
-                                <span>Autres compétences ({(profile?.skills || []).length - 2})</span>
-                              </div>
-                              {(profile?.skills || []).slice(2).map((skill) => {
-                                const categoryStyles: Record<string, { bg: string, border: string, text: string, dot: string }> = {
-                                  technical: { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800/50', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-                                  soft: { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800/50', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
-                                  language: { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800/50', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
-                                  communication: { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800/50', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-                                  management: { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-800/50', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
-                                  other: { bg: 'bg-zinc-100 dark:bg-zinc-800', border: 'border-zinc-200 dark:border-zinc-700', text: 'text-zinc-700 dark:text-zinc-300', dot: 'bg-zinc-400' }
-                                }
-                                const levelLabels: Record<string, string> = {
-                                  beginner: 'Débutant',
-                                  intermediate: 'Intermédiaire',
-                                  advanced: 'Avancé',
-                                  expert: 'Expert',
-                                  'Débutant': 'Débutant',
-                                  'Intermédiaire': 'Intermédiaire',
-                                  'Avancé': 'Avancé',
-                                  'Expert': 'Expert'
-                                }
-                                const style = categoryStyles[skill.category?.toLowerCase()] || categoryStyles.technical
-                                const levelText = levelLabels[skill.level] || skill.level
-
-                                return (
-                                  <div
-                                    key={skill.id}
-                                    className={`flex items-center justify-between gap-2 p-2 rounded-xl border ${style.bg} ${style.border}`}
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className={`w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0`} />
-                                      <span className={`text-xs font-semibold ${style.text} truncate`}>
-                                        {skill.name}
-                                      </span>
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-medium flex-shrink-0">
-                                        {levelText}
-                                      </span>
-                                    </div>
-                                    <button
-                                      onClick={() => handleDeleteSkill(skill.id)}
-                                      className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors flex-shrink-0"
-                                      title="Supprimer"
-                                    >
-                                      <X className="w-3.5 h-3.5 text-red-500" />
-                                    </button>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className={`p-3.5 rounded-xl border border-dashed text-center ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800/50' : 'border-gray-200 bg-gray-50'}`}>
-                      <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1.5`}>
-                        {t('pro.profile.noSkills', 'Aucune compétence renseignée')}
-                      </p>
-                      <button
-                        onClick={() => setShowSkillModal(true)}
-                        className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        <Plus className="w-3 h-3" />
-                        {t('pro.profile.addFirstSkill', 'Ajouter une première compétence')}
-                      </button>
-                    </div>
+                  {isEditMode && (profile?.skills || []).length < 10 && (
+                    <button
+                      onClick={() => setShowSkillModal(true)}
+                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {t('common.add', 'Ajouter')}
+                    </button>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
 
-              {/* Right column - Statistics, Quick Access, Activity, Badges */}
-              <div className="lg:col-span-8 xl:col-span-8 space-y-4 sm:space-y-6">
+                {showSkillsAccordion && (
+                  <div className="mt-2.5">
+                    {(profile?.skills || []).length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Affichage des 2 premières compétences */}
+                        {(profile?.skills || []).slice(0, 2).map((skill) => {
+                          const categoryStyles: Record<string, { bg: string, border: string, text: string, dot: string }> = {
+                            technical: { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800/50', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+                            soft: { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800/50', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
+                            language: { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800/50', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+                            communication: { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800/50', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+                            management: { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-800/50', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
+                            other: { bg: 'bg-zinc-100 dark:bg-zinc-800', border: 'border-zinc-200 dark:border-zinc-700', text: 'text-zinc-700 dark:text-zinc-300', dot: 'bg-zinc-400' }
+                          }
+
+                          const levelLabels: Record<string, string> = {
+                            beginner: 'Débutant',
+                            intermediate: 'Intermédiaire',
+                            advanced: 'Avancé',
+                            expert: 'Expert',
+                            'Débutant': 'Débutant',
+                            'Intermédiaire': 'Intermédiaire',
+                            'Avancé': 'Avancé',
+                            'Expert': 'Expert'
+                          }
+
+                          const style = categoryStyles[skill.category?.toLowerCase()] || categoryStyles.technical
+                          const levelText = levelLabels[skill.level] || skill.level
+
+                          return (
+                            <div
+                              key={skill.id}
+                              className={`group relative flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl border ${style.bg} ${style.border} transition-all hover:shadow-sm`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                              <span className={`text-xs font-semibold ${style.text}`}>
+                                {skill.name}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-medium">
+                                {levelText}
+                              </span>
+                              {isEditMode && (
+                                <button
+                                  onClick={() => handleDeleteSkill(skill.id)}
+                                  className="opacity-75 hover:opacity-100 p-0.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors cursor-pointer"
+                                  title="Supprimer"
+                                >
+                                  <X className="w-3 h-3 text-red-500" />
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+
+                        {/* Menu déroulant pour les compétences à partir de la 3ème */}
+                        {(profile?.skills || []).length > 2 && (
+                          <div className="relative" ref={extraSkillsRef}>
+                            <button
+                              type="button"
+                              onClick={() => setShowExtraSkillsDropdown(!showExtraSkillsDropdown)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-300 dark:border-zinc-700 bg-gray-100/80 dark:bg-zinc-800/90 text-xs font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+                            >
+                              <span>+{(profile?.skills || []).length - 2} autres</span>
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showExtraSkillsDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {showExtraSkillsDropdown && (
+                              <div className="absolute left-0 top-full mt-2 w-72 max-h-56 overflow-y-auto p-2 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-gray-200 dark:border-zinc-700 z-50 flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                                <div className="text-[11px] font-semibold text-gray-500 dark:text-zinc-400 px-2 py-1 border-b border-gray-100 dark:border-zinc-700/60 flex items-center justify-between">
+                                  <span>Autres compétences ({(profile?.skills || []).length - 2})</span>
+                                </div>
+                                {(profile?.skills || []).slice(2).map((skill) => {
+                                  const categoryStyles: Record<string, { bg: string, border: string, text: string, dot: string }> = {
+                                    technical: { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800/50', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+                                    soft: { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800/50', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
+                                    language: { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800/50', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+                                    communication: { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800/50', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+                                    management: { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-800/50', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
+                                    other: { bg: 'bg-zinc-100 dark:bg-zinc-800', border: 'border-zinc-200 dark:border-zinc-700', text: 'text-zinc-700 dark:text-zinc-300', dot: 'bg-zinc-400' }
+                                  }
+                                  const levelLabels: Record<string, string> = {
+                                    beginner: 'Débutant',
+                                    intermediate: 'Intermédiaire',
+                                    advanced: 'Avancé',
+                                    expert: 'Expert',
+                                    'Débutant': 'Débutant',
+                                    'Intermédiaire': 'Intermédiaire',
+                                    'Avancé': 'Avancé',
+                                    'Expert': 'Expert'
+                                  }
+                                  const style = categoryStyles[skill.category?.toLowerCase()] || categoryStyles.technical
+                                  const levelText = levelLabels[skill.level] || skill.level
+
+                                  return (
+                                    <div
+                                      key={skill.id}
+                                      className={`flex items-center justify-between gap-2 p-2 rounded-xl border ${style.bg} ${style.border}`}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${style.dot} flex-shrink-0`} />
+                                        <span className={`text-xs font-semibold ${style.text} truncate`}>
+                                          {skill.name}
+                                        </span>
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-medium flex-shrink-0">
+                                          {levelText}
+                                        </span>
+                                      </div>
+                                      {isEditMode && (
+                                        <button
+                                          onClick={() => handleDeleteSkill(skill.id)}
+                                          className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors flex-shrink-0 cursor-pointer"
+                                          title="Supprimer"
+                                        >
+                                          <X className="w-3.5 h-3.5 text-red-500" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={`p-3.5 rounded-xl border border-dashed text-center ${resolvedTheme === 'dark' ? 'border-zinc-700 bg-zinc-800/50' : 'border-gray-200 bg-gray-50'}`}>
+                        <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-zinc-400' : 'text-gray-500'} mb-1.5`}>
+                          {t('pro.profile.noSkills', 'Aucune compétence renseignée')}
+                        </p>
+                        {isEditMode ? (
+                          <button
+                            onClick={() => setShowSkillModal(true)}
+                            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            {t('pro.profile.addFirstSkill', 'Ajouter une première compétence')}
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-zinc-500 italic">Non renseigné</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right column - Statistics, Quick Access, Activity, Badges */}
+            <div className="lg:col-span-8 xl:col-span-8 space-y-4 sm:space-y-6">
             {/* Statistics */}
             <div>
               <h3 className={`text-base sm:text-lg font-semibold mb-2 sm:mb-3 ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>

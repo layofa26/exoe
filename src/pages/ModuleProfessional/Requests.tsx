@@ -11,16 +11,20 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useQuery } from '../../hooks/useQuery'
 import { notificationService } from '../../services/notificationService'
+import { getCurrentUserId } from '../../services/apiClient'
 import { ConversationView } from './Conversation'
 
 // ─── API Base ─────────────────────────────────────────────────────────────────
-const API = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+const API = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 async function apiFetch(path: string, options?: RequestInit) {
   let token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+  if (!token) {
+    return new Response(JSON.stringify({ results: [] }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    Authorization: `Bearer ${token}`,
     ...(options?.headers as Record<string, string> || {}),
   }
 
@@ -30,36 +34,38 @@ async function apiFetch(path: string, options?: RequestInit) {
       const refresh = localStorage.getItem('refreshToken') || localStorage.getItem('refresh_token')
       if (refresh) {
         try {
-          const refreshRes = await fetch(`${API}/token/refresh/`, {
+          let refreshRes = await fetch(`${API}/token/refresh/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refresh }),
           })
+          if (!refreshRes.ok) {
+            refreshRes = await fetch(`${API}/users/token/refresh/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refresh }),
+            })
+          }
           if (refreshRes.ok) {
             const refreshData = await refreshRes.json()
             if (refreshData.access) {
               localStorage.setItem('accessToken', refreshData.access)
               headers['Authorization'] = `Bearer ${refreshData.access}`
               res = await fetch(`${API}${path}`, { ...options, headers })
+              return res
             }
+          } else {
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('refreshToken')
           }
         } catch {}
+      } else {
+        localStorage.removeItem('accessToken')
       }
     }
     return res
   } catch (err) {
     throw err
-  }
-}
-
-function getCurrentUserId(): string | null {
-  try {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
-    if (!token) return localStorage.getItem('user_id')
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return String(payload.user_id || payload.id || payload.uuid || localStorage.getItem('user_id') || '')
-  } catch {
-    return localStorage.getItem('user_id')
   }
 }
 
@@ -91,6 +97,8 @@ interface Demande {
   lastMessage?: LastMessageInfo | null
   is_pinned?: boolean
   is_archived?: boolean
+  is_blocked?: boolean
+  blocked_by_me?: boolean
 }
 
 interface BlockedUser {
@@ -100,9 +108,12 @@ interface BlockedUser {
     username: string
     full_name: string
     avatar_url?: string
+    photo?: string
   }
-  createdAt: string
+  created_at?: string
+  createdAt?: string
 }
+
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 function normalizeStatus(s: string): DemandeStatus {
@@ -120,6 +131,7 @@ function normalizeStatus(s: string): DemandeStatus {
 }
 
 function normalizeDemande(item: any): Demande {
+  const isBlocked = Boolean(item.is_blocked || item.status === 'bloque' || item.status === 'blocked')
   return {
     id: String(item.id),
     conversationId: item.conversation_id || item.conversation?.id || null,
@@ -132,11 +144,13 @@ function normalizeDemande(item: any): Demande {
     receiverUsername: (item.receiver?.username || '').replace(/^@/, ''),
     receiverAvatar: item.receiver?.avatar_url || item.receiver?.photo || null,
     message: item.message || '',
-    status: normalizeStatus(item.status),
+    status: isBlocked ? 'blocked' : normalizeStatus(item.status),
     createdAt: item.created_at || new Date().toISOString(),
     lastMessage: item.last_message || null,
     is_pinned: false,
     is_archived: false,
+    is_blocked: isBlocked,
+    blocked_by_me: Boolean(item.blocked_by_me),
   }
 }
 
@@ -145,6 +159,7 @@ function normalizeConversationToDemande(c: any, currentUserId: string | null): D
   const partner = parts.find((p: any) => String(p.id) !== String(currentUserId)) || parts[0] || {}
   const lastMsg = c.last_message || (c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null)
   const isLastSenderMe = String(lastMsg?.sender_id || lastMsg?.sender?.id) === String(currentUserId)
+  const isBlocked = Boolean(c.is_blocked)
 
   return {
     id: `conv-${c.id}`,
@@ -158,10 +173,12 @@ function normalizeConversationToDemande(c: any, currentUserId: string | null): D
     receiverUsername: (partner.username || '').replace(/^@/, ''),
     receiverAvatar: partner.avatar_url || null,
     message: lastMsg?.content || '',
-    status: 'accepted' as DemandeStatus,
+    status: isBlocked ? 'blocked' : ('accepted' as DemandeStatus),
     createdAt: c.updated_at || c.created_at || (lastMsg?.created_at) || new Date().toISOString(),
     is_pinned: Boolean(c.is_pinned),
     is_archived: Boolean(c.is_archived),
+    is_blocked: isBlocked,
+    blocked_by_me: Boolean(c.blocked_by_me),
     lastMessage: lastMsg ? {
       id: lastMsg.id,
       content: lastMsg.content,
@@ -172,17 +189,59 @@ function normalizeConversationToDemande(c: any, currentUserId: string | null): D
   }
 }
 
-function timeAgo(iso?: string): string {
+function formatMessagePreview(content?: string | null, currentUserId?: string | null): string {
+  if (!content) return ''
+  const blockMatch = content.match(/^\[block_event:(blocked|unblocked)\|(.*?)\|(.*?)\]$/)
+  if (blockMatch) {
+    const action = blockMatch[1]
+    const blockerId = blockMatch[2]
+    const myId = currentUserId || getCurrentUserId() || (typeof window !== 'undefined' ? localStorage.getItem('userId') : null)
+    const isBlocker = myId ? String(myId) === String(blockerId) : false
+    if (action === 'blocked') {
+      return isBlocker ? 'Vous avez bloqué cet utilisateur' : 'Cet utilisateur vous a bloqué'
+    } else {
+      return isBlocker ? 'Vous avez débloqué cet utilisateur' : 'Cet utilisateur vous a débloqué'
+    }
+  }
+  if (content.startsWith('[image:')) return '📷 Image'
+  if (content.startsWith('[document:')) return '📄 Document'
+  if (content.startsWith('[pro_proposal:')) return '💼 Devis Pro'
+  if (content.startsWith('[event_card:')) return '📅 Événement'
+  if (content.startsWith('[system_notif:')) return 'ℹ️ ' + (content.match(/^\[system_notif:(.*?)\]$/)?.[1] || 'Notification')
+  return content
+}
+
+function formatRequestDate(iso?: string): string {
   if (!iso) return ''
   try {
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000
-    if (diff < 60) return 'À l\'instant'
+    const d = new Date(iso)
+    const now = new Date()
+    const diff = (now.getTime() - d.getTime()) / 1000
+
+    if (diff < 60) return "À l'instant"
     if (diff < 3600) return `${Math.floor(diff / 60)} min`
-    if (diff < 86400) return `${Math.floor(diff / 3600)} h`
-    if (diff < 604800) return `${Math.floor(diff / 86400)} j`
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+
+    const isToday = d.toDateString() === now.toDateString()
+    if (isToday) {
+      return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    }
+
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const isYesterday = d.toDateString() === yesterday.toDateString()
+    if (isYesterday) {
+      return `Hier ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+    }
+
+    if (diff < 7 * 86400) {
+      return d.toLocaleDateString('fr-FR', { weekday: 'short' })
+    }
+
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   } catch { return '' }
 }
+
+const timeAgo = formatRequestDate
 
 // ─── Avatar Dynamic Colors & Real Photo Resolution ────────────────────────────
 const AVATAR_GRADIENTS = [
@@ -277,6 +336,48 @@ export const Requests = (): JSX.Element => {
     return getCurrentUserId()
   }, [user])
 
+  // ─── Identity Sets for Rock-Solid Self vs Partner Detection ─────────────────
+  const myIds = useMemo(() => {
+    const s = new Set<string>()
+    if (user?.id) s.add(String(user.id).trim().toLowerCase())
+    const fromToken = getCurrentUserId()
+    if (fromToken) s.add(String(fromToken).trim().toLowerCase())
+    try {
+      const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+      if (storedProfile.id) s.add(String(storedProfile.id).trim().toLowerCase())
+      if (storedProfile.user_id) s.add(String(storedProfile.user_id).trim().toLowerCase())
+    } catch {}
+    return s
+  }, [user])
+
+  const myUsernames = useMemo(() => {
+    const s = new Set<string>()
+    if (user?.username) {
+      s.add(user.username.replace(/^@/, '').trim().toLowerCase())
+    }
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('access_token')
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        if (payload.username) s.add(String(payload.username).replace(/^@/, '').trim().toLowerCase())
+      }
+    } catch {}
+    try {
+      const storedProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
+      if (storedProfile.username) s.add(String(storedProfile.username).replace(/^@/, '').trim().toLowerCase())
+    } catch {}
+    return s
+  }, [user])
+
+  const isDemandeSentByMe = useCallback((d: Demande) => {
+    if (d.senderName === 'Moi') return true
+    const sId = String(d.senderId || '').trim().toLowerCase()
+    const sUname = String(d.senderUsername || '').replace(/^@/, '').trim().toLowerCase()
+    if (sId && myIds.has(sId)) return true
+    if (sUname && myUsernames.has(sUname)) return true
+    return false
+  }, [myIds, myUsernames])
+
   type Tab = 'all' | 'accepted' | 'received' | 'sent' | 'archived'
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const t = searchParams.get('tab')
@@ -298,12 +399,30 @@ export const Requests = (): JSX.Element => {
   const [loadingBlocked, setLoadingBlocked] = useState(false)
   const [showBlockedPanel, setShowBlockedPanel] = useState(false)
 
+
+
   useEffect(() => {
     const t = searchParams.get('tab')
     if (t === 'sent' || t === 'received' || t === 'accepted' || t === 'all' || t === 'archived') {
       setActiveTab(t as Tab)
     }
   }, [searchParams])
+
+  // Track active conversation on mobile to hide ProSidebar
+  useEffect(() => {
+    const isChatActiveOnMobile = Boolean(selectedConversationId || selectedDemande)
+    if (isChatActiveOnMobile) {
+      localStorage.setItem('exile_in_mobile_conversation', 'true')
+    } else {
+      localStorage.removeItem('exile_in_mobile_conversation')
+    }
+    window.dispatchEvent(new Event('exile_mobile_conversation_change'))
+
+    return () => {
+      localStorage.removeItem('exile_in_mobile_conversation')
+      window.dispatchEvent(new Event('exile_mobile_conversation_change'))
+    }
+  }, [selectedConversationId, selectedDemande])
 
   const handleTabChange = (t: Tab) => {
     setActiveTab(t)
@@ -449,8 +568,27 @@ export const Requests = (): JSX.Element => {
       if (e.detail?.userId) {
         setAllItems((prev: Demande[]) => prev.map(d => {
           const match = String(d.senderId) === String(e.detail.userId) || String(d.receiverId) === String(e.detail.userId)
-          return match ? { ...d, status: 'blocked' as DemandeStatus } : d
+          return match ? { ...d, status: 'blocked' as DemandeStatus, is_blocked: true, blocked_by_me: true } : d
         }))
+        setSelectedDemande(prev => {
+          if (!prev) return prev
+          const match = String(prev.senderId) === String(e.detail.userId) || String(prev.receiverId) === String(e.detail.userId)
+          return match ? { ...prev, status: 'blocked' as DemandeStatus, is_blocked: true, blocked_by_me: true } : prev
+        })
+      }
+    }
+
+    const handleUnblocked = (e: any) => {
+      if (e.detail?.userId) {
+        setAllItems((prev: Demande[]) => prev.map(d => {
+          const match = String(d.senderId) === String(e.detail.userId) || String(d.receiverId) === String(e.detail.userId)
+          return match ? { ...d, status: (d.conversationId ? 'accepted' : 'pending') as DemandeStatus, is_blocked: false, blocked_by_me: false } : d
+        }))
+        setSelectedDemande(prev => {
+          if (!prev) return prev
+          const match = String(prev.senderId) === String(e.detail.userId) || String(prev.receiverId) === String(e.detail.userId)
+          return match ? { ...prev, status: (prev.conversationId ? 'accepted' : 'pending') as DemandeStatus, is_blocked: false, blocked_by_me: false } : prev
+        })
       }
     }
 
@@ -460,6 +598,7 @@ export const Requests = (): JSX.Element => {
     window.addEventListener('exile_conversation_archived', handleArchived)
     window.addEventListener('exile_conversation_deleted', handleDeleted)
     window.addEventListener('exile_user_blocked', handleBlocked)
+    window.addEventListener('exile_user_unblocked', handleUnblocked)
     window.addEventListener('storage', handleDataChange)
 
     const interval = setInterval(() => {
@@ -473,6 +612,7 @@ export const Requests = (): JSX.Element => {
       window.removeEventListener('exile_conversation_archived', handleArchived)
       window.removeEventListener('exile_conversation_deleted', handleDeleted)
       window.removeEventListener('exile_user_blocked', handleBlocked)
+      window.removeEventListener('exile_user_unblocked', handleUnblocked)
       window.removeEventListener('storage', handleDataChange)
       clearInterval(interval)
     }
@@ -488,10 +628,10 @@ export const Requests = (): JSX.Element => {
     setSelectedDemande(d)
     setSelectedConversationId(d.conversationId || `demande-${d.id}`)
 
-    const partnerId = d.senderId === currentUserId ? d.receiverId : d.senderId
+    const partnerId = isDemandeSentByMe(d) ? d.receiverId : d.senderId
     if (!partnerId) return
 
-    if (!d.conversationId) {
+    if (!d.conversationId && d.status === 'accepted') {
       try {
         const startRes = await apiFetch('/conversations/start/', {
           method: 'POST',
@@ -507,7 +647,7 @@ export const Requests = (): JSX.Element => {
         }
       } catch {}
     }
-  }, [currentUserId, updateStatus])
+  }, [isDemandeSentByMe, updateStatus])
 
   // Accept Demande -> Opens discussion on the right immediately
   const handleAccept = useCallback(async (d: Demande) => {
@@ -578,26 +718,6 @@ export const Requests = (): JSX.Element => {
     }
   }, [showToast, updateStatus, t])
 
-  // Block User
-  const handleBlock = useCallback(async (d: Demande) => {
-    setLoadingAction(d.id + ':block')
-    try {
-      const targetUser = d.senderId === currentUserId ? d.receiverId : d.senderId
-      const res = await apiFetch('/blocked/blocked-users/', {
-        method: 'POST',
-        body: JSON.stringify({ blocked_user: targetUser }),
-      })
-      if (!res.ok) throw new Error(t('pro.requests.blockError', 'Erreur lors du blocage'))
-      updateStatus(d.id, 'blocked')
-      setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'blocked' } : prev)
-      showToast(t('pro.requests.blockedToast', '🚫 Utilisateur bloqué'))
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erreur', 'error')
-    } finally {
-      setLoadingAction(null)
-    }
-  }, [currentUserId, showToast, updateStatus, t])
-
   // Load Blocked Users
   const loadBlockedUsers = useCallback(async () => {
     setLoadingBlocked(true)
@@ -612,20 +732,88 @@ export const Requests = (): JSX.Element => {
     }
   }, [])
 
-  const handleUnblock = useCallback(async (userId: string) => {
+  // Block User directly without approval modal
+  const handleBlock = useCallback(async (d: Demande) => {
+    const isSender = isDemandeSentByMe(d)
+    const targetUserId = isSender ? d.receiverId : d.senderId
+    const actionKey = d.id + ':block'
+    setLoadingAction(actionKey)
     try {
-      const res = await apiFetch('/blocked/blocked-users/', {
-        method: 'DELETE',
-        body: JSON.stringify({ blocked_user: userId }),
+      const res = await apiFetch('/blocked/blocked-users/block/', {
+        method: 'POST',
+        body: JSON.stringify({ blocked_id: targetUserId, blocked_user: targetUserId }),
+      })
+      if (!res.ok) {
+        const fallbackRes = await apiFetch('/blocked/blocked-users/', {
+          method: 'POST',
+          body: JSON.stringify({ blocked_id: targetUserId, blocked_user: targetUserId }),
+        })
+        if (!fallbackRes.ok) {
+          const errData = await fallbackRes.json().catch(() => ({}))
+          throw new Error(errData.error || errData.detail || t('pro.requests.blockError', 'Erreur lors du blocage'))
+        }
+      }
+
+      updateStatus(d.id, 'blocked')
+      setSelectedDemande(prev => prev && prev.id === d.id ? { ...prev, status: 'blocked', is_blocked: true, blocked_by_me: true } : prev)
+      showToast(t('pro.requests.blockedToast', '🚫 Utilisateur bloqué'))
+      window.dispatchEvent(new CustomEvent('exile_user_blocked', { detail: { userId: targetUserId } }))
+      loadBlockedUsers()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erreur', 'error')
+    } finally {
+      setLoadingAction(null)
+    }
+  }, [isDemandeSentByMe, showToast, updateStatus, t, loadBlockedUsers])
+
+
+  // Unblock User
+  const handleUnblock = useCallback(async (userId: string | number) => {
+    try {
+      const res = await apiFetch('/blocked/blocked-users/unblock/', {
+        method: 'POST',
+        body: JSON.stringify({ blocked_id: userId, blocked_user: userId }),
       })
       if (res.ok) {
-        setBlockedUsers(prev => prev.filter(b => b.blocked.id !== userId))
+        setBlockedUsers(prev => prev.filter(b => String(b.blocked?.id || (b as any).blocked_user) !== String(userId)))
+        setSelectedDemande(prev => {
+          if (!prev) return prev
+          const isSender = isDemandeSentByMe(prev)
+          const pId = isSender ? prev.receiverId : prev.senderId
+          if (String(pId) === String(userId)) {
+            return { ...prev, status: 'pending', is_blocked: false, blocked_by_me: false }
+          }
+          return prev
+        })
         showToast('Utilisateur débloqué ✓')
+        window.dispatchEvent(new CustomEvent('exile_user_unblocked', { detail: { userId } }))
+      } else {
+        const delRes = await apiFetch('/blocked/blocked-users/', {
+          method: 'DELETE',
+          body: JSON.stringify({ blocked_id: userId, blocked_user: userId }),
+        })
+        if (delRes.ok) {
+          setBlockedUsers(prev => prev.filter(b => String(b.blocked?.id || (b as any).blocked_user) !== String(userId)))
+          setSelectedDemande(prev => {
+            if (!prev) return prev
+            const isSender = isDemandeSentByMe(prev)
+            const pId = isSender ? prev.receiverId : prev.senderId
+            if (String(pId) === String(userId)) {
+              return { ...prev, status: 'pending', is_blocked: false, blocked_by_me: false }
+            }
+            return prev
+          })
+          showToast('Utilisateur débloqué ✓')
+          window.dispatchEvent(new CustomEvent('exile_user_unblocked', { detail: { userId } }))
+        } else {
+          showToast('Erreur lors du déblocage', 'error')
+        }
       }
     } catch {
       showToast('Erreur lors du déblocage', 'error')
     }
-  }, [showToast])
+  }, [showToast, isDemandeSentByMe])
+
 
   // ─── Filtered, Deduplicated & Sorted Demandes ──────────────────────────────
   const deduplicatedDemandes = useMemo(() => {
@@ -682,7 +870,7 @@ export const Requests = (): JSX.Element => {
       const isSender = String(d.senderId) === String(currentUserId)
       const username = (isSender ? d.receiverUsername : d.senderUsername).toLowerCase()
       const name = (isSender ? d.receiverName : d.senderName).toLowerCase()
-      const msg = (d.message || d.lastMessage?.content || '').toLowerCase()
+      const msg = (formatMessagePreview(d.message || d.lastMessage?.content || '', currentUserId)).toLowerCase()
       return !q || username.includes(q) || name.includes(q) || msg.includes(q)
     })
 
@@ -823,14 +1011,49 @@ export const Requests = (): JSX.Element => {
               <p className={`text-xs ${subtle}`}>{t('pro.requests.loading', 'Chargement des échanges...')}</p>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-60">
-              <MessageCircle size={40} className={subtle} />
-              <p className={`text-xs text-center ${subtle}`}>
-                {searchQuery ? t('pro.requests.noResults', 'Aucun résultat trouvé') : t('pro.requests.noRequests', 'Aucune demande pour le moment')}
-              </p>
+            <div className="flex flex-col items-center justify-center py-16 px-4 gap-3">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isDark ? 'bg-white/5 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                {searchQuery ? <Search size={26} /> : <MessageCircle size={26} />}
+              </div>
+              <div className="text-center max-w-xs">
+                <p className="text-sm font-semibold mb-1">
+                  {searchQuery
+                    ? t('pro.requests.noSearchResultsTitle', 'Aucun résultat')
+                    : activeTab === 'accepted'
+                      ? t('pro.requests.noDiscussionsTitle', 'Aucune discussion active')
+                      : activeTab === 'received'
+                        ? t('pro.requests.noReceivedTitle', 'Aucune demande reçue')
+                        : activeTab === 'sent'
+                          ? t('pro.requests.noSentTitle', 'Aucune demande envoyée')
+                          : activeTab === 'archived'
+                            ? t('pro.requests.noArchivedTitle', 'Aucune discussion archivée')
+                            : t('pro.requests.noRequestsTitle', 'Aucune demande')}
+                </p>
+                <p className={`text-xs ${subtle}`}>
+                  {searchQuery
+                    ? `Aucun échange trouvé pour « ${searchQuery} »`
+                    : activeTab === 'accepted'
+                      ? 'Vos conversations acceptées apparaîtront ici.'
+                      : activeTab === 'received'
+                        ? 'Les demandes de clients ou collaborateurs reçues s\'afficheront ici.'
+                        : activeTab === 'sent'
+                          ? 'Vos demandes envoyées aux autres professionnels apparaîtront ici.'
+                          : activeTab === 'archived'
+                            ? 'Vos discussions archivées apparaîtront ici.'
+                            : 'Toutes vos demandes et discussions s\'afficheront ici.'}
+                </p>
+              </div>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="mt-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                >
+                  {t('pro.requests.clearSearch', 'Réinitialiser la recherche')}
+                </button>
+              )}
             </div>
           ) : filtered.map(d => {
-            const isSender = String(d.senderId) === String(currentUserId)
+            const isSender = isDemandeSentByMe(d)
             const otherUsername = (isSender ? d.receiverUsername : d.senderUsername) || (isSender ? d.receiverName : d.senderName)
             const otherAvatar = isSender ? d.receiverAvatar : d.senderAvatar
             const isAccepted = d.status === 'accepted'
@@ -838,11 +1061,13 @@ export const Requests = (): JSX.Element => {
             const isLoadingAction = loadingAction?.startsWith(d.id + ':')
             const isDiscussionTab = activeTab === 'accepted'
             const showAsDiscussionCard = isAccepted && (isDiscussionTab || activeTab === 'all')
+            const hasUnread = Boolean(d.lastMessage && d.lastMessage.read === false && !isSender)
 
             // ─── 1. WhatsApp Discussion Card (Accepted in Discussions or All) ──
             if (showAsDiscussionCard) {
-              const previewMsg = d.lastMessage?.content || d.message || t('pro.requests.activeDiscussion', 'Discussion active')
-              const msgTime = timeAgo(d.lastMessage?.created_at || d.createdAt)
+              const rawMsg = d.lastMessage?.content || d.message || t('pro.requests.activeDiscussion', 'Discussion active')
+              const previewMsg = formatMessagePreview(rawMsg, currentUserId)
+              const msgTime = formatRequestDate(d.lastMessage?.created_at || d.createdAt)
 
               return (
                 <div
@@ -854,12 +1079,17 @@ export const Requests = (): JSX.Element => {
                       : 'hover:border-emerald-500/50 hover:shadow-md'}`}
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar src={otherAvatar} name={otherUsername} size={46} />
+                    <div className="relative flex-shrink-0">
+                      <Avatar src={otherAvatar} name={otherUsername} size={46} />
+                      {hasUnread && (
+                        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                      )}
+                    </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <h3 className="font-bold text-sm truncate text-emerald-400">
+                          <h3 className={`font-bold text-sm truncate ${hasUnread ? 'text-emerald-400' : isDark ? 'text-white' : 'text-slate-900'}`}>
                             @{otherUsername.replace(/^@/, '')}
                           </h3>
                           {d.is_pinned && (
@@ -871,22 +1101,32 @@ export const Requests = (): JSX.Element => {
                             </span>
                           )}
                         </div>
-                        <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">
+                        <span className={`text-[11px] font-medium flex-shrink-0 ${hasUnread ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
                           {msgTime}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0 text-xs text-slate-300">
-                          <CheckCheck size={14} className="text-emerald-400 flex-shrink-0" />
+                        <div className={`flex items-center gap-1.5 min-w-0 text-xs ${hasUnread ? (isDark ? 'text-white font-semibold' : 'text-slate-900 font-semibold') : 'text-slate-300'}`}>
+                          {d.lastMessage && (
+                            d.lastMessage.read
+                              ? <CheckCheck size={14} className="text-emerald-400 flex-shrink-0" />
+                              : <Check size={14} className="text-slate-400 flex-shrink-0" />
+                          )}
                           <p className="truncate text-xs">
                             {previewMsg}
                           </p>
                         </div>
 
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 flex-shrink-0">
-                          <MessageSquare size={10} /> {t('pro.requests.open', 'Ouvrir')}
-                        </span>
+                        {hasUnread ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow-sm flex-shrink-0">
+                            Nouveau
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 flex-shrink-0">
+                            <MessageSquare size={10} /> {t('pro.requests.open', 'Ouvrir')}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -921,7 +1161,7 @@ export const Requests = (): JSX.Element => {
                     {d.message && (
                       <p className={`text-xs mt-2 px-3 py-1.5 rounded-xl leading-relaxed
                         ${isDark ? 'bg-slate-800/80 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
-                        "{d.message}"
+                        "{formatMessagePreview(d.message, currentUserId)}"
                       </p>
                     )}
 
@@ -939,7 +1179,7 @@ export const Requests = (): JSX.Element => {
                               {t('pro.requests.reject', 'Refuser')}
                             </button>
                             <button
-                              onClick={() => handleBlock(d)}
+                              onClick={() => promptBlockUser(d)}
                               disabled={!!loadingAction}
                               className="px-2.5 py-1 rounded-xl text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
                             >
@@ -953,6 +1193,16 @@ export const Requests = (): JSX.Element => {
                               <Check size={12} /> {t('pro.requests.accept', 'Accepter')}
                             </button>
                           </>
+                        )}
+
+                        {d.status === 'blocked' && (
+                          <button
+                            onClick={() => handleUnblock(isSender ? d.receiverId : d.senderId)}
+                            disabled={!!loadingAction}
+                            className="px-2.5 py-1 rounded-xl text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
+                          >
+                            {t('pro.modals.unblock', 'Débloquer')}
+                          </button>
                         )}
 
                         {isSender && d.status === 'pending' && (
@@ -984,35 +1234,60 @@ export const Requests = (): JSX.Element => {
       </div>
 
       {/* ── RIGHT PANE : WhatsApp Active Conversation View ── */}
-      <div className={`flex-1 flex flex-col h-full overflow-hidden ${selectedConversationId || selectedDemande ? 'flex' : 'hidden lg:flex'}`}>
-        {selectedDemande ? (
-          <ConversationView
-            key={`demande-${selectedDemande.id}-${selectedDemande.conversationId || 'none'}`}
-            conversationId={selectedDemande.conversationId}
-            partnerId={String(selectedDemande.senderId) === String(currentUserId) ? selectedDemande.receiverId : selectedDemande.senderId}
-            partnerUsername={String(selectedDemande.senderId) === String(currentUserId) ? selectedDemande.receiverUsername : selectedDemande.senderUsername}
-            partnerAvatar={String(selectedDemande.senderId) === String(currentUserId) ? selectedDemande.receiverAvatar : selectedDemande.senderAvatar}
-            initialMessage={selectedDemande.message}
-            demandeStatus={selectedDemande.status}
-            isDemandeSender={String(selectedDemande.senderId) === String(currentUserId)}
-            onAcceptDemande={() => handleAccept(selectedDemande)}
-            onRejectDemande={() => handleReject(selectedDemande)}
-            onBlockUser={() => handleBlock(selectedDemande)}
-            onClose={() => {
-              setSelectedConversationId(null)
-              setSelectedDemande(null)
-            }}
-          />
-        ) : selectedConversationId ? (
-          <ConversationView
-            key={`conv-${selectedConversationId}`}
-            conversationId={selectedConversationId}
-            onClose={() => {
-              setSelectedConversationId(null)
-              setSelectedDemande(null)
-            }}
-          />
-        ) : (
+      <div className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden ${selectedConversationId || selectedDemande ? 'flex' : 'hidden lg:flex'}`}>
+        {selectedDemande ? (() => {
+          const isSender = isDemandeSentByMe(selectedDemande)
+          const pId = isSender ? selectedDemande.receiverId : selectedDemande.senderId
+          const pUname = isSender ? selectedDemande.receiverUsername : selectedDemande.senderUsername
+          const pAvatar = isSender ? selectedDemande.receiverAvatar : selectedDemande.senderAvatar
+
+          return (
+            <ConversationView
+              key={`demande-${selectedDemande.id}-${selectedDemande.conversationId || 'none'}`}
+              conversationId={selectedDemande.conversationId}
+              partnerId={pId}
+              partnerUsername={pUname}
+              partnerAvatar={pAvatar}
+              initialMessage={selectedDemande.message}
+              demandeStatus={selectedDemande.status}
+              isDemandeSender={isSender}
+              onAcceptDemande={() => handleAccept(selectedDemande)}
+              onRejectDemande={() => handleReject(selectedDemande)}
+              onBlockUser={() => promptBlockUser(selectedDemande)}
+              onClose={() => {
+                setSelectedConversationId(null)
+                setSelectedDemande(null)
+              }}
+            />
+          )
+        })() : selectedConversationId ? (() => {
+          const matchedDemande = (allItems || []).find(d =>
+            String(d.conversationId) === String(selectedConversationId) || d.id === String(selectedConversationId) || d.id === `conv-${selectedConversationId}`
+          )
+          const isSender = matchedDemande ? isDemandeSentByMe(matchedDemande) : false
+          const pId = matchedDemande ? (isSender ? matchedDemande.receiverId : matchedDemande.senderId) : undefined
+          const pUname = matchedDemande ? (isSender ? matchedDemande.receiverUsername : matchedDemande.senderUsername) : undefined
+          const pAvatar = matchedDemande ? (isSender ? matchedDemande.receiverAvatar : matchedDemande.senderAvatar) : undefined
+
+          return (
+            <ConversationView
+              key={`conv-${selectedConversationId}`}
+              conversationId={selectedConversationId}
+              partnerId={pId}
+              partnerUsername={pUname}
+              partnerAvatar={pAvatar}
+              demandeStatus={matchedDemande?.status}
+              isDemandeSender={isSender}
+              onAcceptDemande={() => matchedDemande && handleAccept(matchedDemande)}
+              onRejectDemande={() => matchedDemande && handleReject(matchedDemande)}
+              onBlockUser={() => matchedDemande && handleBlock(matchedDemande)}
+              onClose={() => {
+                setSelectedConversationId(null)
+                setSelectedDemande(null)
+              }}
+            />
+          )
+        })() : (
           <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center select-none ${isDark ? 'bg-[#090c10] text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
             <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-600/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-4 shadow-xl">
               <MessageCircle size={38} />
@@ -1025,39 +1300,48 @@ export const Requests = (): JSX.Element => {
         )}
       </div>
 
-      {/* ── Blocked Users Modal Panel ── */}
+      {/* ── Blocked Users Modal Panel (Full-screen on mobile & tablet) ── */}
       {showBlockedPanel && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowBlockedPanel(false)}>
-          <div className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-              <h2 className="font-bold flex items-center gap-2 text-sm">
-                <Shield size={18} className="text-orange-400" /> {t('pro.modals.blockedUsers', 'Utilisateurs bloqués')}
+        <div 
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 lg:p-4" 
+          onClick={() => setShowBlockedPanel(false)}
+        >
+          <div 
+            className={`w-full h-full lg:h-auto lg:max-h-[85vh] lg:max-w-lg rounded-none lg:rounded-2xl shadow-2xl border-0 lg:border overflow-hidden flex flex-col ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`} 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={`flex items-center justify-between px-4 sm:px-6 py-4 border-b shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+              <h2 className="font-bold flex items-center gap-2.5 text-base sm:text-lg">
+                <Shield size={20} className="text-orange-400" /> {t('pro.modals.blockedUsers', 'Utilisateurs bloqués')}
               </h2>
-              <button onClick={() => setShowBlockedPanel(false)}>
-                <X size={18} className={subtle} />
+              <button 
+                onClick={() => setShowBlockedPanel(false)}
+                className={`p-2 rounded-xl ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'} transition-colors`}
+              >
+                <X size={20} />
               </button>
             </div>
 
-            <div className="max-h-96 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
               {loadingBlocked ? (
-                <div className="flex items-center justify-center py-10">
-                  <Loader2 size={24} className="animate-spin text-emerald-500" />
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 size={28} className="animate-spin text-emerald-500" />
                 </div>
               ) : blockedUsers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 gap-2 opacity-50">
-                  <UserX size={32} className={subtle} />
+                <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-60">
+                  <UserX size={40} className={subtle} />
                   <p className={`text-sm ${subtle}`}>{t('pro.modals.noBlockedUsers', 'Aucun utilisateur bloqué')}</p>
                 </div>
               ) : blockedUsers.map(b => (
-                <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                  <Avatar src={b.blocked.avatar_url || null} name={b.blocked.full_name || b.blocked.username} size={36} />
+                <div key={b.id} className={`flex items-center gap-3.5 p-3.5 rounded-xl border transition-colors ${isDark ? 'bg-slate-800/80 border-slate-700/60' : 'bg-slate-50 border-slate-200'}`}>
+                  <Avatar src={b.blocked?.avatar_url || b.blocked?.photo || null} name={b.blocked?.full_name || b.blocked?.username} size={40} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{b.blocked.full_name || b.blocked.username}</p>
-                    <p className={`text-xs ${subtle}`}>@{b.blocked.username}</p>
+                    <p className="font-semibold text-sm truncate">{b.blocked?.full_name || b.blocked?.username}</p>
+                    <p className={`text-xs ${subtle}`}>@{b.blocked?.username}</p>
                   </div>
                   <button
-                    onClick={() => handleUnblock(b.blocked.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${isDark ? 'bg-orange-900/30 text-orange-400 hover:bg-orange-900/50' : 'bg-orange-50 text-orange-500 hover:bg-orange-100'}`}
+                    onClick={() => handleUnblock(b.blocked?.id || (b as any).blocked_user)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${isDark ? 'bg-orange-900/30 text-orange-400 hover:bg-orange-900/50 border border-orange-500/20' : 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200'}`}
                   >
                     {t('pro.modals.unblock', 'Débloquer')}
                   </button>
@@ -1067,6 +1351,7 @@ export const Requests = (): JSX.Element => {
           </div>
         </div>
       )}
+
     </div>
   )
 }

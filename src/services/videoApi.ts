@@ -124,9 +124,17 @@ export const mapApiVideo = (v: any): FeedVideo => {
       avatar: resolvedAvatarUrl || undefined,
       avatarColor,
       initials: authorInitials,
-      followers: v.subscribers_count ?? v.author?.followers ?? 0,
       verified: false,
     },
+    allowComments: v.allowComments !== undefined
+      ? Boolean(v.allowComments)
+      : v.allow_comments !== undefined
+        ? Boolean(v.allow_comments)
+        : v.comments_enabled !== undefined
+          ? Boolean(v.comments_enabled)
+          : (typeof localStorage !== 'undefined' && localStorage.getItem(`video_allow_comments_${v.id}`) !== null
+              ? localStorage.getItem(`video_allow_comments_${v.id}`) === 'true'
+              : true),
   }
 }
 
@@ -244,6 +252,16 @@ export const videoApi = {
         formData.append('thumbnail', videoData.thumbnail)
       }
 
+      const allowComments = videoData.allowComments !== undefined
+        ? videoData.allowComments
+        : (videoData.allow_comments !== undefined ? videoData.allow_comments : true)
+      formData.append('allow_comments', String(allowComments))
+      formData.append('comments_enabled', String(allowComments))
+
+      if (videoData.allowAnonymousComments !== undefined) {
+        formData.append('allow_anonymous_comments', String(videoData.allowAnonymousComments))
+      }
+
       return new Promise((resolve) => {
         const xhr = new XMLHttpRequest()
         xhr.upload.addEventListener('progress', (event) => {
@@ -256,6 +274,11 @@ export const videoApi = {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const data = JSON.parse(xhr.responseText)
+              if (data?.id) {
+                try {
+                  localStorage.setItem(`video_allow_comments_${data.id}`, String(allowComments))
+                } catch {}
+              }
               resolve({ success: true, data })
             } catch {
               resolve({ success: true })

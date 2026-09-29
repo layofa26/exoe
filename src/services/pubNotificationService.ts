@@ -1,6 +1,6 @@
 import { notificationService, type AppNotification } from './notificationService'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 export type PubNotificationType = 
   | 'inquiry_received'   // Demande reçue
@@ -23,7 +23,7 @@ interface PubNotificationPayload {
 export const triggerPubNotification = (payload: PubNotificationPayload): void => {
   const platformLogo = typeof localStorage !== 'undefined' ? localStorage.getItem('exile_pub_platform_logo') || '' : ''
 
-  let title = 'Espace Entreprise (PUB)'
+  let title = payload.brandName || ''
   let message = ''
   let actionButton: { label: string; actionUrl: string } | undefined = undefined
 

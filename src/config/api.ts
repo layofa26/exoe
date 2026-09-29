@@ -1,6 +1,3 @@
-const PRODUCTION_API_BASE_URL = 'https://exile-backend-9q6o.onrender.com/api/v1'
-const DEVELOPMENT_API_BASE_URL = '/api/v1'
-
 const resolveApiBaseUrl = (): string => {
   const configured = (import.meta.env.VITE_API_BASE_URL || '').trim()
   if (configured) return configured.replace(/\/+$/, '')
@@ -12,10 +9,7 @@ const resolveApiBaseUrl = (): string => {
     }
   }
 
-  if (import.meta.env.PROD) {
-    return PRODUCTION_API_BASE_URL
-  }
-  return DEVELOPMENT_API_BASE_URL
+  return '/api/v1'
 }
 
 export const API_BASE_URL = resolveApiBaseUrl()

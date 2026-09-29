@@ -39,7 +39,6 @@ import ImportantMessages from './pages/ModuleProfessional/ImportantMessages'
 import MyVideos from './pages/ModuleProfessional/MyVideos'
 import Subscribers from './pages/ModuleProfessional/Subscribers'
 import Statistics from './pages/ModuleProfessional/Statistics'
-import Calendar from './pages/ModuleProfessional/Calendar'
 import Profile from './pages/ModuleProfessional/Profile'
 import { PublicProfile } from './pages/ModuleProfessional/PublicProfile'
 import Settings from './pages/ModuleProfessional/Settings'
@@ -71,7 +70,7 @@ const PageLoading = () => (
 // Professional module layout with caching
 const ProLayout = () => {
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       <Outlet />
     </div>
   )
@@ -115,11 +114,11 @@ function App(): JSX.Element {
       const alreadyNotified = sessionStorage.getItem(`exile_verification_notified_${user.id}`)
       if (!alreadyNotified) {
         sessionStorage.setItem(`exile_verification_notified_${user.id}`, 'true')
-        // Voye notifikasyon an tou swit avèk klik pou louvri fòmilè a dirèkteman
+        // Voye notifikasyon kout avèk klik pou louvri fòmilè a dirèkteman
         showWarning(
-          t('verification.notificationTitle', 'Action requise : Vérification du Compte'),
-          t('verification.notificationMessage', 'Bienvenue sur EXILE ! Veuillez certifier votre âge (18+) et profession pour débloquer toutes les fonctionnalités et sécuriser votre compte.'),
-          10000,
+          t('verification.notificationTitle', 'Vérification du Compte'),
+          t('verification.notificationMessage', 'Vérifiez votre profil (18+) pour débloquer toutes les fonctionnalités.'),
+          8000,
           () => setShowGlobalVerificationModal(true)
         )
       }
@@ -148,7 +147,6 @@ function App(): JSX.Element {
                            location.pathname.startsWith('/pro/conversations') || 
                            location.pathname.startsWith('/pro/profile') ||
                            location.pathname.startsWith('/pro/subscribers') ||
-                           location.pathname.startsWith('/pro/calendar') ||
                            location.pathname.startsWith('/pro/settings') ||
                            location.pathname.startsWith('/pro/requests') ||
                            location.pathname.startsWith('/pro/demandes') ||
@@ -162,8 +160,14 @@ function App(): JSX.Element {
                            isVideoPlayerActive ||
                            isPubRoute
 
-  // Pages où le ProSidebar doit être masqué (conversations plein écran uniquement)
-  const isNoSidebarPage = location.pathname.startsWith('/pro/conversations')
+  // Pages où le ProSidebar doit être masqué (aucune pour le moment, affiché sur conversations)
+  const isNoSidebarPage = false
+
+  // Routes où tout débordement de page doit être bloqué (conversations, demandes, événements pro)
+  const isChatRoute = location.pathname.startsWith('/pro/conversations') ||
+                      location.pathname.startsWith('/pro/requests') ||
+                      location.pathname.startsWith('/pro/demandes') ||
+                      location.pathname.startsWith('/pro/events')
 
   // Cacher header et sous-module sur mobile pour page détails vidéo uniquement
   const isVideoDetailPage = location.pathname.startsWith('/pro/video')
@@ -191,6 +195,14 @@ function App(): JSX.Element {
   // Cacher SubHeader sur mobile pour page détails vidéo
   const shouldHideSubHeaderOnVideoDetail = isMobile && isVideoDetailPage
   
+  const [isInMobileConversation, setIsInMobileConversation] = useState(() => {
+    try {
+      return localStorage.getItem('exile_in_mobile_conversation') === 'true'
+    } catch {
+      return false
+    }
+  })
+
   // Detekte si modal upload video la louvri pou kache ProSidebar
   useEffect(() => {
     const checkUploading = () => {
@@ -209,24 +221,41 @@ function App(): JSX.Element {
       }
     }
 
+    const checkMobileConv = () => {
+      try {
+        setIsInMobileConversation(localStorage.getItem('exile_in_mobile_conversation') === 'true')
+      } catch {
+        setIsInMobileConversation(false)
+      }
+    }
+
     checkUploading()
     checkVideoPlayer()
+    checkMobileConv()
 
-    // Listen for storage changes
+    // Listen for storage changes & custom events
     const handleStorageChange = () => {
       checkUploading()
       checkVideoPlayer()
+      checkMobileConv()
+    }
+
+    const handleMobileConvChange = (e: any) => {
+      setIsInMobileConversation(Boolean(e.detail?.inConversation))
     }
 
     window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('exile_mobile_conversation_change', handleMobileConvChange)
 
     const interval = setInterval(() => {
       checkUploading()
       checkVideoPlayer()
+      checkMobileConv()
     }, 1000)
 
     return () => {
       window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('exile_mobile_conversation_change', handleMobileConvChange)
       clearInterval(interval)
     }
   }, [])
@@ -247,19 +276,19 @@ function App(): JSX.Element {
     <ThemeProvider>
 
       <ScrollToTop />
-      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 overflow-x-hidden">
+      <div className={`min-h-screen ${isChatRoute ? 'h-screen max-h-screen overflow-hidden' : ''} flex flex-col bg-white dark:bg-slate-950 overflow-x-hidden`}>
       {/* Always show main header for module navigation between Pro and Social */}
       {showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <Header />}
 
-      {/* ProSidebar parèt toujou sou wout Pro, y konpri sou Demandes */}
-      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage && !isVideoPlayerActive && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <ProSidebar />}
+      {/* ProSidebar parèt toujou sou wout Pro, y konpri sou Demandes, sof nan konvesasyon prive sou mobil */}
+      {isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage && !(isMobile && isInMobileConversation) && !isVideoPlayerActive && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail && <ProSidebar />}
 
       {/* SocialSidebar parèt sèlman si se yon wout Social epi li pa nan mobile search */}
       {isSocialRoute && !isLiveRoom && <SocialSidebar />}
 
-      <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-          <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage ? 'pb-16' : isSocialRoute ? 'md:pl-64 pb-20 md:pb-0' : ''}`}>
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        <main className={`flex-1 flex flex-col min-h-0 ${isChatRoute ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          <div className={`flex-1 flex flex-col min-h-0 ${showMainHeader && !shouldHideHeaderOnMobileUpload && !shouldHideHeaderOnVideoDetail ? 'pt-14 sm:pt-16' : 'pt-0'} ${isProRoute && !isLiveRoom && !isUploadingVideo && !isNoSidebarPage && !(isMobile && isInMobileConversation) ? 'pb-16' : isSocialRoute ? 'md:pl-64 pb-20 md:pb-0' : ''}`}>
             <Suspense fallback={<PageLoading />}>
               <Routes>
                 {/* Public Routes — Redirection directe vers /pro pour capter l'attention sans texte */}
@@ -292,11 +321,11 @@ function App(): JSX.Element {
                   <Route path="drafts" element={<ProtectedRoute><MyDrafts /></ProtectedRoute>} />
                   <Route path="subscribers" element={<ProtectedRoute><Subscribers /></ProtectedRoute>} />
                   <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
-                  <Route path="calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
                   <Route path="subscriptions" element={<ProtectedRoute><Subscriptions /></ProtectedRoute>} />
                   <Route path="events" element={<EventsPro />} />
                   <Route path="events/:eventId/preview" element={<EventPreview />} />
                   <Route path="events/:eventId/live" element={<LiveRoom />} />
+                  <Route path="live/:eventId" element={<LiveRoom />} />
                   <Route path="ads" element={<ProtectedRoute><AdDashboard /></ProtectedRoute>} />
                   <Route path="video/:videoId" element={<VideoPage />} />
                 </Route>

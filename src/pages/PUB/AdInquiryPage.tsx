@@ -97,7 +97,7 @@ export default function AdInquiryPage() {
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-black">{t('pub.inquiryPage.title', 'Demande de Campagne Publicitaire')}</h1>
-              <p className="text-xs text-zinc-400">{t('pub.inquiryPage.subtitle', 'Espace Entreprise (PUB) · Visibilité auprès de la communauté EXILE')}</p>
+              <p className="text-xs text-zinc-400">{t('pub.inquiryPage.subtitle', 'Visibilité auprès de la communauté EXILE')}</p>
             </div>
           </div>
 

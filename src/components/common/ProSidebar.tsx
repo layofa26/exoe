@@ -32,24 +32,52 @@ export const ProSidebar = (): JSX.Element | null => {
   const [showMobileActionMenu, setShowMobileActionMenu] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
 
-  // Badge demandes reçues (pending)
+  // Badge demandes reçues (pending) en temps réel
   useEffect(() => {
+    let isMounted = true
     const loadUnreadRequests = async () => {
       const currentUserId = getCurrentUserId()
-      if (!currentUserId) { setNewRequestsCount(0); return }
-      const token = localStorage.getItem('accessToken')
+      if (!currentUserId) {
+        if (isMounted) setNewRequestsCount(0)
+        return
+      }
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
       if (!token) return
       try {
-        const res = await fetch(`${API_BASE_URL}/demandes/`, {
+        const res = await fetch(`${API_BASE_URL}/demandes/?type=recues&status=envoye`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         if (!res.ok) return
         const data = await res.json()
         const raw: any[] = Array.isArray(data) ? data : (data.results || [])
-        setNewRequestsCount(raw.filter(r => String(r.receiver?.id || r.receiver_id) === currentUserId && r.status === 'envoye').length)
-      } catch { setNewRequestsCount(0) }
+        const count = typeof data.count === 'number' ? data.count : raw.length
+        if (isMounted) {
+          setNewRequestsCount(count)
+        }
+      } catch {
+        if (isMounted) setNewRequestsCount(0)
+      }
     }
+
     loadUnreadRequests()
+
+    const handleUpdate = () => {
+      loadUnreadRequests()
+    }
+
+    window.addEventListener('exile_demande_created', handleUpdate)
+    window.addEventListener('exile_demande_updated', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+
+    const interval = setInterval(loadUnreadRequests, 3500)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('exile_demande_created', handleUpdate)
+      window.removeEventListener('exile_demande_updated', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
+      clearInterval(interval)
+    }
   }, [location.pathname])
 
   const handleNavigate = (path: string) => {
@@ -57,20 +85,46 @@ export const ProSidebar = (): JSX.Element | null => {
     navigate(path)
   }
 
+  const [isInMobileConversation, setIsInMobileConversation] = useState(() => {
+    try {
+      return localStorage.getItem('exile_in_mobile_conversation') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    const handleMobileConvChange = (e: any) => {
+      setIsInMobileConversation(Boolean(e.detail?.inConversation))
+    }
+    const handleStorage = () => {
+      try {
+        setIsInMobileConversation(localStorage.getItem('exile_in_mobile_conversation') === 'true')
+      } catch {
+        setIsInMobileConversation(false)
+      }
+    }
+    window.addEventListener('exile_mobile_conversation_change', handleMobileConvChange)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('exile_mobile_conversation_change', handleMobileConvChange)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [])
+
   const isManagementPage = [
     '/pro/profile',
     '/pro/statistics',
-    '/pro/calendar',
     '/pro/my-videos',
     '/pro/drafts',
-    '/pro/settings',
-    '/pro/conversations'
+    '/pro/settings'
   ].some(path => location.pathname.startsWith(path))
 
   const isLiveRoom = location.pathname.includes('/live')
   const isPreviewPage = location.pathname.includes('/preview')
+  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 1024 : false
 
-  const shouldHide = isManagementPage || isLiveRoom || isPreviewPage
+  const shouldHide = isManagementPage || isLiveRoom || isPreviewPage || (isMobile && isInMobileConversation && location.pathname !== '/pro/conversations')
 
   return (
     <div style={{ display: shouldHide ? 'none' : 'contents' }}>
@@ -132,6 +186,7 @@ export const ProSidebar = (): JSX.Element | null => {
                 <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>{t('pro.sidebar.createEventDesc', 'Webinaire, atelier, conférence')}</p>
               </div>
             </button>
+
 
             {/* 3. Lancer un Live */}
             <button
@@ -205,7 +260,7 @@ export const ProSidebar = (): JSX.Element | null => {
             <div className="relative">
               <Inbox className="w-5 h-5" />
               {newRequestsCount > 0 && (
-                <span className="absolute -top-1 -right-2 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 animate-pulse select-none">
                   {newRequestsCount > 9 ? '9+' : newRequestsCount}
                 </span>
               )}
@@ -281,7 +336,7 @@ export const ProSidebar = (): JSX.Element | null => {
                 <div className="relative">
                   <item.icon className="w-4 h-4" />
                   {item.badge && item.badge > 0 ? (
-                    <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-zinc-900 animate-pulse select-none">
                       {item.badge > 9 ? '9+' : item.badge}
                     </span>
                   ) : null}

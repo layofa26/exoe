@@ -21,6 +21,13 @@ export const resolveMediaUrl = (url?: string | null): string => {
     trimmed.startsWith('blob:') ||
     trimmed.startsWith('data:')
   ) {
+    if (trimmed.includes('/Exile_images/')) {
+      const parts = trimmed.split('/Exile_images/')
+      const rawName = parts[parts.length - 1].split('?')[0]
+      if (rawName.startsWith('profile_') || rawName.startsWith('banner_') || rawName.startsWith('cover_')) {
+        return `/media/images/${rawName}`
+      }
+    }
     return trimmed
   }
 
@@ -43,7 +50,7 @@ export const resolveMediaUrl = (url?: string | null): string => {
     }
 
     // SSR ou fallback
-    const apiBase = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com/api/v1' : 'http://localhost:8000/api/v1')
+    const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1'
     const origin = apiBase.replace(/\/api.*$/, '').replace(/\/+$/, '')
     return `${origin}${cleanPath}`
   }

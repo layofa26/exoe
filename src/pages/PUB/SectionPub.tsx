@@ -52,13 +52,6 @@ interface RecommendedPro {
   isFollowing?: boolean
 }
 
-interface UpcomingEvent {
-  id: string
-  title: string
-  date: string
-  category: string
-  isLive?: boolean
-}
 
 interface SectionPubProps {
   variant?: 'auto' | 'mobile' | 'desktop'
@@ -212,10 +205,6 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
     { id: '2', name: 'Sophie Laurent', username: 'sophielaurent', profession: 'Experte FinTech & IA', subscribersCount: 3890, isFollowing: false }
   ])
 
-  const [events, setEvents] = useState<UpcomingEvent[]>([
-    { id: 'evt_1', title: 'Masterclass : Architecture Web & Sécurité', date: 'Demain à 18h00', category: 'Tech', isLive: true },
-    { id: 'evt_2', title: 'Webinaire : Stratégies d’Investissement 2026', date: 'Samedi 14h00', category: 'Finance', isLive: false }
-  ])
 
   // Charger les profils réels du backend
   useEffect(() => {
@@ -289,7 +278,6 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
           <div className="w-9 h-9 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto text-sm font-bold">
             🏢
           </div>
-          <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('pub.enterpriseSpace', 'Espace Entreprise (PUB)')}</p>
           <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pub.promoteBrand', 'Promouvez votre marque auprès des professionnels EXILE.')}</p>
           <button
             onClick={() => setIsInquiryModalOpen(true)}
@@ -300,12 +288,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
         </div>
       ) : (
         <div>
-          <div className="flex items-center justify-between px-2 sm:px-1 mb-2">
-            <h3 className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'} flex items-center gap-1.5`}>
-              <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                {t('pub.enterpriseSpace', 'Espace Entreprise (PUB)')}
-              </span>
-            </h3>
+          <div className="flex items-center justify-end px-2 sm:px-1 mb-2">
             {/* Indicateur d'animation synchronisé avec Desktop */}
             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
               {companies.slice(0, 6).map((_, i) => (
@@ -473,7 +456,6 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
             <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mx-auto">
               <Building2 className="w-5 h-5" />
             </div>
-            <h4 className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('pub.enterpriseSpace', 'Espace Entreprises (PUB)')}</h4>
             <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>{t('pub.promoteBrand', 'Promouvez votre marque auprès des professionnels EXILE.')}</p>
             <button
               onClick={() => setIsInquiryModalOpen(true)}
@@ -489,13 +471,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
               isDark ? 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700' : 'bg-white border-gray-200 hover:border-gray-300'
             }`}
           >
-            {/* En-tête Badge Espace Entreprise(PUB) */}
-            <div className="p-3 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                  {t('pub.enterpriseSpace', 'Espace Entreprise (PUB)')}
-                </span>
-              </div>
+            <div className="p-3 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-end flex-shrink-0">
               <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                 {companies.map((_, i) => (
                   <button
@@ -684,54 +660,7 @@ export default function SectionPub({ variant = 'auto' }: SectionPubProps) {
         </div>
       </div>
 
-      {/* 3. SECTION : ÉVÉNEMENTS À VENIR */}
-      <div className={`p-4 rounded-3xl border ${isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-gray-200'} shadow-sm`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
-              <Calendar className="w-4 h-4" />
-            </div>
-            <h3 className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {t('pub.eventsAndLive', 'Événements & Live')}
-            </h3>
-          </div>
-          <Link
-            to="/pro/events"
-            className="text-[11px] font-semibold text-purple-500 hover:text-purple-600 transition-colors flex items-center gap-0.5"
-          >
-            {t('common.all', 'Tous')}
-            <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
 
-        <div className="space-y-2">
-          {events.map(evt => (
-            <div
-              key={evt.id}
-              onClick={() => navigate('/pro/events')}
-              className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                isDark ? 'bg-zinc-800/40 border-zinc-800 hover:bg-zinc-800' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                  evt.isLive
-                    ? 'bg-red-500/15 text-red-500 animate-pulse'
-                    : 'bg-blue-500/10 text-blue-500'
-                }`}>
-                  {evt.isLive ? t('common.live', 'EN DIRECT') : evt.category}
-                </span>
-                <span className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
-                  {evt.date}
-                </span>
-              </div>
-              <p className={`text-xs font-semibold line-clamp-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {evt.title}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
 
     {/* Modal de Demande Publicitaire Directe (Option 1) */}

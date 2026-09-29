@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Check, CheckCheck, Star, Reply, Copy, Edit2,
   Trash2, Forward, Flag, ChevronDown, Smile
 } from 'lucide-react'
+import { getCurrentUserId } from '../services/apiClient'
 
 export interface MessageBubbleData {
   id: string
@@ -105,6 +106,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   // Touch swipe-to-reply state
   const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+  const isTouchMoving = useRef<boolean>(false)
   const [swipeOffset, setSwipeOffset] = useState(0)
 
   // Detect image in message content
@@ -123,36 +126,69 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Detect System Notification: [system_notif:Message]
   const sysNotifMatch = message.content.match(/^\[system_notif:(.*?)\]$/)
 
-  // Long text threshold
-  const isLong = message.content.length > 240 && !imageUrl && !docMatch && !proposalMatch && !eventMatch && !sysNotifMatch
-  const displayContent = isLong && !isExpanded ? message.content.slice(0, 240) + '...' : message.content
+  // Detect Block / Unblock event: [block_event:blocked|blockerId|isoTime] or [block_event:unblocked|blockerId|isoTime]
+  const blockEventMatch = message.content.match(/^\[block_event:(blocked|unblocked)\|(.*?)\|(.*?)\]$/)
 
-  // Swipe-to-reply on touch devices (WhatsApp mobile behavior)
+  // Long text threshold (WhatsApp standard: ~320 chars or > 6 linebreaks)
+  const lineCount = (message.content.match(/\n/g) || []).length
+  const isLong = (message.content.length > 320 || lineCount > 6) && !imageUrl && !docMatch && !proposalMatch && !eventMatch && !sysNotifMatch && !blockEventMatch
+  const displayContent = isLong && !isExpanded ? message.content.slice(0, 300) + '...' : message.content
+
+  // Touch handlers (mobile & tablette) - Long press strictly cancels on vertical scroll!
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isSelectionMode) return
     touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+    isTouchMoving.current = false
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
     longPressTimer.current = setTimeout(() => {
-      setShowReactionPicker(true)
+      if (!isTouchMoving.current) {
+        setShowMenu(true)
+        setShowReactionPicker(true)
+      }
     }, 500)
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return
-    const diff = e.touches[0].clientX - touchStartX.current
-    if (diff > 10) {
-      // Clear long-press if swiping
-      if (longPressTimer.current) clearTimeout(longPressTimer.current)
-      // Limit swipe distance max 70px
-      setSwipeOffset(Math.min(diff * 0.7, 70))
+    if (touchStartX.current === null || touchStartY.current === null) return
+    const diffX = e.touches[0].clientX - touchStartX.current
+    const diffY = e.touches[0].clientY - touchStartY.current
+
+    // If scrolling vertically or moving horizontally significantly, cancel long press
+    if (Math.abs(diffY) > 8 || Math.abs(diffX) > 10) {
+      isTouchMoving.current = true
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+    }
+
+    // Horizontal swipe to reply
+    if (diffX > 10 && Math.abs(diffY) < 15) {
+      setSwipeOffset(Math.min(diffX * 0.7, 70))
     }
   }
 
   const handleTouchEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
     if (swipeOffset > 45) {
       onReply(message)
     }
     setSwipeOffset(0)
     touchStartX.current = null
+    touchStartY.current = null
+    isTouchMoving.current = false
+  }
+
+  // Right-click context menu handler
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isSelectionMode) return
+    e.preventDefault()
+    e.stopPropagation()
+    setShowMenu(true)
   }
 
   const handleQuickReaction = (emoji: string) => {
@@ -193,6 +229,52 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     ]),
   ]
 
+  // Render simple gray system message for block / unblock events
+  if (blockEventMatch) {
+    const actionType = blockEventMatch[1]
+    const blockerId = blockEventMatch[2]
+    const isoTime = blockEventMatch[3]
+    const myId = getCurrentUserId() || (typeof window !== 'undefined' ? (localStorage.getItem('userId') || localStorage.getItem('current_user_id')) : null)
+    const isBlocker = myId ? String(myId) === String(blockerId) : isMine
+    
+    let dateStr = ''
+    try {
+      const d = new Date(isoTime || message.createdAt)
+      dateStr = d.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      dateStr = ''
+    }
+
+    let text = ''
+    if (actionType === 'blocked') {
+      text = isBlocker
+        ? `Vous avez bloqué cet utilisateur · ${dateStr}`
+        : `Cet utilisateur vous a bloqué · ${dateStr}`
+    } else {
+      text = isBlocker
+        ? `Vous avez débloqué cet utilisateur · ${dateStr}`
+        : `Cet utilisateur vous a débloqué · ${dateStr}`
+    }
+
+    return (
+      <div className="w-full flex justify-center my-3 px-4 select-none">
+        <div className={`px-4 py-1.5 rounded-full text-xs font-normal text-center shadow-xs border ${
+          isDark 
+            ? 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50' 
+            : 'bg-zinc-100 text-zinc-500 border-zinc-200/80'
+        }`}>
+          {text}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       id={`message-${message.id}`}
@@ -207,6 +289,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           onReply(message)
         }
       }}
+      onContextMenu={handleContextMenu}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -252,7 +335,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
 
       {/* Bubble + actions container */}
-      <div className={`relative flex flex-col max-w-[85%] sm:max-w-[72%] ${isMine ? 'items-end' : 'items-start'}`}>
+      <div className={`relative flex flex-col min-w-0 max-w-[85%] sm:max-w-[70%] md:max-w-[62%] ${isMine ? 'items-end' : 'items-start'}`}>
 
         {/* ── 1. Image Bubble ── */}
         {imageUrl ? (
@@ -448,12 +531,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         ) : (
           /* ── 6. Standard Text Bubble (WhatsApp Look & Feel) ── */
           <div
-            className={`group/bubble relative px-3 py-2 shadow-sm transition-all duration-150
+            className={`group/bubble relative px-3.5 py-2 shadow-sm transition-all duration-150 min-w-0 max-w-full w-fit
               ${isMine
-                ? 'rounded-2xl rounded-tr-sm bg-emerald-600 text-white'
+                ? 'rounded-2xl rounded-tr-xs bg-emerald-600 text-white'
                 : isDark
-                  ? 'rounded-2xl rounded-tl-sm bg-slate-800 border border-slate-700/70 text-slate-100'
-                  : 'rounded-2xl rounded-tl-sm bg-white border border-slate-200/80 text-slate-800 shadow-sm'
+                  ? 'rounded-2xl rounded-tl-xs bg-slate-800 border border-slate-700/70 text-slate-100'
+                  : 'rounded-2xl rounded-tl-xs bg-white border border-slate-200/80 text-slate-800 shadow-sm'
               }
             `}
           >
@@ -505,17 +588,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
 
             {/* Message Text Content */}
-            <p className="text-[13.5px] leading-relaxed break-words whitespace-pre-wrap pr-4">
+            <p className="text-[13.5px] leading-relaxed [overflow-wrap:anywhere] break-words [word-break:break-word] whitespace-pre-wrap pr-3">
               {highlightText(displayContent, searchQuery)}
             </p>
 
-            {/* Expand / Collapse Button for very long messages */}
+            {/* Expand / Collapse Button for very long messages (WhatsApp style) */}
             {isLong && (
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); setIsExpanded(v => !v) }}
-                className={`text-xs font-bold mt-1 underline hover:no-underline block ${isMine ? 'text-emerald-100' : 'text-emerald-500'}`}
+                className={`text-[11.5px] font-bold mt-1 inline-flex items-center gap-1 hover:underline cursor-pointer select-none ${
+                  isMine
+                    ? 'text-emerald-100 hover:text-white'
+                    : isDark
+                      ? 'text-emerald-400 hover:text-emerald-300'
+                      : 'text-emerald-600 hover:text-emerald-700'
+                }`}
               >
-                {isExpanded ? 'Voir moins' : 'Voir plus'}
+                <span>{isExpanded ? '▲ Voir moins' : '... Lire la suite ▼'}</span>
               </button>
             )}
 
@@ -536,9 +626,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {formatTime(message.createdAt)}
               </span>
               {isMine && (
-                message.read
-                  ? <CheckCheck size={13} className="text-cyan-200" />
-                  : <Check size={13} className="text-emerald-200" />
+                <span
+                  className="inline-flex items-center ml-1 select-none"
+                  title={message.read ? "Vu / Lu" : "Distribué"}
+                >
+                  {message.read ? (
+                    <CheckCheck size={14} className="text-[#38bdf8] drop-shadow-[0_0_2px_rgba(56,189,248,0.6)] stroke-[2.5]" />
+                  ) : (
+                    <CheckCheck size={14} className="text-white/60 dark:text-slate-400 stroke-[1.8]" />
+                  )}
+                </span>
               )}
             </div>
 
@@ -578,15 +675,33 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Active Reaction Badge under bubble */}
         {selectedEmoji && (
           <div
-            onClick={() => handleQuickReaction(selectedEmoji)}
-            className={`-mt-2 ${isMine ? 'mr-2 self-end' : 'ml-2 self-start'} px-2 py-0.5 rounded-full text-xs font-semibold shadow-md border cursor-pointer hover:scale-105 transition-transform flex items-center gap-1
-              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+            onClick={(e) => { e.stopPropagation(); handleQuickReaction(selectedEmoji) }}
+            className={`relative z-20 -mt-2.5 ${isMine ? 'mr-3 self-end' : 'ml-3 self-start'} px-2.5 py-1 rounded-full text-xs font-semibold shadow-md border cursor-pointer hover:scale-110 active:scale-95 transition-transform flex items-center gap-1.5 select-none backdrop-blur-md ${
+              isDark
+                ? 'bg-slate-800/95 border-slate-700 text-white ring-1 ring-black/40'
+                : 'bg-white/95 border-slate-200 text-slate-800 ring-1 ring-slate-100 shadow-sm'
+            }`}
           >
-            <span>{selectedEmoji}</span>
-            <span className="text-[10px] text-emerald-500 font-bold">1</span>
+            <span className="text-sm leading-none inline-block">{selectedEmoji}</span>
+            <span className={`text-[10px] font-bold leading-none ${isMine ? 'text-emerald-400' : 'text-emerald-600'}`}>1</span>
           </div>
         )}
       </div>
+
+      {/* WhatsApp Desktop reaction trigger on hover */}
+      {!isSelectionMode && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowReactionPicker(v => !v)
+          }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hidden sm:flex items-center justify-center self-center flex-shrink-0 cursor-pointer mb-1"
+          title="Réagir au message"
+        >
+          <Smile size={16} />
+        </button>
+      )}
 
       {/* Lightbox Image Preview Modal */}
       {showImageModal && (
@@ -605,6 +720,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               ${isMine ? 'right-2' : 'left-2'} top-full mt-1
               ${isDark ? 'bg-slate-900/95 border-slate-700' : 'bg-white/95 border-slate-200'}`}
           >
+            {/* Quick emoji reactions in context menu */}
+            <div className={`flex items-center justify-around px-2 py-1.5 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+              {QUICK_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleQuickReaction(emoji)
+                    setShowMenu(false)
+                  }}
+                  className="text-base p-1 rounded-full hover:scale-125 transition-transform cursor-pointer"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
             {menuItems.map((item, i) => (
               <button
                 key={i}

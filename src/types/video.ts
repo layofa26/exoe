@@ -74,4 +74,10 @@ export interface Video {
   allowLikes?: boolean;
   allowShares?: boolean;
   isLive?: boolean;
+  eventId?: string | number;
+  liveRoomName?: string;
+  startDate?: string;
+  endDate?: string;
+  isRegistered?: boolean;
+  replayUrl?: string;
 }

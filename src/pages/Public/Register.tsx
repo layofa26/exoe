@@ -19,7 +19,10 @@ import {
   AlertCircle,
   ChevronDown,
   Users,
-  CheckCircle
+  CheckCircle,
+  Sun,
+  Moon,
+  Laptop
 } from 'lucide-react'
 
 interface FormData {
@@ -39,7 +42,7 @@ interface FormData {
 
 export const Register = (): JSX.Element => {
   const { registerPro, loginWithGoogle } = useAuth()
-  const { resolvedTheme } = useTheme()
+  const { resolvedTheme, theme, setTheme } = useTheme()
   const navigate = useNavigate()
 
   const [step, setStep] = useState<number>(1)
@@ -74,7 +77,7 @@ export const Register = (): JSX.Element => {
 
   const handleSocialSelect = async (provider: 'google') => {
     if (provider === 'google') {
-      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1066102624726-tqcs9mv5j9ngtrco6dphca8j2evh74eo.apps.googleusercontent.com'
+      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
       
       // Essayer le TokenClient officiel Google (ouvre le vrai popup OAuth)
       if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
@@ -358,33 +361,16 @@ export const Register = (): JSX.Element => {
   }
 
   return (
-    <div className={`min-h-screen pt-2 sm:pt-4 pb-8 px-3 sm:px-6 relative overflow-hidden flex flex-col justify-start items-center ${
+    <div className={`min-h-screen pt-2 sm:pt-4 pb-8 px-3 sm:px-6 relative overflow-hidden flex flex-col justify-start items-center transition-colors ${
       resolvedTheme === 'dark' 
-        ? 'bg-slate-900' 
-        : 'bg-gray-50'
+        ? 'bg-[#0b0e14] text-white' 
+        : 'bg-white text-slate-900'
     }`}>
-      {/* Animated Background with Color Mixing */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 animate-gradient-x" style={{
-          background: `linear-gradient(45deg, 
-            ${resolvedTheme === 'dark' ? '#1e3a8a' : '#3b82f6'}, 
-            ${resolvedTheme === 'dark' ? '#7c3aed' : '#8b5cf6'}, 
-            ${resolvedTheme === 'dark' ? '#059669' : '#10b981'}, 
-            ${resolvedTheme === 'dark' ? '#dc2626' : '#ef4444'}
-          )`,
-          backgroundSize: '400% 400%',
-          animation: 'gradient 15s ease infinite',
-        }} />
-        
-        <div className="absolute top-20 left-10 w-24 sm:w-32 h-24 sm:h-32 bg-white/10 rounded-full animate-bounce" style={{ animationDuration: '3s' }} />
-        <div className="absolute top-40 right-10 sm:right-20 w-16 sm:w-24 h-16 sm:h-24 bg-white/10 rounded-lg animate-spin" style={{ animationDuration: '10s' }} />
-      </div>
-
       <div className="w-full max-w-lg mx-auto relative z-10 my-0 pt-1 sm:pt-2 pb-6">
-        <div className={`rounded-2xl shadow-2xl p-5 sm:p-8 backdrop-blur-md transition-all ${
+        <div className={`rounded-2xl p-5 sm:p-8 transition-all ${
           resolvedTheme === 'dark' 
-            ? 'bg-slate-800/90 border border-slate-700/80 shadow-black/40' 
-            : 'bg-white/90 border border-gray-200/80 shadow-slate-200/60'
+            ? 'bg-slate-900 border border-slate-800 shadow-2xl shadow-black/50 text-white' 
+            : 'bg-white border border-slate-200 shadow-xl shadow-slate-100 text-slate-900'
         }`}>
           <div className="text-center mb-5 sm:mb-7">
             <h1 className={`text-xl sm:text-2xl md:text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-gray-900'} mb-1.5`}>

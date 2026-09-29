@@ -267,17 +267,8 @@ export const useAccueilAlgo = (userId: string): UseAccueilAlgoReturn => {
 
   // Déterminer si on doit afficher des lives
   const shouldShowLive = useCallback((availableLives: number): boolean => {
-    if (availableLives === 0) return false
-
-    // Si l'utilisateur préfère les lives, toujours montrer
-    if (liveEngagementRate > 0.6) return true
-
-    // Si l'utilisateur est neutre, montrer si des lives sont disponibles
-    if (liveEngagementRate > 0.3 && availableLives > 0) return true
-
-    // Si l'utilisateur préfère les vidéos, montrer seulement si beaucoup de lives
-    return availableLives >= 3
-  }, [liveEngagementRate])
+    return availableLives > 0
+  }, [])
 
   // Obtenir la fréquence optimale de lives
   const getOptimalLiveFrequency = useCallback((): number => {

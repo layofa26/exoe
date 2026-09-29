@@ -36,28 +36,7 @@ export function SocialHeader({
   const [recentAndPopular, setRecentAndPopular] = useState<{recentProfessionals: any[], popularProfessionals: any[], popularVideos: any[]} | null>(null)
   const { recentSearches, addRecentSearch, clearRecentSearches } = useRecentSearches()
 
-  // Synchroniser avec localStorage pour éviter les conflits avec Header.tsx
-  useEffect(() => {
-    const checkMobileSearch = () => {
-      try {
-        const isActive = localStorage.getItem('exile_mobile_search_active')
-        setIsMobileSearchOpen(isActive === 'true')
-      } catch (e) {
-        setIsMobileSearchOpen(false)
-      }
-    }
-    
-    checkMobileSearch()
-    
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'exile_mobile_search_active') {
-        setIsMobileSearchOpen(e.newValue === 'true')
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [])
+
 
   // Fonction de recherche avec filtre - utilise l'API réelle
   const handleSearch = async (query: string) => {
@@ -160,16 +139,13 @@ export function SocialHeader({
   }
 
   const handleMobileSearchOpen = () => {
-    console.log('Opening mobile search')
     setIsMobileSearchOpen(true)
     setShowDropdown(true)
-    localStorage.setItem('exile_mobile_search_active', 'true')
   }
 
   const handleMobileSearchClose = () => {
     setIsMobileSearchOpen(false)
     setShowDropdown(false)
-    localStorage.setItem('exile_mobile_search_active', 'false')
     setSearchQuery('')
   }
 

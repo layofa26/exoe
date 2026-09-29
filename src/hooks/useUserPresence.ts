@@ -28,14 +28,14 @@ export function useUserPresence() {
       return
     }
 
-    const backendUrl = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://exile-backend-9q6o.onrender.com' : 'http://localhost:8000')).replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '')
+    const backendUrl = (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '')
     let wsBase = ''
     try {
       const parsed = new URL(backendUrl, window.location.origin)
       const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
       wsBase = `${wsProto}//${parsed.host}`
     } catch {
-      wsBase = window.location.protocol === 'https:' ? 'wss://exile-backend-9q6o.onrender.com' : 'ws://localhost:8000'
+      wsBase = typeof window !== 'undefined' && window.location.protocol === 'https:' ? `wss://${window.location.host}` : `ws://${window.location.host}`
     }
     const wsUrl = `${wsBase}/ws/presence/?uuid=${encodeURIComponent(userUuid)}`
 

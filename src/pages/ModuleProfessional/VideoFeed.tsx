@@ -8,10 +8,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAccueilAlgo } from '../../algoPro/signals/useAccueilAlgo';
 import { useSubsAlgo } from '../../algoPro/signals/useSubsAlgo';
 import { useRequestsAlgo } from '../../algoPro/signals/useRequestsAlgo';
+import { useEventsAlgo } from '../../algoPro/signals/useEventsAlgo';
+import { TigerFeedOrchestrator } from '../../algoPro/orchestrator/TigerFeedOrchestrator';
 import { useSearch } from '../../hooks/useSearch';
 import { useQuery } from '../../hooks/useQuery';
-import { useNavigate } from 'react-router-dom';
-import { MessageCircle, WifiOff, Wifi, RefreshCw, AlertCircle, Sparkles, Plus, Play, ArrowRight } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MessageCircle, WifiOff, Wifi, RefreshCw, AlertCircle, Plus, Play, ArrowRight, Radio, Users } from 'lucide-react';
 import { ContactModal } from '../../components/modals/ContactModal';
 import { UploadVideo } from '../../components/video/UploadVideo';
 import { FeedVideoCard } from '../../components/video/FeedVideoCard';
@@ -37,12 +39,200 @@ const VideoSkeleton = ({ resolvedTheme }: { resolvedTheme: string }) => {
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FeedLiveCard — Carte sobre et neutre pour les diffusions en direct (AlgoPro)
+// ─────────────────────────────────────────────────────────────────────────────
+interface FeedLiveCardProps {
+  live: {
+    id: string
+    title: string
+    category?: string
+    coverImage?: string
+    viewerCount?: number
+    creatorId?: string
+    organizerName?: string
+    organizerAvatar?: string
+    organizerProfession?: string
+    liveRoomName?: string
+  }
+  onClick: () => void
+  onProfileClick?: (creatorId: string) => void
+  resolvedTheme: string
+}
+
+const FeedLiveCard: React.FC<FeedLiveCardProps> = ({ live, onClick, onProfileClick, resolvedTheme }) => {
+  const isDark = resolvedTheme === 'dark'
+  const initialLetter = (live.organizerName || 'U').charAt(0).toUpperCase()
+  const viewers = live.viewerCount ?? 0
+
+  return (
+    <div
+      className={`w-full ${isDark ? 'bg-zinc-950 border-zinc-800/80' : 'bg-white border-slate-200'} border-b flex flex-col overflow-hidden cursor-pointer group`}
+      onClick={onClick}
+    >
+      {/* ── ZONE MINIATURE DU DIRECT (16:9) ── */}
+      <div className="relative w-full aspect-video bg-black overflow-hidden flex items-center justify-center select-none">
+        {live.coverImage ? (
+          <img
+            src={live.coverImage}
+            alt={live.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-black relative overflow-hidden select-none">
+            {/* Vagues sonores animées en fond */}
+            <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-25 pointer-events-none">
+              <span className="w-1.5 h-10 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-16 bg-zinc-300 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-20 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+              <span className="w-1.5 h-14 bg-zinc-300 rounded-full animate-pulse" style={{ animationDelay: '75ms' }} />
+              <span className="w-1.5 h-8 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '225ms' }} />
+            </div>
+
+            {/* Avatar de l'hôte avec cercle rouge pulsant de direct */}
+            <div className="relative z-10 flex flex-col items-center gap-2">
+              <div className="relative w-14 h-14 rounded-full ring-2 ring-red-500 ring-offset-2 ring-offset-black flex items-center justify-center overflow-hidden bg-zinc-800 shadow-xl">
+                {live.organizerAvatar ? (
+                  <img src={live.organizerAvatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white font-bold text-base">{initialLetter}</span>
+                )}
+                <div className="absolute inset-0 bg-red-500/10 animate-ping rounded-full pointer-events-none" />
+              </div>
+              <span className="text-xs font-bold text-zinc-200 tracking-wide shadow-sm">
+                Direct en cours • {live.organizerName || 'Créateur'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Badge EN DIRECT sobre */}
+        <div className="absolute top-2.5 left-2.5 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold tracking-wider uppercase shadow-md">
+          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+          <span>En Direct</span>
+        </div>
+
+        {/* Compteur Spectateurs */}
+        <div className="absolute bottom-2.5 left-2.5 z-20 flex items-center gap-1 px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-white text-[10px] font-medium">
+          <Users size={11} className="text-zinc-300" />
+          <span>{viewers} spectateurs</span>
+        </div>
+
+        {/* Bouton Rejoindre discret au survol */}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+          <div className="px-3 py-1.5 rounded-full bg-black/85 border border-white/20 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
+            <Play size={12} className="fill-white" />
+            <span>Rejoindre</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── FOOTER DU DIRECT ── */}
+      <div className="px-3 py-2 flex items-start gap-2.5">
+        {/* Avatar de l'hôte */}
+        <div
+          onClick={(e) => {
+            e.stopPropagation()
+            if (live.creatorId) onProfileClick?.(live.creatorId)
+          }}
+          className={`w-[34px] h-[34px] rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden cursor-pointer mt-0.5 border ${
+            isDark ? 'border-zinc-700 bg-zinc-800' : 'border-gray-200 bg-gray-100'
+          }`}
+        >
+          {live.organizerAvatar ? (
+            <img
+              src={live.organizerAvatar}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          ) : (
+            <span className={`font-bold text-xs ${isDark ? 'text-zinc-200' : 'text-zinc-700'}`}>
+              {initialLetter}
+            </span>
+          )}
+        </div>
+
+        {/* Infos du direct */}
+        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className={`text-xs font-bold truncate ${isDark ? 'text-zinc-200' : 'text-gray-900'}`}>
+              {live.organizerName}
+            </span>
+            {live.organizerProfession && (
+              <>
+                <span className="text-[10px] text-zinc-500">•</span>
+                <span className="text-[11px] text-zinc-400 truncate">
+                  {live.organizerProfession}
+                </span>
+              </>
+            )}
+          </div>
+
+          <h4 className={`text-xs font-semibold leading-snug line-clamp-2 ${isDark ? 'text-zinc-100' : 'text-gray-800'}`}>
+            {live.title}
+          </h4>
+
+          {live.category && (
+            <div className="mt-1">
+              <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {live.category}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function mapEventToVideo(item: any): Video {
+  const isLiveNow = item.isLive === true || item.is_live === true || item.status === 'live' || item.live_status === 'ongoing' || item.streaming?.isLive === true
+  const cleanId = String(item.id).replace('evt-', '').replace('exile-', '')
+  return {
+    id: `evt-${cleanId}`,
+    eventId: cleanId,
+    title: item.title || item.name || 'Événement',
+    description: item.description || '',
+    category: item.categorie || item.category || 'Événement',
+    isLive: isLiveNow,
+    liveRoomName: item.live_room_name || item.jitsi_room || item.streaming?.roomName || `exile-${cleanId}`,
+    startDate: item.date_debut || item.start_date,
+    endDate: item.date_fin || item.end_date,
+    replayUrl: item.replay_url || item.recording_url || item.recording_file,
+    videoUrl: item.replay_url || item.recording_url || item.recording_file || '',
+    thumbnail: item.cover || item.cover_image || item.image || item.coverImage,
+    views: item.views_count || item.participants_count || item.participantsCount || item.stats?.attendees || 0,
+    viewsCount: item.views_count || item.participants_count || item.participantsCount || item.stats?.attendees || 0,
+    likes: 0,
+    isRegistered: Boolean(item.is_registered),
+    author: {
+      id: String(item.owner_id || item.ownerId || item.organizerId || ''),
+      name: item.owner_name || item.organizer_name || item.organizerName || 'Organisateur',
+      username: item.owner_username || item.owner_name || item.organizer_name || 'Organisateur',
+      profession: item.owner_profession || item.profession || 'Créateur',
+      location: item.location || 'En ligne',
+      initials: (item.owner_name || item.organizer_name || 'U').charAt(0).toUpperCase(),
+      avatarColor: '#27272a',
+      avatarUrl: item.owner_avatar || item.organizer_avatar || item.organizerAvatar
+    }
+  }
+}
+
 export default function VideoFeed() {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const navigate = useNavigate()
   const { isAuthenticated, user } = useAuth()
   const [activeVideo, setActiveVideo] = useState<Video | null>(null)
+  const [allBackendEvents, setAllBackendEvents] = useState<any[]>([])
   const [isMobile, setIsMobile] = useState(false)
   const [isOnline, setIsOnline] = useState<boolean>(() => typeof navigator !== 'undefined' ? navigator.onLine : true)
   const [isReconnecting, setIsReconnecting] = useState(false)
@@ -87,10 +277,11 @@ export default function VideoFeed() {
   // Récupérer ou créer un userId pour les signaux algorithmiques
   const userId = localStorage.getItem('exile_user_id') || 'user_default'
   
-  // Initialiser les Logic Hooks
+  // Initialiser les Logic Hooks (AlgoPro)
   const accueilAlgo = useAccueilAlgo(userId)
   const subsAlgo = useSubsAlgo(userId)
   const requestsAlgo = useRequestsAlgo(userId)
+  const eventsAlgo = useEventsAlgo(userId)
 
   // Hook SWR avec revalidation - Récupère exclusivement les VRAIES vidéos du Backend Django
   const {
@@ -118,6 +309,74 @@ export default function VideoFeed() {
     }
   )
 
+  // Hook SWR - Récupère les diffusions en DIRECT actives (Backend Django & LocalStorage)
+  const {
+    data: cachedLives,
+    refetch: loadLives
+  } = useQuery<any[]>(
+    async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+        const response = await fetch(`${API_BASE_URL}/evenement/evenements/`, {
+          headers: token ? {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } : {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        let rawEvents: any[] = []
+        if (response.ok) {
+          const data = await response.json()
+          rawEvents = Array.isArray(data) ? data : (data.results || [])
+        }
+
+        setAllBackendEvents(rawEvents)
+        const allEvents = rawEvents
+
+        // Filtrer les événements actuellement en direct
+        const activeLives = allEvents
+          .filter((item: any) =>
+            item.isLive === true ||
+            item.is_live === true ||
+            item.status === 'live' ||
+            item.live_status === 'ongoing' ||
+            item.streaming?.isLive === true
+          )
+          .map((item: any) => ({
+            id: String(item.id),
+            title: item.title || item.name || 'Direct en cours',
+            description: item.description || '',
+            category: item.categorie || item.category || 'GENERAL',
+            coverImage: item.cover || item.cover_image || item.coverImage,
+            viewerCount: item.viewerCount || item.participants_count || item.participantsCount || item.stats?.attendees || 0,
+            creatorId: String(item.owner_id || item.ownerId || item.organizerId || ''),
+            organizerName: item.owner_name || item.organizer_name || item.organizerName || 'Organisateur',
+            organizerAvatar: item.owner_avatar || item.organizer_avatar || item.organizerAvatar,
+            organizerProfession: item.owner_profession || item.profession || 'Créateur',
+            liveRoomName: item.live_room_name || item.jitsi_room || item.streaming?.roomName
+          }))
+
+        const seen = new Set<string>()
+        return activeLives.filter(l => {
+          if (seen.has(l.id)) return false
+          seen.add(l.id)
+          return true
+        })
+      } catch (err) {
+        console.warn('[VideoFeed] Error loading lives:', err)
+        return []
+      }
+    },
+    {
+      cacheKey: 'pro:lives:feed:active',
+      cacheTime: 15 * 1000,
+      refetchOnMount: true,
+    }
+  )
+
   const videos = cachedVideos || []
   const error = queryError ? queryError.message : null
 
@@ -125,23 +384,27 @@ export default function VideoFeed() {
     setIsReconnecting(true)
     const online = typeof navigator !== 'undefined' ? navigator.onLine : true
     setIsOnline(online)
-    await loadVideos()
+    await Promise.all([loadVideos(), loadLives()])
     setTimeout(() => setIsReconnecting(false), 600)
   }
 
-  // Écouter l'événement de vidéo uploadée pour rafraîchissement instantané
+  // Écouter les événements pour rafraîchissement instantané
   useEffect(() => {
-    const handleVideoUploaded = () => {
+    const handleRefresh = () => {
       loadVideos()
+      loadLives()
     }
 
-    window.addEventListener('video-uploaded', handleVideoUploaded)
-    window.addEventListener('video-published', handleVideoUploaded)
+    window.addEventListener('video-uploaded', handleRefresh)
+    window.addEventListener('video-published', handleRefresh)
     return () => {
-      window.removeEventListener('video-uploaded', handleVideoUploaded)
-      window.removeEventListener('video-published', handleVideoUploaded)
+      window.removeEventListener('video-uploaded', handleRefresh)
+      window.removeEventListener('video-published', handleRefresh)
     }
-  }, [loadVideos])
+  }, [loadVideos, loadLives])
+
+  const [searchParams, setSearchParams] = useSearchParams()
+  const eventParam = searchParams.get('event') || searchParams.get('live')
 
   const handleOpen = useCallback((video: Video) => {
     // Arrêter immédiatement toute vidéo en lecture dans le feed
@@ -156,12 +419,126 @@ export default function VideoFeed() {
     }
     
     setActiveVideo(video);
+    const nextParams = new URLSearchParams(searchParams);
+    if (video.eventId || video.isLive) {
+      const cleanId = String(video.eventId || video.id).replace('evt-', '').replace('exile-', '');
+      if (video.isLive) {
+        nextParams.set('live', cleanId);
+        nextParams.delete('event');
+      } else {
+        nextParams.set('event', cleanId);
+        nextParams.delete('live');
+      }
+    } else {
+      nextParams.delete('event');
+      nextParams.delete('live');
+    }
+    setSearchParams(nextParams, { replace: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [accueilAlgo, subsAlgo]);
+  }, [accueilAlgo, subsAlgo, searchParams, setSearchParams]);
+
+  // Charger l'événement ou le live directement dans le lecteur avec le deuxième feed
+  useEffect(() => {
+    if (!eventParam) return
+    const cleanId = String(eventParam).replace('evt-', '').replace('exile-', '')
+    if (activeVideo && (activeVideo.eventId === cleanId || activeVideo.id === `evt-${cleanId}`)) {
+      return
+    }
+
+    let isCancelled = false
+
+    const loadEventIntoPlayer = async () => {
+      try {
+        if (!cleanId || isNaN(Number(cleanId))) {
+          const next = new URLSearchParams(searchParams)
+          next.delete('event')
+          next.delete('live')
+          setSearchParams(next, { replace: true })
+          return
+        }
+
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token')
+        const res = await fetch(`${API_BASE_URL}/evenement/evenements/${cleanId}/`, {
+          headers: token ? {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } : {
+            'Content-Type': 'application/json'
+          }
+        })
+        if (res.ok && !isCancelled) {
+          const item = await res.json()
+          const isLiveNow = item.is_live === true || item.status === 'live' || item.live_status === 'ongoing' || searchParams.has('live')
+          const eventVideo: Video = {
+            id: `evt-${item.id}`,
+            eventId: item.id,
+            title: item.title || item.name || 'Événement',
+            description: item.description || '',
+            category: item.categorie || item.category || 'Événement',
+            isLive: isLiveNow,
+            liveRoomName: item.live_room_name || `exile-${item.id}`,
+            startDate: item.date_debut || item.start_date,
+            endDate: item.date_fin || item.end_date,
+            replayUrl: item.replay_url || item.recording_url,
+            videoUrl: item.replay_url || item.recording_url || '',
+            thumbnail: item.cover || item.cover_image,
+            views: item.participants_count || item.stats?.attendees || 0,
+            viewsCount: item.participants_count || item.stats?.attendees || 0,
+            likes: 0,
+            isRegistered: Boolean(item.is_registered),
+            author: {
+              id: String(item.owner_id || ''),
+              name: item.owner_name || 'Organisateur',
+              username: item.owner_username || item.owner_name,
+              profession: item.owner_profession || 'Créateur',
+              location: item.location || 'En ligne',
+              initials: (item.owner_name || 'U').charAt(0).toUpperCase(),
+              avatarColor: '#27272a',
+              avatarUrl: item.owner_avatar
+            }
+          }
+          setActiveVideo(eventVideo)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        } else if (!res.ok && !isCancelled) {
+          const next = new URLSearchParams(searchParams)
+          next.delete('event')
+          next.delete('live')
+          setSearchParams(next, { replace: true })
+        }
+      } catch (err) {
+        console.error('[VideoFeed] Erreur chargement événement pour lecteur:', err)
+        if (!isCancelled) {
+          const next = new URLSearchParams(searchParams)
+          next.delete('event')
+          next.delete('live')
+          setSearchParams(next, { replace: true })
+        }
+      }
+    }
+
+    loadEventIntoPlayer()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [eventParam, activeVideo, searchParams, setSearchParams])
 
   const handleBack = useCallback(() => {
     setActiveVideo(null);
-  }, []);
+    const fromParam = searchParams.get('from');
+    if (fromParam) {
+      navigate(fromParam, { replace: true });
+      return;
+    }
+    if (searchParams.has('event') || searchParams.has('live')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('event');
+      nextParams.delete('live');
+      nextParams.delete('from');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, navigate]);
 
   const handleContact = useCallback((video: Video) => {
     if (!isAuthenticated) {
@@ -180,6 +557,47 @@ export default function VideoFeed() {
       navigate(`/pro/profile/${authorId}`)
     }
   }, [navigate, user]);
+
+  const handleLiveClick = useCallback((live: any) => {
+    window.dispatchEvent(new CustomEvent('exile_feed_play_video', { detail: { videoId: '__stop_all__' } }))
+    accueilAlgo.trackLiveClick(
+      String(live.id),
+      String(live.creatorId || ''),
+      live.category || 'general',
+      0,
+      false
+    )
+    const cleanId = String(live.id).replace('evt-', '').replace('exile-', '')
+    const liveVideo: Video = {
+      id: `evt-${cleanId}`,
+      eventId: cleanId,
+      title: live.title || 'Direct en cours',
+      description: live.description || '',
+      category: live.category || 'Direct',
+      isLive: true,
+      liveRoomName: live.liveRoomName || `exile-${cleanId}`,
+      thumbnail: live.coverImage,
+      views: live.viewerCount || 0,
+      viewsCount: live.viewerCount || 0,
+      likes: 0,
+      author: {
+        id: String(live.creatorId || ''),
+        name: live.organizerName || 'Organisateur',
+        username: live.organizerName,
+        profession: live.organizerProfession || 'Créateur',
+        location: 'En ligne',
+        initials: (live.organizerName || 'U').charAt(0).toUpperCase(),
+        avatarColor: '#27272a',
+        avatarUrl: live.organizerAvatar
+      }
+    }
+    setActiveVideo(liveVideo)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('live', cleanId)
+    nextParams.delete('event')
+    setSearchParams(nextParams, { replace: true })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [accueilAlgo, searchParams, setSearchParams]);
 
   // Cacher body + html scroll quand on est dans le player
   useEffect(() => {
@@ -212,10 +630,6 @@ export default function VideoFeed() {
     }
   }, [])
 
-  const related = activeVideo
-    ? videos.filter(v => v.id !== activeVideo.id)
-    : [];
-
   // Profil utilisateur connecté
   const userProfile = JSON.parse(localStorage.getItem('exile_user_profile') || '{}')
   const currentUserId = userProfile?.id || 'current-user-' + Date.now()
@@ -241,6 +655,163 @@ export default function VideoFeed() {
       return true;
     });
   }, [query, results, videos]);
+
+  // Orchestration unifiée du feed (Vidéos d'accueil + Événements + Directs) via AlgoPro
+  const orchestratedItems = useMemo(() => {
+    if (query.trim()) {
+      return displayVideos.map(v => ({ id: String(v.id), type: 'video' as const, content: v }))
+    }
+    const lives = cachedLives || []
+    try {
+      const orchestrator = new TigerFeedOrchestrator({
+        userId,
+        signals: {
+          subscribedCreators: subsAlgo.subscribedCreators,
+          priorityCreators: subsAlgo.priorityCreators,
+          shouldPrioritizeCreator: subsAlgo.shouldPrioritizeCreator,
+          liveEngagementRate: accueilAlgo.liveEngagementRate,
+          videoEngagementRate: accueilAlgo.videoEngagementRate,
+          preferredContentTypes: accueilAlgo.preferredContentTypes,
+          mostEngagedCategory: accueilAlgo.mostEngagedCategory,
+          peakEngagementHour: accueilAlgo.peakEngagementHour,
+          shouldShowLive: accueilAlgo.shouldShowLive,
+          getOptimalLiveFrequency: accueilAlgo.getOptimalLiveFrequency,
+          categoryPreferences: eventsAlgo.categoryPreferences || [],
+          preferredCategories: requestsAlgo.getPreferredCategories ? requestsAlgo.getPreferredCategories() : [],
+        }
+      })
+      const mappedEvents = (allBackendEvents || []).map(mapEventToVideo)
+      const combinedVideos = [...displayVideos]
+      const seen = new Set(displayVideos.map(v => String(v.id)))
+      for (const mv of mappedEvents) {
+        if (!seen.has(String(mv.id))) {
+          seen.add(String(mv.id))
+          combinedVideos.push(mv)
+        }
+      }
+
+      const result = orchestrator.orchestrateFeed(combinedVideos, lives, [])
+      return result.feed
+    } catch (err) {
+      console.warn('[VideoFeed] Orchestrator fallback:', err)
+      return displayVideos.map(v => ({ id: String(v.id), type: 'video' as const, content: v }))
+    }
+  }, [displayVideos, cachedLives, allBackendEvents, query, userId, subsAlgo, accueilAlgo, eventsAlgo, requestsAlgo]);
+
+  // Deuxième Feed Algo Pro pour le lecteur (Vidéos d'accueil + Replays/Événements + Directs orchestrés)
+  const related = useMemo(() => {
+    if (!activeVideo) return [];
+    const activeCleanId = String(activeVideo.eventId || activeVideo.id).replace('evt-', '').replace('exile-', '');
+
+    const list: Video[] = [];
+    const seen = new Set<string>();
+    seen.add(activeCleanId);
+    if (activeVideo.id) seen.add(String(activeVideo.id));
+
+    // 1. Vidéos & contenus issus de l'orchestration Algo Pro unifiée
+    for (const item of orchestratedItems) {
+      if (item.type === 'video') {
+        const v = item.content as Video;
+        const vCleanId = String(v.eventId || v.id).replace('evt-', '').replace('exile-', '');
+        if (!seen.has(vCleanId) && !seen.has(String(v.id))) {
+          seen.add(vCleanId);
+          seen.add(String(v.id));
+          list.push(v);
+        }
+      } else if (item.type === 'live') {
+        const l = item.content;
+        const lCleanId = String(l.id).replace('evt-', '').replace('exile-', '');
+        if (!seen.has(lCleanId) && !seen.has(`evt-${lCleanId}`)) {
+          seen.add(lCleanId);
+          seen.add(`evt-${lCleanId}`);
+          list.push({
+            id: `evt-${lCleanId}`,
+            eventId: lCleanId,
+            title: l.title || 'Direct en cours',
+            description: l.description || '',
+            category: l.category || 'Direct',
+            isLive: true,
+            liveRoomName: l.liveRoomName || `exile-${lCleanId}`,
+            thumbnail: l.coverImage,
+            views: l.viewerCount || 0,
+            viewsCount: l.viewerCount || 0,
+            likes: 0,
+            author: {
+              id: String(l.creatorId || ''),
+              name: l.organizerName || 'Organisateur',
+              username: l.organizerName,
+              profession: l.organizerProfession || 'Créateur',
+              location: 'En ligne',
+              initials: (l.organizerName || 'U').charAt(0).toUpperCase(),
+              avatarColor: '#27272a',
+              avatarUrl: l.organizerAvatar
+            }
+          });
+        }
+      } else if ((item as any).type === 'event') {
+        const ev = item.content;
+        const evCleanId = String(ev.id).replace('evt-', '').replace('exile-', '');
+        if (!seen.has(evCleanId) && !seen.has(`evt-${evCleanId}`)) {
+          seen.add(evCleanId);
+          seen.add(`evt-${evCleanId}`);
+          list.push(mapEventToVideo(ev));
+        }
+      }
+    }
+
+    // 2. Toujours s'assurer d'inclure toutes les vidéos d'accueil (displayVideos) non vues
+    for (const v of displayVideos) {
+      const vCleanId = String(v.eventId || v.id).replace('evt-', '').replace('exile-', '');
+      if (!seen.has(vCleanId) && !seen.has(String(v.id))) {
+        seen.add(vCleanId);
+        seen.add(String(v.id));
+        list.push(v);
+      }
+    }
+
+    // 3. Compléter avec tous les autres événements / diffusions / replays du backend non vus
+    if (allBackendEvents && allBackendEvents.length > 0) {
+      for (const ev of allBackendEvents) {
+        const evCleanId = String(ev.id).replace('evt-', '').replace('exile-', '');
+        if (!seen.has(evCleanId) && !seen.has(`evt-${evCleanId}`)) {
+          seen.add(evCleanId);
+          seen.add(`evt-${evCleanId}`);
+          list.push(mapEventToVideo(ev));
+        }
+      }
+    }
+
+    // 4. Scoring et tri Algo Pro :
+    // - Priorité aux créateurs suivis (Top Feed +40)
+    // - Directs en cours (+30)
+    // - Même catégorie que la vidéo actuelle (+20) ou catégorie préférée (+15)
+    // - Engagement & vues
+    const activeCategory = (activeVideo.category || '').toLowerCase();
+    const preferredCat = (accueilAlgo.mostEngagedCategory || '').toLowerCase();
+
+    return list.sort((a, b) => {
+      let scoreA = 0;
+      let scoreB = 0;
+
+      if (subsAlgo.subscribedCreators?.includes(a.author?.id || '')) scoreA += 40;
+      if (subsAlgo.subscribedCreators?.includes(b.author?.id || '')) scoreB += 40;
+
+      if (a.isLive) scoreA += 30;
+      if (b.isLive) scoreB += 30;
+
+      const catA = (a.category || '').toLowerCase();
+      const catB = (b.category || '').toLowerCase();
+      if (activeCategory && catA === activeCategory) scoreA += 20;
+      if (activeCategory && catB === activeCategory) scoreB += 20;
+      if (preferredCat && catA === preferredCat) scoreA += 15;
+      if (preferredCat && catB === preferredCat) scoreB += 15;
+
+      scoreA += Math.min(25, (a.views || 0) / 10);
+      scoreB += Math.min(25, (b.views || 0) / 10);
+
+      return scoreB - scoreA;
+    });
+  }, [activeVideo, orchestratedItems, displayVideos, allBackendEvents, subsAlgo, accueilAlgo]);
 
   // Tracker les recherches avec useRequestsAlgo
   useEffect(() => {
@@ -273,7 +844,7 @@ export default function VideoFeed() {
       {/* PAGE PLAYER - Overlay ki kouvri TOUT (Header, Sidebar, tout) */}
       {activeVideo && (
         <div
-          className={`fixed ${resolvedTheme === 'dark' ? 'bg-[#0a0a0a]' : 'bg-[#0f0f0f]'} overflow-y-auto`}
+          className={`fixed ${resolvedTheme === 'dark' ? 'bg-[#0a0a0a]' : 'bg-gray-50'} overflow-y-auto`}
           style={{
             top: 0,
             left: 0,
@@ -293,10 +864,25 @@ export default function VideoFeed() {
         </div>
       )}
 
+      {/* Chargement direct d'un événement ou live - évite le flash de l'accueil */}
+      {!activeVideo && eventParam && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center ${resolvedTheme === 'dark' ? 'bg-[#0a0a0a]' : 'bg-gray-50'}`}
+          style={{
+            zIndex: 9999,
+            transform: 'translateZ(0)'
+          }}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <div className={`w-8 h-8 border-2 border-t-transparent ${resolvedTheme === 'dark' ? 'border-zinc-400' : 'border-zinc-700'} rounded-full animate-spin`} />
+          </div>
+        </div>
+      )}
+
       {/* FEED ACCUEIL - Mobile First: Videyo anba */}
       <div
         ref={feedRef}
-        className={`flex-1 flex flex-col ${activeVideo ? 'hidden' : 'flex'}`}
+        className={`flex-1 flex flex-col ${activeVideo || eventParam ? 'hidden' : 'flex'}`}
         style={{ 
           scrollPaddingTop: '0px'
         }}
@@ -419,13 +1005,13 @@ export default function VideoFeed() {
         <div className="lg:hidden">
           <div className="pt-0 pb-4">
             <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 sm:gap-4 md:grid-cols-2 md:gap-4">
-              {loading && displayVideos.length === 0 ? (
+              {loading && orchestratedItems.length === 0 ? (
                 <>
                   {[1, 2, 3, 4].map(i => (
                     <VideoSkeleton key={`mob-skel-${i}`} resolvedTheme={resolvedTheme} />
                   ))}
                 </>
-              ) : error && displayVideos.length === 0 ? (
+              ) : error && orchestratedItems.length === 0 ? (
                 <div className="col-span-full py-12 text-center">
                   <p className={`${resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600'} text-sm`}>{error}</p>
                   <button
@@ -435,17 +1021,26 @@ export default function VideoFeed() {
                     {t('common.retry', 'Réessayer')}
                   </button>
                 </div>
-              ) : displayVideos.length > 0 ? (
+              ) : orchestratedItems.length > 0 ? (
                 <>
-                  {displayVideos.map((video, idx) => (
-                    <React.Fragment key={`mob-video-${video.id}-${idx}`}>
-                      <FeedVideoCard
-                        video={video}
-                        onClick={() => handleOpen(video)}
-                        onContact={handleContact}
-                        onProfileClick={handleProfileClick}
-                      />
-                      {/* SectionPub après 2 vidéos sur Mobile/Tablette - Espacement compact et fluide sans vide */}
+                  {orchestratedItems.map((item, idx) => (
+                    <React.Fragment key={`mob-feed-${item.type}-${item.id}-${idx}`}>
+                      {item.type === 'live' ? (
+                        <FeedLiveCard
+                          live={item.content}
+                          onClick={() => handleLiveClick(item.content)}
+                          onProfileClick={handleProfileClick}
+                          resolvedTheme={resolvedTheme}
+                        />
+                      ) : (
+                        <FeedVideoCard
+                          video={item.content}
+                          onClick={() => handleOpen(item.content)}
+                          onContact={handleContact}
+                          onProfileClick={handleProfileClick}
+                        />
+                      )}
+                      {/* SectionPub après 2 contenus sur Mobile/Tablette - Espacement compact et fluide sans vide */}
                       {idx === 1 && (
                         <div className="col-span-full my-0.5 sm:my-1">
                           <SectionPub />
@@ -485,13 +1080,13 @@ export default function VideoFeed() {
             <div className="px-4 md:px-6 lg:px-8 pb-6 pt-2">
               {/* Grid videyo - Desktop: 3 cols */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
-                {loading && displayVideos.length === 0 ? (
+                {loading && orchestratedItems.length === 0 ? (
                   <>
                     {[1, 2, 3, 4, 5, 6].map(i => (
                       <VideoSkeleton key={`desk-skel-${i}`} resolvedTheme={resolvedTheme} />
                     ))}
                   </>
-                ) : error && displayVideos.length === 0 ? (
+                ) : error && orchestratedItems.length === 0 ? (
                   <div className="col-span-full py-12 text-center">
                     <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
                     <button
@@ -501,15 +1096,25 @@ export default function VideoFeed() {
                       {t('common.retry', 'Réessayer')}
                     </button>
                   </div>
-                ) : displayVideos.length > 0 ? (
-                  displayVideos.map((video, idx) => (
-                    <FeedVideoCard
-                      key={`desk-video-${video.id}-${idx}`}
-                      video={video}
-                      onClick={() => handleOpen(video)}
-                      onContact={handleContact}
-                      onProfileClick={handleProfileClick}
-                    />
+                ) : orchestratedItems.length > 0 ? (
+                  orchestratedItems.map((item, idx) => (
+                    item.type === 'live' ? (
+                      <FeedLiveCard
+                        key={`desk-live-${item.id}-${idx}`}
+                        live={item.content}
+                        onClick={() => handleLiveClick(item.content)}
+                        onProfileClick={handleProfileClick}
+                        resolvedTheme={resolvedTheme}
+                      />
+                    ) : (
+                      <FeedVideoCard
+                        key={`desk-video-${item.id}-${idx}`}
+                        video={item.content}
+                        onClick={() => handleOpen(item.content)}
+                        onContact={handleContact}
+                        onProfileClick={handleProfileClick}
+                      />
+                    )
                   ))
                 ) : (
                   <div className="col-span-full py-20 px-4 text-center space-y-3">

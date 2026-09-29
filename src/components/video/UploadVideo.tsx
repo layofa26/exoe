@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Image as ImageIcon,
   Film,
-  Sparkles,
   Lock,
   Globe,
   MessageSquare,
@@ -499,6 +498,9 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     <video
                       src={videoUrl}
                       controls
+                      controlsList="nodownload"
+                      disablePictureInPicture
+                      onContextMenu={(e) => e.preventDefault()}
                       className="w-full max-h-56 object-contain"
                     />
                   </div>
@@ -789,7 +791,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                 <div className="relative w-16 h-16 mx-auto">
                   <div className="w-16 h-16 rounded-full border-4 border-zinc-800 border-t-amber-500 animate-spin" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
+                    <Film className="w-6 h-6 text-amber-500 animate-pulse" />
                   </div>
                 </div>
 
@@ -944,7 +946,7 @@ export const UploadVideo = ({ isOpen = false, onClose, initialVideoData, onSucce
                     onClick={handlePublish}
                     className="px-6 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-2"
                   >
-                    <Sparkles className="w-4 h-4" />
+                    <Upload className="w-4 h-4" />
                     <span>{t('pro.upload.publishBtn', 'Publier la vidéo')}</span>
                   </button>
                 )}

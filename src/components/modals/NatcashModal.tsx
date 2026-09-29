@@ -84,7 +84,7 @@ export const NatcashModal: React.FC<NatcashModalProps> = ({
         return;
       }
 
-      const apiBase = API_BASE_URL || 'https://exile-backend-9q6o.onrender.com/api/v1';
+      const apiBase = API_BASE_URL;
 
       const response = await fetch(`${apiBase}/abonnement/abonnements/soumettre_natcash/`, {
         method: 'POST',

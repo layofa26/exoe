@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { DotsIcon, StarIcon, BellIcon, SaveIcon, FlagIcon, BlockIcon, ShareIcon, MessageCircleIcon } from '../icons/VideoIcons';
+import { createPortal } from 'react-dom';
+import { useTheme } from '../../contexts/ThemeContext';
+import { DotsIcon, StarIcon, SaveIcon, FlagIcon, ShareIcon, MessageCircleIcon } from '../icons/VideoIcons';
 
 interface DotsMenuProps {
   videoId: string;
@@ -12,87 +14,131 @@ interface DotsMenuProps {
 }
 
 export function DotsMenu({ videoId, authorId, show, saved = false, onSave, onShare, onContact }: DotsMenuProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const [open, setOpen] = useState(false);
-  const [openUpwards, setOpenUpwards] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    if (ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      const menuHeight = 280;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      setOpenUpwards(spaceBelow < menuHeight && rect.top > spaceBelow);
-    }
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    const hKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', h);
-    document.addEventListener('keydown', hKey);
-    return () => { document.removeEventListener('mousedown', h); document.removeEventListener('keydown', hKey); };
+    const updatePos = () => {
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        const menuHeight = 220;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const openUpwards = spaceBelow < menuHeight && rect.top > spaceBelow;
+        setPos({
+          top: openUpwards ? Math.max(8, rect.top - menuHeight) : rect.bottom + 6,
+          right: Math.max(8, window.innerWidth - rect.right),
+        });
+      }
+    };
+    updatePos();
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current && menuRef.current.contains(target)) return;
+      if (buttonRef.current && buttonRef.current.contains(target)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
   }, [open]);
 
-  const handleAction = (type: string) => {
+  const handleAction = (e: React.MouseEvent, type: string) => {
+    e.preventDefault();
+    e.stopPropagation();
     setOpen(false);
     switch(type) {
-      case 'share':
-        onShare?.();
-        break;
-      case 'save':
-        onSave?.();
-        break;
       case 'contact':
         onContact?.();
         break;
-      case 'fav':
-        show('Ajouté aux favoris ⭐');
+      case 'share':
+        onShare?.();
         break;
-      case 'bell':
-        show('Notification activée 🔔');
+      case 'fav':
+        onSave?.();
+        break;
+      case 'flag':
+        show('Contenu signalé. Merci.');
         break;
     }
   };
 
   const items = [
-    { icon: <ShareIcon />, label: 'Partager', action: () => handleAction('share') },
-    { icon: <SaveIcon filled={saved} />, label: saved ? 'Retirer' : 'Enregistrer', action: () => handleAction('save') },
-    { icon: <StarIcon />, label: 'Ajouter aux favoris', action: () => handleAction('fav') },
-    { icon: <BellIcon />, label: "S'abonner aux alertes", action: () => handleAction('bell') },
-    { icon: <MessageCircleIcon />, label: 'Contacter', action: () => handleAction('contact') },
-  ];
-  const danger = [
-    { icon: <FlagIcon />, label: 'Signaler', msg: 'Contenu signalé. Merci.' },
-    { icon: <BlockIcon />, label: "Bloquer l'utilisateur", msg: 'Utilisateur bloqué' },
+    { icon: <MessageCircleIcon />, label: 'Contacter', type: 'contact' },
+    { icon: <ShareIcon />, label: 'Partager', type: 'share' },
+    { icon: <StarIcon />, label: saved ? 'Retirer des favoris' : 'Ajouter aux favoris', type: 'fav' },
+    { icon: <FlagIcon />, label: 'Signaler', type: 'flag' },
   ];
 
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={buttonRef}
         aria-label="Plus d'options"
         aria-expanded={open}
-        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
-        className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+          isDark ? 'text-zinc-400 hover:bg-zinc-800' : 'text-zinc-600 hover:bg-zinc-100'
+        }`}
       >
         <span className="w-4 h-4"><DotsIcon /></span>
       </button>
-      {open && (
-        <div role="menu" className={`absolute right-0 z-[200] w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl overflow-hidden py-1 ${
-          openUpwards ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-        }`}>
+
+      {open && pos && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            right: pos.right,
+            zIndex: 99999,
+          }}
+          className={`w-52 rounded-xl shadow-2xl overflow-hidden py-1 border animate-in fade-in zoom-in-95 duration-100 ${
+            isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-white border-zinc-200 text-zinc-800'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
           {items.map((item, i) => (
-            <button key={i} role="menuitem" onClick={item.action}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left">
-              <span className="w-4 h-4 text-zinc-400 flex-shrink-0">{item.icon}</span>{item.label}
+            <button
+              key={i}
+              role="menuitem"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => handleAction(e, item.type)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left cursor-pointer ${
+                isDark ? 'hover:bg-zinc-800 text-zinc-200' : 'hover:bg-zinc-100 text-zinc-800'
+              }`}
+            >
+              <span className={`w-4 h-4 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
             </button>
           ))}
-          <div className="border-t border-zinc-100 dark:border-zinc-800 my-1" />
-          {danger.map((item, i) => (
-            <button key={i} role="menuitem" onClick={() => { show(item.msg); setOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left">
-              <span className="w-4 h-4 flex-shrink-0">{item.icon}</span>{item.label}
-            </button>
-          ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }

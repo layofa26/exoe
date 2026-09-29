@@ -95,12 +95,18 @@ export class TigerFeedOrchestrator {
 
     // Étape 3: Séparer vidéos et lives pour l'injection dynamique
     const videos = mixedFeed.filter(item => item.type === 'video')
-    const lives = mixedFeed.filter(item => item.type === 'live')
+    
+    // Tous les lives actifs doivent être disponibles pour l'injection dynamique
+    const liveFeedItems: FeedItem[] = allLives.map(live => {
+      const item = this.createFeedItem('live', live)
+      item.score = this.calculateLiveScore(live)
+      return item
+    })
 
     // Étape 4: Injecter les lives dynamiquement
     const liveInjectionResult = mixFeedWithLives(
       videos,
-      lives,
+      liveFeedItems,
       this.config.signals.liveEngagementRate,
       this.config.feedConfig || DEFAULT_FEED_CONFIG,
       {
@@ -231,7 +237,7 @@ export class TigerFeedOrchestrator {
    */
   private createFeedItem(type: ContentType, content: any): FeedItem {
     return {
-      id: content.id,
+      id: String(content.id),
       type,
       content,
       score: 0,
@@ -271,7 +277,7 @@ export class TigerFeedOrchestrator {
     }
 
     // Score selon le créateur (abonné ou prioritaire)
-    if (this.config.signals.shouldPrioritizeCreator(video.author.id)) {
+    if (this.config.signals.shouldPrioritizeCreator(video.author?.id || '')) {
       score += 25
     }
 
@@ -285,7 +291,7 @@ export class TigerFeedOrchestrator {
     let score = 50
 
     // Score selon les viewers
-    const viewerCount = live.viewerCount || 0
+    const viewerCount = live.viewerCount || live.participantsCount || live.stats?.attendees || 0
     score += Math.min(40, viewerCount / 50)
 
     // Score selon l'engagement utilisateur pour les lives
@@ -294,7 +300,7 @@ export class TigerFeedOrchestrator {
     }
 
     // Score selon le créateur
-    if (this.config.signals.shouldPrioritizeCreator(live.creatorId)) {
+    if (this.config.signals.shouldPrioritizeCreator(live.creatorId || live.ownerId || '')) {
       score += 25
     }
 
@@ -323,7 +329,7 @@ export class TigerFeedOrchestrator {
    * Détermine si le contenu est Top Feed (abonnés, prioritaires)
    */
   private isTopFeedContent(content: any): boolean {
-    const creatorId = content.author?.id || content.creatorId
+    const creatorId = content.author?.id || content.creatorId || content.ownerId || ''
     return this.config.signals.subscribedCreators.includes(creatorId) ||
            this.config.signals.priorityCreators.includes(creatorId)
   }

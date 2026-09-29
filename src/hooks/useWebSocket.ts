@@ -1,6 +1,23 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 
-const WS_BASE = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? 'wss://exile-backend-9q6o.onrender.com' : 'ws://localhost:8000')
+const getWsBase = () => {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL
+  const apiBase = import.meta.env.VITE_API_BASE_URL
+  if (apiBase) {
+    const backendUrl = apiBase.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '')
+    try {
+      const parsed = new URL(backendUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
+      const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
+      return `${wsProto}//${parsed.host}`
+    } catch {}
+  }
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${proto}//${window.location.host}`
+  }
+  return 'ws://localhost:8000'
+}
+const WS_BASE = getWsBase()
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error'
 
@@ -139,7 +156,17 @@ export function useWebSocket({
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
       if (retryTimer.current) clearTimeout(retryTimer.current)
-      wsRef.current?.close(1000, 'Component unmounted')
+      if (wsRef.current) {
+        const ws = wsRef.current
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            try { ws.close(1000, 'Component unmounted') } catch {}
+          }
+          ws.onerror = () => {}
+        } else if (ws.readyState === WebSocket.OPEN) {
+          try { ws.close(1000, 'Component unmounted') } catch {}
+        }
+      }
     }
   }, [connect, enabled])
 

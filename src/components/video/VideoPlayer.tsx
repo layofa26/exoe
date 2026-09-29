@@ -92,6 +92,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const playerRef = useRef<any>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -268,6 +270,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onEnded?.();
     });
     player.on('timeupdate', () => {
+      if (isDraggingRef.current) return;
       const cur = player.currentTime() ?? 0;
       const dur = player.duration() ?? 0;
       setCurrentTime(cur);
@@ -423,24 +426,74 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setShowCaptionsMenu(false);
     resetControlsTimer();
   }, [resetControlsTimer]);
-  const handleProgressHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressBarRef.current || !duration) return;
+  const calcProgressFromClientX = useCallback((clientX: number) => {
+    if (!progressBarRef.current || !duration) return 0;
     const rect = progressBarRef.current.getBoundingClientRect();
-    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    setPreviewPos(pos * 100);
-    setPreviewTime(pos * duration);
+    const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return pos * duration;
   }, [duration]);
 
-  const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (!progressBarRef.current || !playerRef.current || !duration) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+
+    isDraggingRef.current = true;
+    setIsScrubbing(true);
+    resetControlsTimer();
+
     const rect = progressBarRef.current.getBoundingClientRect();
     const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const target = pos * duration;
-    playerRef.current.currentTime(target);
+    setPreviewPos(pos * 100);
+    setPreviewTime(target);
     setCurrentTime(target);
-    resetControlsTimer();
   }, [duration, resetControlsTimer]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!progressBarRef.current || !duration) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const target = pos * duration;
+
+    setPreviewPos(pos * 100);
+    setPreviewTime(target);
+
+    if (isDraggingRef.current) {
+      setCurrentTime(target);
+      resetControlsTimer();
+    }
+  }, [duration, resetControlsTimer]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+
+    isDraggingRef.current = false;
+    setIsScrubbing(false);
+
+    if (progressBarRef.current && playerRef.current && duration) {
+      const target = calcProgressFromClientX(e.clientX);
+      playerRef.current.currentTime(target);
+      setCurrentTime(target);
+      setPreviewTime(null);
+    }
+    resetControlsTimer();
+  }, [duration, calcProgressFromClientX, resetControlsTimer]);
+
+  const handlePointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    isDraggingRef.current = false;
+    setIsScrubbing(false);
+    setPreviewTime(null);
+  }, []);
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufferedPercent = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
@@ -523,17 +576,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       >
         <div
           ref={progressBarRef}
-          onClick={handleProgressClick}
-          onMouseMove={handleProgressHover}
-          onMouseLeave={() => setPreviewTime(null)}
-          className="relative w-full h-1.5 hover:h-2.5 bg-white/25 rounded-full cursor-pointer transition-all mb-2 flex items-center"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onMouseLeave={() => { if (!isDraggingRef.current) setPreviewTime(null); }}
+          className={`relative w-full ${isScrubbing ? 'h-3' : 'h-1.5 hover:h-2.5'} bg-white/25 rounded-full cursor-pointer transition-all mb-2 flex items-center touch-none`}
         >
           <div className="absolute top-0 bottom-0 left-0 bg-white/35 rounded-full pointer-events-none" style={{ width: `${bufferedPercent}%` }} />
           <div className="absolute top-0 bottom-0 left-0 bg-red-600 rounded-full pointer-events-none" style={{ width: `${progressPercent}%` }} />
-          <div className="absolute w-3 h-3 bg-white rounded-full shadow-md -translate-x-1/2 pointer-events-none" style={{ left: `${progressPercent}%` }} />
-          {previewTime !== null && (
-            <div className="absolute bottom-5 -translate-x-1/2 bg-zinc-900/95 border border-zinc-700 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xl pointer-events-none flex flex-col items-center gap-0.5 backdrop-blur-md" style={{ left: `${previewPos}%` }}>
-              <span>{formatTime(previewTime)}</span>
+          <div className={`absolute ${isScrubbing ? 'w-4 h-4 scale-125' : 'w-3 h-3 group-hover:scale-110'} bg-white rounded-full shadow-md -translate-x-1/2 pointer-events-none transition-transform`} style={{ left: `${progressPercent}%` }} />
+          {(previewTime !== null || isScrubbing) && (
+            <div className="absolute bottom-6 -translate-x-1/2 bg-zinc-900/95 border border-zinc-700 text-white text-[11px] font-bold px-2 py-0.5 rounded shadow-xl pointer-events-none flex flex-col items-center gap-0.5 backdrop-blur-md z-30" style={{ left: `${previewPos}%` }}>
+              <span>{formatTime(previewTime ?? currentTime)}</span>
             </div>
           )}
         </div>
