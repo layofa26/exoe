@@ -426,13 +426,18 @@ export function useLiveWebRTC({
     setFacingMode(targetFacing)
     facingModeRef.current = targetFacing
 
+    const markGranted = () => {
+      try {
+        localStorage.setItem('exoe_media_permissions_granted', 'true')
+      } catch {}
+    }
+
     const videoConstraint: MediaTrackConstraints | boolean = opts?.videoDeviceId
       ? { deviceId: { exact: opts.videoDeviceId } }
       : {
-          width: { ideal: 1280, max: 1280 },
-          height: { ideal: 720, max: 720 },
-          frameRate: { ideal: 25, max: 30 },
-          facingMode: { ideal: targetFacing },
+          facingMode: targetFacing,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         }
 
     const audioConstraint: MediaTrackConstraints | boolean = opts?.audioDeviceId
@@ -448,7 +453,7 @@ export function useLiveWebRTC({
           autoGainControl: true,
         }
 
-    // Attempt 1: Full Camera + Microphone
+    // Attempt 1: Full Camera + Microphone with ideal constraints
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: videoConstraint,
@@ -457,54 +462,63 @@ export function useLiveWebRTC({
       localStreamRef.current = stream
       setLocalStream(stream)
       setMediaError(null)
+      markGranted()
       refreshDevices().catch(() => {})
       return stream
     } catch (bothErr) {
-      console.warn('Could not get both video and audio, trying video only:', bothErr)
+      console.warn('Could not get optimal video + audio, trying relaxed constraints:', bothErr)
 
-      // Attempt 2: Video only (if microphone is missing or in use)
+      // Attempt 2: Relaxed video + standard audio
       try {
-        const videoOnly = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraint,
-          audio: false,
+        const stream2 = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: targetFacing },
+          audio: true,
         })
-        localStreamRef.current = videoOnly
-        setLocalStream(videoOnly)
-        setIsMuted(true)
+        localStreamRef.current = stream2
+        setLocalStream(stream2)
         setMediaError(null)
-        onToastRef.current?.('Caméra activée (sans micro)')
+        markGranted()
         refreshDevices().catch(() => {})
-        return videoOnly
-      } catch (videoErr) {
-        console.warn('Could not get video, trying audio only:', videoErr)
+        return stream2
+      } catch (relaxedErr) {
+        console.warn('Could not get relaxed video + audio, trying video only:', relaxedErr)
 
-        // Attempt 3: Audio only (if camera is missing or in use)
+        // Attempt 3: Video only (if microphone is missing or in use)
         try {
-          const audioOnly = await navigator.mediaDevices.getUserMedia({
-            video: false,
-            audio: audioConstraint,
+          const videoOnly = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: targetFacing },
+            audio: false,
           })
-          localStreamRef.current = audioOnly
-          setLocalStream(audioOnly)
-          setIsVideoOff(true)
+          localStreamRef.current = videoOnly
+          setLocalStream(videoOnly)
+          setIsMuted(true)
           setMediaError(null)
-          onToastRef.current?.('Micro activé (sans caméra)')
+          markGranted()
           refreshDevices().catch(() => {})
-          return audioOnly
-        } catch (err: any) {
-          console.warn('All getUserMedia attempts failed:', err)
-          const errName = err?.name || 'PermissionDenied'
-          setMediaError(errName)
-          if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            onToastRef.current?.('Accès caméra/micro bloqué. Cliquez sur le cadenas 🔒 dans la barre d’adresse pour autoriser.')
-          } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
-            onToastRef.current?.('Aucune caméra ni micro détecté sur votre appareil.')
-          } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
-            onToastRef.current?.('Caméra ou micro déjà utilisé par une autre application.')
-          } else {
-            onToastRef.current?.('Accès caméra/micro non autorisé ou indisponible.')
+          return videoOnly
+        } catch (videoErr) {
+          console.warn('Could not get video, trying audio only:', videoErr)
+
+          // Attempt 4: Audio only (if camera is missing or in use)
+          try {
+            const audioOnly = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: true,
+            })
+            localStreamRef.current = audioOnly
+            setLocalStream(audioOnly)
+            setIsVideoOff(true)
+            setMediaError(null)
+            markGranted()
+            refreshDevices().catch(() => {})
+            return audioOnly
+          } catch (err: any) {
+            console.warn('All getUserMedia attempts failed:', err)
+            const errName = err?.name || 'PermissionDenied'
+            setMediaError(errName)
+            // No disruptive duplicate toasts - clean in-canvas UI handles it smoothly
+            return null
           }
-          return null
         }
       }
     }

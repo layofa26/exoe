@@ -502,6 +502,17 @@ export default function LiveRoom() {
     markLiveStarted()
   }, [isReallyHost, eventId])
 
+  // Démarrage automatique discret si l'utilisateur a déjà accordé l'accès caméra/micro auparavant
+  useEffect(() => {
+    if (!isReallyHost && !isSpeaker) return
+    if (localStream || isScreenSharing) return
+
+    const hasGranted = localStorage.getItem('exoe_media_permissions_granted') === 'true'
+    if (hasGranted) {
+      startLocalMedia().catch(() => {})
+    }
+  }, [isReallyHost, isSpeaker, localStream, isScreenSharing, startLocalMedia])
+
   // Post-Live Duration & Peak Viewers Tracker
   useEffect(() => {
     if (viewerCount > peakViewers) {
@@ -1279,43 +1290,34 @@ export default function LiveRoom() {
         {/* Video Canvas / Player */}
         <div className="flex-1 relative bg-zinc-950 flex items-center justify-center overflow-hidden">
           {(isReallyHost || isSpeaker) && !localStream && !isScreenSharing ? (
-            <div className="flex flex-col items-center justify-center gap-4 text-center p-6 max-w-md bg-zinc-900/80 border border-zinc-800 rounded-3xl backdrop-blur-md m-4 shadow-2xl animate-in fade-in">
-              <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xl">
-                <VideoOff size={32} />
+            <div className="relative z-30 flex flex-col items-center justify-center gap-3.5 text-center p-5 sm:p-6 max-w-sm bg-zinc-900/90 border border-zinc-800 rounded-3xl backdrop-blur-md mx-4 shadow-2xl animate-in fade-in">
+              <div className="w-14 h-14 rounded-full bg-[#FF6B00]/15 border border-[#FF6B00]/30 flex items-center justify-center text-[#FF6B00] shadow-lg">
+                <Video size={28} />
               </div>
               <div className="space-y-1">
                 <h2 className="text-sm sm:text-base font-bold text-white">
-                  Caméra & Micro à autoriser
+                  Prêt pour la diffusion ?
                 </h2>
-                <p className="text-xs text-zinc-400">
-                  Votre navigateur a besoin de votre autorisation pour diffuser votre vidéo.
+                <p className="text-xs text-zinc-400 max-w-xs">
+                  Activez votre caméra et votre micro pour démarrer votre session en direct.
                 </p>
               </div>
 
-              <div className="w-full bg-zinc-950/80 p-3.5 rounded-2xl border border-zinc-800 text-left text-[11px] text-zinc-300 space-y-1">
-                <p className="font-bold text-amber-400 flex items-center gap-1.5">
-                  <Lock size={13} className="text-amber-400" /> Comment autoriser l'accès :
-                </p>
-                <p>1. Cliquez sur l'icône de cadenas dans la barre d'adresse de votre navigateur.</p>
-                <p>2. Réglez <strong>Caméra</strong> et <strong>Microphone</strong> sur <strong>Autoriser</strong>.</p>
-                <p>3. Cliquez sur le bouton « Réessayer » ci-dessous.</p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1 w-full">
+              <div className="flex flex-col items-center gap-2 pt-2 w-full">
                 <button
                   onClick={() => startLocalMedia()}
-                  className="px-4 py-2.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-2"
+                  className="w-full py-2.5 px-4 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Video size={14} />
-                  <span>Réessayer la caméra</span>
+                  <Video size={15} />
+                  <span>Activer la caméra</span>
                 </button>
 
                 <button
                   onClick={toggleScreenShare}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-2"
+                  className="w-full py-2 px-3 bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl text-xs font-medium transition-all border border-zinc-700/60 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Monitor size={14} />
-                  <span>Partager mon écran</span>
+                  <Monitor size={13} />
+                  <span>Partager l'écran à la place</span>
                 </button>
               </div>
             </div>
@@ -1461,58 +1463,62 @@ export default function LiveRoom() {
           </div>
 
           {/* ─── TIKTOK / YOUTUBE LIVE MOBILE CHAT STREAM (md:hidden) ─── */}
-          <div
-            ref={mobileScrollContainerRef}
-            onScroll={handleMobileChatScroll}
-            className="absolute bottom-3 left-3 right-16 max-h-[38vh] overflow-y-auto pointer-events-auto flex flex-col z-20 space-y-1.5 md:hidden overscroll-contain"
-            style={{
-              scrollbarWidth: 'none',
-              touchAction: 'pan-y',
-              WebkitOverflowScrolling: 'touch',
-              maskImage: 'linear-gradient(to top, black 80%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(to top, black 80%, transparent 100%)',
-            }}
-          >
-            {chatMessages.slice(-50).map((msg) => (
+          {(localStream || remoteStream || isScreenSharing) && (
+            <>
               <div
-                key={msg.id}
-                className={`pointer-events-auto max-w-[85%] px-3 py-1.5 rounded-2xl text-xs backdrop-blur-md shadow-lg border inline-flex items-start gap-1.5 animate-in fade-in slide-in-from-bottom-2 ${
-                  msg.isSuperChat
-                    ? 'bg-amber-500/25 border-amber-500/60 text-amber-100'
-                    : msg.isSystem
-                    ? 'bg-zinc-900/60 border-zinc-700/50 text-zinc-300 text-[11px]'
-                    : 'bg-black/55 border-white/10 text-white'
-                }`}
+                ref={mobileScrollContainerRef}
+                onScroll={handleMobileChatScroll}
+                className="absolute bottom-3 left-3 right-16 max-h-[38vh] overflow-y-auto pointer-events-auto flex flex-col z-20 space-y-1.5 md:hidden overscroll-contain"
+                style={{
+                  scrollbarWidth: 'none',
+                  touchAction: 'pan-y',
+                  WebkitOverflowScrolling: 'touch',
+                  maskImage: 'linear-gradient(to top, black 80%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to top, black 80%, transparent 100%)',
+                }}
               >
-                <div className="leading-snug break-all min-w-0 [overflow-wrap:anywhere] line-clamp-4">
-                  <span className="font-bold text-amber-400 mr-1 shrink-0">{formatHandle(msg.username || msg.user)}</span>
-                  {msg.role === 'host' && <Crown size={11} className="inline text-amber-400 mr-1 shrink-0" />}
-                  {msg.role === 'moderator' && <ShieldCheck size={11} className="inline text-emerald-400 mr-1 shrink-0" />}
-                  {msg.customTitle && (
-                    <span className="text-[10px] px-1 py-0.2 rounded bg-purple-500/30 text-purple-300 font-semibold mr-1 shrink-0">
-                      {msg.customTitle}
-                    </span>
-                  )}
-                  {msg.isSuperChat && (
-                    <span className="px-1.5 py-0.2 rounded bg-amber-500/40 text-amber-200 font-mono font-bold text-[10px] mr-1 shrink-0">
-                      ${msg.superChatAmount} USD
-                    </span>
-                  )}
-                  <span className="text-zinc-100 break-all">{msg.text}</span>
-                </div>
+                {chatMessages.slice(-50).map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`pointer-events-auto max-w-[85%] px-3 py-1.5 rounded-2xl text-xs backdrop-blur-md shadow-lg border inline-flex items-start gap-1.5 animate-in fade-in slide-in-from-bottom-2 ${
+                      msg.isSuperChat
+                        ? 'bg-amber-500/25 border-amber-500/60 text-amber-100'
+                        : msg.isSystem
+                        ? 'bg-zinc-900/60 border-zinc-700/50 text-zinc-300 text-[11px]'
+                        : 'bg-black/55 border-white/10 text-white'
+                    }`}
+                  >
+                    <div className="leading-snug break-all min-w-0 [overflow-wrap:anywhere] line-clamp-4">
+                      <span className="font-bold text-amber-400 mr-1 shrink-0">{formatHandle(msg.username || msg.user)}</span>
+                      {msg.role === 'host' && <Crown size={11} className="inline text-amber-400 mr-1 shrink-0" />}
+                      {msg.role === 'moderator' && <ShieldCheck size={11} className="inline text-emerald-400 mr-1 shrink-0" />}
+                      {msg.customTitle && (
+                        <span className="text-[10px] px-1 py-0.2 rounded bg-purple-500/30 text-purple-300 font-semibold mr-1 shrink-0">
+                          {msg.customTitle}
+                        </span>
+                      )}
+                      {msg.isSuperChat && (
+                        <span className="px-1.5 py-0.2 rounded bg-amber-500/40 text-amber-200 font-mono font-bold text-[10px] mr-1 shrink-0">
+                          ${msg.superChatAmount} USD
+                        </span>
+                      )}
+                      <span className="text-zinc-100 break-all">{msg.text}</span>
+                    </div>
+                  </div>
+                ))}
+                <div ref={mobileChatBottomRef} />
               </div>
-            ))}
-            <div ref={mobileChatBottomRef} />
-          </div>
 
-          {/* Bouton Flottant "Nouveaux messages ↓" si l'utilisateur a scrollé vers le haut */}
-          {isMobileUserScrolledUp && (
-            <button
-              onClick={scrollToMobileBottom}
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 px-3 py-1 bg-blue-600/90 hover:bg-blue-600 text-white rounded-full text-[11px] font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5 animate-bounce md:hidden pointer-events-auto"
-            >
-              <span>↓ {mobileUnreadCount > 0 ? `${mobileUnreadCount} nouveaux messages` : 'Derniers messages'}</span>
-            </button>
+              {/* Bouton Flottant "Nouveaux messages ↓" si l'utilisateur a scrollé vers le haut */}
+              {isMobileUserScrolledUp && (
+                <button
+                  onClick={scrollToMobileBottom}
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 px-3 py-1 bg-blue-600/90 hover:bg-blue-600 text-white rounded-full text-[11px] font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5 animate-bounce md:hidden pointer-events-auto"
+                >
+                  <span>↓ {mobileUnreadCount > 0 ? `${mobileUnreadCount} nouveaux messages` : 'Derniers messages'}</span>
+                </button>
+              )}
+            </>
           )}
         </div>
 
