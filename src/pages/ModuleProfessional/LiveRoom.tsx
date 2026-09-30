@@ -294,6 +294,8 @@ export default function LiveRoom() {
   const [isPostLiveSummaryOpen, setIsPostLiveSummaryOpen] = useState(false)
   const [streamStartTime] = useState<number>(() => Date.now())
   const [peakViewers, setPeakViewers] = useState<number>(0)
+  const [isStartingCamera, setIsStartingCamera] = useState(false)
+  const [cameraPermissionBlocked, setCameraPermissionBlocked] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const chatBottomRef = useRef<HTMLDivElement>(null)
@@ -512,6 +514,22 @@ export default function LiveRoom() {
       startLocalMedia().catch(() => {})
     }
   }, [isReallyHost, isSpeaker, localStream, isScreenSharing, startLocalMedia])
+
+  // Déclenchement réactif de la caméra avec retour visuel immédiat
+  const handleActivateCamera = useCallback(async () => {
+    setIsStartingCamera(true)
+    setCameraPermissionBlocked(false)
+    try {
+      const stream = await startLocalMedia()
+      if (!stream) {
+        setCameraPermissionBlocked(true)
+      }
+    } catch {
+      setCameraPermissionBlocked(true)
+    } finally {
+      setIsStartingCamera(false)
+    }
+  }, [startLocalMedia])
 
   // Post-Live Duration & Peak Viewers Tracker
   useEffect(() => {
@@ -1305,12 +1323,34 @@ export default function LiveRoom() {
 
               <div className="flex flex-col items-center gap-2 pt-2 w-full">
                 <button
-                  onClick={() => startLocalMedia()}
-                  className="w-full py-2.5 px-4 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={handleActivateCamera}
+                  disabled={isStartingCamera}
+                  className="w-full py-2.5 px-4 bg-[#FF6B00] hover:bg-[#e05e00] disabled:opacity-75 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Video size={15} />
-                  <span>Activer la caméra</span>
+                  {isStartingCamera ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin text-white" />
+                      <span>Connexion à la caméra...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Video size={15} />
+                      <span>{cameraPermissionBlocked ? "Réessayer l'autorisation" : "Activer la caméra"}</span>
+                    </>
+                  )}
                 </button>
+
+                {cameraPermissionBlocked && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed text-left flex items-start gap-2 animate-in fade-in">
+                    <span className="text-base shrink-0">🔒</span>
+                    <div>
+                      <p className="font-semibold text-white text-xs">Autorisation bloquée</p>
+                      <p className="text-zinc-300 text-[10px] mt-0.5">
+                        Appuyez sur l'icône de réglages à gauche de <strong>exoe.vercel.app</strong> dans la barre d'adresse pour autoriser la caméra, puis réessayez.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={toggleScreenShare}
