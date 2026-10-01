@@ -434,26 +434,13 @@ export function useLiveWebRTC({
 
     const videoConstraint: MediaTrackConstraints | boolean = opts?.videoDeviceId
       ? { deviceId: { exact: opts.videoDeviceId } }
-      : {
-          facingMode: targetFacing,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        }
+      : { facingMode: { ideal: targetFacing } }
 
     const audioConstraint: MediaTrackConstraints | boolean = opts?.audioDeviceId
-      ? {
-          deviceId: { exact: opts.audioDeviceId },
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        }
-      : {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        }
+      ? { deviceId: { exact: opts.audioDeviceId } }
+      : true
 
-    // Attempt 1: Full Camera + Microphone with ideal constraints
+    // Attempt 1: Full Camera + Microphone together (Native OS prompt for both)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: videoConstraint,
@@ -461,64 +448,51 @@ export function useLiveWebRTC({
       })
       localStreamRef.current = stream
       setLocalStream(stream)
+      setIsVideoOff(false)
+      setIsMuted(false)
       setMediaError(null)
       markGranted()
       refreshDevices().catch(() => {})
       return stream
     } catch (bothErr) {
-      console.warn('Could not get optimal video + audio, trying relaxed constraints:', bothErr)
+      console.warn('Could not get camera + microphone simultaneously, testing individual streams:', bothErr)
 
-      // Attempt 2: Relaxed video + standard audio
+      // Attempt 2: Video only (if microphone was denied or device microphone is occupied)
       try {
-        const stream2 = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: targetFacing },
-          audio: true,
+        const videoOnly = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraint,
+          audio: false,
         })
-        localStreamRef.current = stream2
-        setLocalStream(stream2)
+        localStreamRef.current = videoOnly
+        setLocalStream(videoOnly)
+        setIsVideoOff(false)
+        setIsMuted(true) // Mic is off, but video stream is working
         setMediaError(null)
         markGranted()
         refreshDevices().catch(() => {})
-        return stream2
-      } catch (relaxedErr) {
-        console.warn('Could not get relaxed video + audio, trying video only:', relaxedErr)
+        return videoOnly
+      } catch (videoErr) {
+        console.warn('Could not get video stream, testing audio only:', videoErr)
 
-        // Attempt 3: Video only (if microphone is missing or in use)
+        // Attempt 3: Audio only (if camera was denied or device camera is occupied)
         try {
-          const videoOnly = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: targetFacing },
-            audio: false,
+          const audioOnly = await navigator.mediaDevices.getUserMedia({
+            video: false,
+            audio: audioConstraint,
           })
-          localStreamRef.current = videoOnly
-          setLocalStream(videoOnly)
-          setIsMuted(true)
+          localStreamRef.current = audioOnly
+          setLocalStream(audioOnly)
+          setIsVideoOff(true) // Video is off, but microphone stream is working (podcast mode)
+          setIsMuted(false)
           setMediaError(null)
           markGranted()
           refreshDevices().catch(() => {})
-          return videoOnly
-        } catch (videoErr) {
-          console.warn('Could not get video, trying audio only:', videoErr)
-
-          // Attempt 4: Audio only (if camera is missing or in use)
-          try {
-            const audioOnly = await navigator.mediaDevices.getUserMedia({
-              video: false,
-              audio: true,
-            })
-            localStreamRef.current = audioOnly
-            setLocalStream(audioOnly)
-            setIsVideoOff(true)
-            setMediaError(null)
-            markGranted()
-            refreshDevices().catch(() => {})
-            return audioOnly
-          } catch (err: any) {
-            console.warn('All getUserMedia attempts failed:', err)
-            const errName = err?.name || 'PermissionDenied'
-            setMediaError(errName)
-            // No disruptive duplicate toasts - clean in-canvas UI handles it smoothly
-            return null
-          }
+          return audioOnly
+        } catch (err: any) {
+          console.warn('Both camera and microphone access failed:', err)
+          const errName = err?.name || 'PermissionDenied'
+          setMediaError(errName)
+          return null
         }
       }
     }
@@ -830,9 +804,12 @@ export function useLiveWebRTC({
               setShardId(msg.shard_id)
             }
 
-            // If Host, start local camera stream automatically
+            // If Host, start local camera stream automatically only if permission was previously granted by user
             if (hostFlag) {
-              await startLocalMediaRef.current()
+              const hasGranted = localStorage.getItem('exoe_media_permissions_granted') === 'true'
+              if (hasGranted) {
+                await startLocalMediaRef.current()
+              }
             } else {
               // Viewer asks Host for WebRTC stream
               sendWS({

@@ -1308,45 +1308,45 @@ export default function LiveRoom() {
         {/* Video Canvas / Player */}
         <div className="flex-1 relative bg-zinc-950 flex items-center justify-center overflow-hidden">
           {(isReallyHost || isSpeaker) && !localStream && !isScreenSharing ? (
-            <div className="relative z-30 flex flex-col items-center justify-center gap-3.5 text-center p-5 sm:p-6 max-w-sm bg-zinc-900/90 border border-zinc-800 rounded-3xl backdrop-blur-md mx-4 shadow-2xl animate-in fade-in">
-              <div className="w-14 h-14 rounded-full bg-[#FF6B00]/15 border border-[#FF6B00]/30 flex items-center justify-center text-[#FF6B00] shadow-lg">
-                <Video size={28} />
+            <div className="relative z-30 flex flex-col items-center justify-center gap-4 text-center p-6 max-w-sm bg-zinc-950 border border-zinc-800 rounded-2xl mx-4 shadow-2xl animate-in fade-in">
+              <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300">
+                <Video size={20} strokeWidth={1.75} />
               </div>
               <div className="space-y-1">
-                <h2 className="text-sm sm:text-base font-bold text-white">
-                  Prêt pour la diffusion ?
+                <h2 className="text-sm font-semibold text-white tracking-tight">
+                  Prêt pour le direct ?
                 </h2>
-                <p className="text-xs text-zinc-400 max-w-xs">
-                  Activez votre caméra et votre micro pour démarrer votre session en direct.
+                <p className="text-xs text-zinc-400 max-w-xs mx-auto leading-relaxed">
+                  Autorisez la caméra et le microphone pour démarrer votre diffusion.
                 </p>
               </div>
 
-              <div className="flex flex-col items-center gap-2 pt-2 w-full">
+              <div className="flex flex-col items-center gap-2 pt-1 w-full">
                 <button
                   onClick={handleActivateCamera}
                   disabled={isStartingCamera}
-                  className="w-full py-2.5 px-4 bg-[#FF6B00] hover:bg-[#e05e00] disabled:opacity-75 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2.5 px-4 bg-white hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-50 text-black rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
                   {isStartingCamera ? (
                     <>
-                      <Loader2 size={15} className="animate-spin text-white" />
-                      <span>Connexion à la caméra...</span>
+                      <Loader2 size={14} className="animate-spin text-black" />
+                      <span>Connexion matériel...</span>
                     </>
                   ) : (
                     <>
-                      <Video size={15} />
-                      <span>{cameraPermissionBlocked ? "Réessayer l'autorisation" : "Activer la caméra"}</span>
+                      <Video size={14} />
+                      <span>{cameraPermissionBlocked ? "Réessayer l'autorisation" : "Activer la caméra et le micro"}</span>
                     </>
                   )}
                 </button>
 
                 {cameraPermissionBlocked && (
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed text-left flex items-start gap-2 animate-in fade-in">
-                    <span className="text-base shrink-0">🔒</span>
+                  <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] leading-relaxed text-left flex items-start gap-2 animate-in fade-in">
+                    <span className="text-zinc-400 shrink-0 text-xs">ℹ️</span>
                     <div>
-                      <p className="font-semibold text-white text-xs">Autorisation bloquée</p>
-                      <p className="text-zinc-300 text-[10px] mt-0.5">
-                        Appuyez sur l'icône de réglages à gauche de <strong>exoe.vercel.app</strong> dans la barre d'adresse pour autoriser la caméra, puis réessayez.
+                      <p className="font-semibold text-white text-xs">Accès requis</p>
+                      <p className="text-zinc-400 text-[10px] mt-0.5">
+                        Vérifiez les permissions de votre navigateur (icône à gauche du lien) pour autoriser la caméra et le micro, puis réessayez.
                       </p>
                     </div>
                   </div>
@@ -1354,10 +1354,10 @@ export default function LiveRoom() {
 
                 <button
                   onClick={toggleScreenShare}
-                  className="w-full py-2 px-3 bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl text-xs font-medium transition-all border border-zinc-700/60 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2 px-3 bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 rounded-xl text-xs font-medium transition-colors border border-zinc-800/80 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Monitor size={13} />
-                  <span>Partager l'écran à la place</span>
+                  <span>Partager l'écran</span>
                 </button>
               </div>
             </div>
